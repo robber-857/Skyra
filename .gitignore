@@ -1,0 +1,13 @@
+.firecrawl/
+.playwright-cli/
+.impeccable/
+output/
+node_modules/
+dist/
+tmp/
+assets/references/
+*.prompt.txt
+assets/site/studio-hero-wide.png
+PRODUCT.md
+Skyra 内部开发 PRD.pdf
+Skyra_网站升级项目报价单.pdf
