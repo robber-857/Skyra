@@ -263,3 +263,44 @@ document.querySelectorAll("[data-session]").forEach((button) => {
 document.querySelector("[data-close-preview]")?.addEventListener("click", () => {
   if (bookingPreview) bookingPreview.hidden = true;
 });
+const communityForm = document.querySelector("[data-community-form]");
+const communityEmail = document.querySelector("[data-community-email]");
+const communityStatus = document.querySelector("[data-community-status]");
+
+function setCommunityStatus(message, success = false) {
+  if (!communityStatus) return;
+  communityStatus.textContent = message;
+  communityStatus.hidden = false;
+  communityStatus.classList.toggle("is-success", success);
+}
+
+communityForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!communityEmail) return;
+
+  const email = communityEmail.value.trim();
+  communityEmail.value = email;
+
+  if (!email || !communityEmail.checkValidity()) {
+    communityEmail.setAttribute("aria-invalid", "true");
+    communityEmail.classList.add("is-invalid");
+    setCommunityStatus(
+      email
+        ? "Enter a complete email address, such as name@example.com."
+        : "Enter your email address to continue.",
+    );
+    communityEmail.focus();
+    return;
+  }
+
+  communityEmail.removeAttribute("aria-invalid");
+  communityEmail.classList.remove("is-invalid");
+  setCommunityStatus("Signup preview complete — no email has been stored yet.", true);
+  communityForm.reset();
+});
+
+communityEmail?.addEventListener("input", () => {
+  communityEmail.removeAttribute("aria-invalid");
+  communityEmail.classList.remove("is-invalid");
+  if (communityStatus) communityStatus.hidden = true;
+});
