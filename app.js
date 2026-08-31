@@ -139,10 +139,12 @@ function signedGalleryDistance(index, active) {
 function renderGallery() {
   if (!gallery || !galleryCards.length) return;
   const active = wrapGalleryIndex(galleryPosition);
-  const cardGap = Math.min(window.innerWidth < 768 ? 158 : 220, gallery.clientWidth * 0.27);
+  const isMobileGallery = window.innerWidth < 768;
+  const cardGap = Math.min(isMobileGallery ? 132 : 220, gallery.clientWidth * 0.27);
 
   galleryCards.forEach((card, index) => {
     const distance = signedGalleryDistance(index, active);
+    const isVisible = !isMobileGallery || (distance >= -1 && distance <= 2);
     const x = distance * cardGap;
     const y = Math.abs(distance) * 28 + distance * distance * 8;
     const rotate = distance * -8;
@@ -150,10 +152,12 @@ function renderGallery() {
     const opacity = Math.max(0.22, 1 - Math.abs(distance) * 0.2);
 
     card.style.transform = `translate3d(calc(-50% + ${x}px), calc(-50% + ${y}px), ${-Math.abs(distance) * 55}px) rotateY(${rotate}deg) rotateZ(${distance * 1.4}deg) scale(${scale})`;
-    card.style.opacity = String(opacity);
+    card.style.opacity = isVisible ? String(opacity) : "0";
+    card.style.visibility = isVisible ? "visible" : "hidden";
+    card.style.pointerEvents = isVisible ? "auto" : "none";
     card.style.filter = `saturate(${Math.max(0.7, 1 - Math.abs(distance) * 0.08)})`;
     card.style.zIndex = String(20 - Math.abs(distance));
-    card.setAttribute("aria-hidden", String(Math.abs(distance) > 2));
+    card.setAttribute("aria-hidden", String(!isVisible || Math.abs(distance) > 2));
   });
 }
 
