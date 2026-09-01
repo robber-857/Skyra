@@ -22,6 +22,7 @@ heroImage?.addEventListener("animationend", (event) => {
 });
 
 function closedMenuLabel() {
+  if (body.classList.contains("membership-page") && window.innerWidth >= 820) return "More";
   return window.innerWidth <= 1024 ? "Menu" : "More";
 }
 
