@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Contact Skyra Studio for aerial yoga, dance, membership and studio enquiries."
+    />
+    <title>Contact Us | Skyra Studio</title>
+    <link rel="preload" href="assets/site/contact-studio.png" as="image" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="contact.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body class="contact-page">
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header" data-header>
+      <a class="brand" href="index.html" aria-label="Skyra Studio home">
+        <img src="assets/site/skyra-logo.png" alt="" width="208" height="208" />
+      </a>
+
+      <nav class="header-links" aria-label="Featured navigation">
+        <a href="index.html">Home</a>
+        <a href="https://skyrastudio.com.au/programs">Programs</a>
+        <a href="membership.html">Membership</a>
+        <a href="about.html">About</a>
+        <a href="https://skyrastudio.com.au/mv-project">MV Project</a>
+      </nav>
+
+      <div class="header-actions">
+        <nav class="header-utilities" aria-label="Store and account navigation">
+          <a href="https://skyrastudio.com.au/ols/products" aria-label="Search products">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="10.8" cy="10.8" r="6.2"></circle>
+              <path d="m15.4 15.4 4.1 4.1"></path>
+            </svg>
+          </a>
+          <a href="https://skyrastudio.com.au/mv-project?olsPage=cart" aria-label="View shopping cart">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3.8 5.2h2l1.7 9.2h9.2l2-6.6H7"></path>
+              <circle cx="9.3" cy="18.5" r="1"></circle>
+              <circle cx="16.2" cy="18.5" r="1"></circle>
+            </svg>
+          </a>
+          <a href="https://skyrastudio.com.au/m/account" aria-label="Member account">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="8" r="3.4"></circle>
+              <path d="M5.8 19.2c.8-3.3 3-5 6.2-5s5.4 1.7 6.2 5"></path>
+            </svg>
+          </a>
+        </nav>
+        <button
+          class="menu-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="primary-navigation"
+        >
+          <span class="menu-toggle__lines" aria-hidden="true"><i></i><i></i></span>
+          <span class="menu-toggle__label">More</span>
+        </button>
+      </div>
+
+      <nav
+        class="primary-nav"
+        id="primary-navigation"
+        aria-label="Menu navigation"
+        aria-hidden="true"
+        inert
+      >
+        <div class="primary-nav__shell">
+          <div class="primary-nav__links">
+            <a href="index.html"><strong>Home</strong></a>
+            <a href="https://skyrastudio.com.au/programs"><strong>Programs</strong></a>
+            <a href="membership.html"><strong>Membership</strong></a>
+            <a href="about.html"><strong>About Skyra</strong></a>
+            <a href="https://skyrastudio.com.au/mv-project"><strong>MV Project</strong></a>
+            <a href="https://skyrastudio.com.au/functions-%26-studio-hire">
+              <strong>Functions &amp; Studio Hire</strong>
+            </a>
+            <a href="contact.html" aria-current="page"><strong>Contact</strong></a>
+            <a href="https://skyrastudio.com.au/terms-and-conditions">
+              <strong>Terms and Conditions</strong>
+            </a>
+          </div>
+          <div class="primary-nav__meta">
+            <a href="https://skyrastudio.com.au/ols/products">Online store</a>
+            <a href="https://skyrastudio.com.au/m/account">Member account</a>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main id="main" class="contact-main">
+      <section class="contact-stage" aria-labelledby="contact-title">
+        <figure class="contact-media">
+          <img
+            src="assets/site/contact-studio.png"
+            alt="Skyra Studio aerial room with peach silks and sunset light"
+            width="1672"
+            height="941"
+            fetchpriority="high"
+          />
+        </figure>
+
+        <div class="contact-panel">
+          <header class="contact-intro">
+            <p class="contact-eyebrow">Contact us</p>
+            <h1 id="contact-title">Contact us</h1>
+            <span class="contact-divider" aria-hidden="true"></span>
+            <p>We'd love to hear from you.<br />Send us a message and we'll get back to you soon.</p>
+          </header>
+
+          <form class="contact-form" novalidate data-contact-form>
+            <div class="contact-form__grid">
+              <div class="contact-field">
+                <label class="contact-visually-hidden" for="contact-name">Name</label>
+                <input id="contact-name" name="name" type="text" autocomplete="name" placeholder="Name" />
+              </div>
+              <div class="contact-field">
+                <label class="contact-visually-hidden" for="contact-phone">Phone</label>
+                <input id="contact-phone" name="phone" type="tel" autocomplete="tel" placeholder="Phone" />
+              </div>
+              <div class="contact-field contact-field--wide">
+                <label class="contact-visually-hidden" for="contact-email">Email</label>
+                <input
+                  id="contact-email"
+                  name="email"
+                  type="email"
+                  autocomplete="email"
+                  placeholder="Email*"
+                  required
+                  aria-describedby="contact-form-status"
+                  data-contact-email
+                />
+              </div>
+              <div class="contact-field contact-field--wide">
+                <label class="contact-visually-hidden" for="contact-interest">I'm interested in</label>
+                <textarea
+                  id="contact-interest"
+                  name="interest"
+                  rows="3"
+                  placeholder="I'm interested in"
+                ></textarea>
+              </div>
+              <div class="contact-field contact-field--wide">
+                <label class="contact-visually-hidden" for="contact-notes">Other notes</label>
+                <textarea id="contact-notes" name="notes" rows="3" placeholder="Other notes"></textarea>
+              </div>
+            </div>
+
+            <button class="contact-submit" type="submit" data-contact-submit>
+              <span>Send</span>
+            </button>
+            <p class="contact-form__status" id="contact-form-status" role="status" hidden data-contact-status></p>
+            <p class="contact-form__note">Preview form only. No message will be sent or stored yet.</p>
+          </form>
+
+          <div class="contact-location">
+            <span class="contact-location__mark" aria-hidden="true">S</span>
+            <div>
+              <h2>Better yet, see us in person!</h2>
+              <p>We'd love to welcome you in person. Check the current schedule before visiting.</p>
+              <h3>Skyra Studio</h3>
+              <address>Commercial Building, Level 12<br />1202/180-186 Burwood Rd<br />Burwood NSW 2134</address>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-main">
+        <div class="footer-brand">
+          <img
+            src="assets/site/skyra-logo.png"
+            alt="Skyra Studio"
+            width="208"
+            height="208"
+            loading="lazy"
+          />
+          <p>Where movement becomes expression.</p>
+        </div>
+
+        <nav class="footer-navigation" aria-label="Footer navigation">
+          <div class="footer-group">
+            <p class="footer-heading">Explore</p>
+            <a href="index.html">Home</a>
+            <a href="https://skyrastudio.com.au/programs">Programs</a>
+            <a href="membership.html">Membership</a>
+            <a href="https://skyrastudio.com.au/mv-project">MV Project</a>
+          </div>
+
+          <div class="footer-group">
+            <p class="footer-heading">Studio</p>
+            <a href="about.html">About Skyra</a>
+            <a href="https://skyrastudio.com.au/functions-%26-studio-hire">Functions &amp; Studio Hire</a>
+            <a href="contact.html" aria-current="page">Contact</a>
+          </div>
+
+          <div class="footer-group">
+            <p class="footer-heading">Account</p>
+            <a href="https://skyrastudio.com.au/ols/products">Online store</a>
+            <a href="https://skyrastudio.com.au/m/account">Member account</a>
+          </div>
+        </nav>
+
+        <address class="footer-visit">
+          <p class="footer-heading">Visit Skyra</p>
+          <p>Commercial Building, Level 12</p>
+          <p>1202/180-186 Burwood Rd</p>
+          <p>Burwood NSW 2134</p>
+        </address>
+      </div>
+
+      <div class="footer-bottom">
+        <p class="footer-copyright">Copyright © 2026 Skyra Studio. All rights reserved.</p>
+        <nav class="footer-legal" aria-label="Legal">
+          <a href="https://skyrastudio.com.au/privacy-policy">Privacy Policy</a>
+          <a href="https://skyrastudio.com.au/terms-and-conditions">Terms &amp; Conditions</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

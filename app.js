@@ -22,7 +22,11 @@ heroImage?.addEventListener("animationend", (event) => {
 });
 
 function closedMenuLabel() {
-  if (body.classList.contains("membership-page") && window.innerWidth >= 820) return "More";
+  const isInteriorPage =
+    body.classList.contains("membership-page") ||
+    body.classList.contains("contact-page") ||
+    body.classList.contains("about-page");
+  if (isInteriorPage && window.innerWidth >= 820) return "More";
   return window.innerWidth <= 1024 ? "Menu" : "More";
 }
 
@@ -308,4 +312,114 @@ communityEmail?.addEventListener("input", () => {
   communityEmail.removeAttribute("aria-invalid");
   communityEmail.classList.remove("is-invalid");
   if (communityStatus) communityStatus.hidden = true;
+});
+
+const contactForm = document.querySelector("[data-contact-form]");
+const contactEmail = document.querySelector("[data-contact-email]");
+const contactSubmit = document.querySelector("[data-contact-submit]");
+const contactStatus = document.querySelector("[data-contact-status]");
+
+function setContactStatus(message, success = false) {
+  if (!contactStatus) return;
+  contactStatus.textContent = message;
+  contactStatus.hidden = false;
+  contactStatus.classList.toggle("is-success", success);
+}
+
+contactForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!contactEmail || !contactSubmit) return;
+
+  const email = contactEmail.value.trim();
+  contactEmail.value = email;
+
+  if (!email || !contactEmail.checkValidity()) {
+    contactEmail.setAttribute("aria-invalid", "true");
+    contactEmail.classList.add("is-invalid");
+    setContactStatus(
+      email
+        ? "Enter a complete email address, such as name@example.com."
+        : "Enter your email address to continue.",
+    );
+    contactEmail.focus();
+    return;
+  }
+
+  contactEmail.removeAttribute("aria-invalid");
+  contactEmail.classList.remove("is-invalid");
+  contactSubmit.disabled = true;
+  contactSubmit.querySelector("span").textContent = "Sending";
+
+  window.setTimeout(() => {
+    setContactStatus("Form preview complete. No message has been sent or stored yet.", true);
+    contactForm.reset();
+    contactSubmit.disabled = false;
+    contactSubmit.querySelector("span").textContent = "Send";
+  }, 450);
+});
+
+contactEmail?.addEventListener("input", () => {
+  contactEmail.removeAttribute("aria-invalid");
+  contactEmail.classList.remove("is-invalid");
+  if (contactStatus) contactStatus.hidden = true;
+});
+
+const applicationForm = document.querySelector("[data-application-form]");
+const applicationEmail = document.querySelector("[data-application-email]");
+const applicationSubmit = document.querySelector("[data-application-submit]");
+const applicationStatus = document.querySelector("[data-application-status]");
+const applicationFile = document.querySelector("[data-application-file]");
+const applicationFileName = document.querySelector("[data-application-file-name]");
+
+function updateApplicationFileName() {
+  if (!applicationFileName) return;
+  applicationFileName.textContent = applicationFile?.files?.[0]?.name || "No file chosen";
+}
+
+function setApplicationStatus(message, success = false) {
+  if (!applicationStatus) return;
+  applicationStatus.textContent = message;
+  applicationStatus.hidden = false;
+  applicationStatus.classList.toggle("is-success", success);
+}
+
+applicationForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!applicationEmail || !applicationSubmit) return;
+
+  const email = applicationEmail.value.trim();
+  applicationEmail.value = email;
+
+  if (!email || !applicationEmail.checkValidity()) {
+    applicationEmail.setAttribute("aria-invalid", "true");
+    applicationEmail.classList.add("is-invalid");
+    setApplicationStatus(
+      email
+        ? "Enter a complete email address, such as name@example.com."
+        : "Enter your email address to continue.",
+    );
+    applicationEmail.focus();
+    return;
+  }
+
+  applicationEmail.removeAttribute("aria-invalid");
+  applicationEmail.classList.remove("is-invalid");
+  applicationSubmit.disabled = true;
+  applicationSubmit.querySelector("span").textContent = "Submitting";
+
+  window.setTimeout(() => {
+    setApplicationStatus("Application preview complete. No details or files have been sent.", true);
+    applicationForm.reset();
+    updateApplicationFileName();
+    applicationSubmit.disabled = false;
+    applicationSubmit.querySelector("span").textContent = "Submit application";
+  }, 450);
+});
+
+applicationFile?.addEventListener("change", updateApplicationFileName);
+
+applicationEmail?.addEventListener("input", () => {
+  applicationEmail.removeAttribute("aria-invalid");
+  applicationEmail.classList.remove("is-invalid");
+  if (applicationStatus) applicationStatus.hidden = true;
 });
