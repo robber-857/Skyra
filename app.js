@@ -25,7 +25,9 @@ function closedMenuLabel() {
   const isInteriorPage =
     body.classList.contains("membership-page") ||
     body.classList.contains("contact-page") ||
-    body.classList.contains("about-page");
+    body.classList.contains("about-page") ||
+    body.classList.contains("programs-page") ||
+    body.classList.contains("mv-project-page");
   if (isInteriorPage && window.innerWidth >= 820) return "More";
   return window.innerWidth <= 1024 ? "Menu" : "More";
 }

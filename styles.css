@@ -31,6 +31,8 @@
   --ink-soft: #625d57;
   --gold: #b98b3f;
   --gold-soft: #dcc28f;
+  --brand-heading: #6a471e;
+  --brand-heading-on-dark: #e5c99c;
   --line: rgba(36, 33, 30, 0.16);
   --shadow: 0 30px 90px rgba(86, 64, 43, 0.16);
   --radius: 16px;
@@ -315,7 +317,7 @@ img {
 }
 
 .primary-nav__shell {
-  width: min(calc(100% - 96px), 1400px);
+  width: min(calc(100% - 96px), 1500px);
   min-height: 100dvh;
   margin-inline: auto;
   padding: clamp(136px, 16vh, 190px) 0 64px;
@@ -325,28 +327,29 @@ img {
 }
 
 .primary-nav__links {
-  width: min(100%, 1120px);
+  width: min(100%, 1500px);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   justify-self: center;
-  column-gap: clamp(28px, 4vw, 64px);
+  column-gap: clamp(32px, 4.5vw, 80px);
   align-content: start;
 }
 
 .primary-nav__links a {
   display: block;
   padding: 12px 0 16px;
-  border-bottom: 1px solid rgba(36, 33, 30, 0.18);
-  color: inherit;
+  border-bottom: 1px solid rgba(106, 71, 30, 0.2);
+  color: var(--brand-heading);
   text-decoration: none;
 }
 
 .primary-nav__links strong {
   display: inline-block;
-  font-family: "Skyra Display", sans-serif;
-  font-size: clamp(2.4rem, 3.7vw, 4rem);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.85rem, 3.7vw, 4.25rem);
   font-weight: 400;
-  line-height: 0.96;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
   transition: transform 260ms var(--ease-out);
 }
 
@@ -621,6 +624,19 @@ body.is-menu-open .menu-toggle {
   max-width: 10ch;
 }
 
+/* Match the softer Georgia display face already used by "Our Programs". */
+.programs-copy h2,
+.story-copy h2,
+.membership-intro h2,
+.membership-path__copy h3,
+.community-heading h2 {
+  color: var(--brand-heading);
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+}
+
 .programs-copy__details {
   display: flex;
   flex-direction: column;
@@ -758,7 +774,7 @@ body.is-menu-open .menu-toggle {
 .story-copy h2 {
   max-width: none;
   font-size: clamp(3.45rem, 5.2vw, 5.15rem);
-  line-height: 0.92;
+  line-height: 1.02;
 }
 
 .story-copy h2 span {
@@ -1015,12 +1031,7 @@ body.is-menu-open .menu-toggle {
 
 .membership-path__copy h3 {
   margin: 0;
-  color: #302a25;
-  font-family: "Skyra Display", "Arial Narrow", sans-serif;
   font-size: clamp(3rem, 5vw, 5.2rem);
-  font-weight: 400;
-  line-height: 0.92;
-  letter-spacing: -0.02em;
 }
 
 .membership-path__copy p {
@@ -1441,7 +1452,7 @@ body.is-menu-open .menu-toggle {
   gap: clamp(42px, 6vw, 96px);
 }
 
-.footer-brand img {
+.footer-brand > img {
   width: 76px;
   height: 76px;
   object-fit: cover;
@@ -1455,6 +1466,43 @@ body.is-menu-open .menu-toggle {
   margin: 20px 0 0;
   color: #695d51;
   font-size: clamp(1rem, 1.2vw, 1.12rem);
+}
+
+.footer-socials {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.footer-socials a {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(118, 82, 30, 0.24);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.28);
+  transition: transform 180ms var(--ease-out), background-color 180ms var(--ease-out);
+}
+
+.footer-socials a:hover,
+.footer-socials a:focus-visible {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.footer-socials a:active {
+  transform: translateY(1px);
+}
+
+.footer-socials img {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  opacity: 0.76;
 }
 
 .footer-heading {
@@ -1706,8 +1754,8 @@ body.is-menu-open .menu-toggle {
   }
 
   .primary-nav__links strong {
-    font-size: clamp(1.85rem, 8vw, 2.55rem);
-    line-height: 0.98;
+    font-size: clamp(1.8rem, 7.6vw, 2.45rem);
+    line-height: 1.04;
   }
 
   .primary-nav__links a {
@@ -2051,6 +2099,11 @@ body.is-menu-open .menu-toggle {
   .primary-nav {
     background: #f3efeb;
     color: #24211e;
+  }
+
+  .programs-copy h2,
+  .story-copy h2 {
+    color: var(--brand-heading-on-dark);
   }
 
   body.is-menu-open .menu-toggle {
