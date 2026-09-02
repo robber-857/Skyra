@@ -1509,6 +1509,23 @@ body.is-menu-open .menu-toggle {
   line-height: 1.75;
 }
 
+.footer-visit p.footer-email {
+  margin-bottom: 10px;
+}
+
+.footer-email a {
+  color: #30281f;
+  text-decoration-color: rgba(91, 66, 32, 0.34);
+  text-underline-offset: 5px;
+  transition: color 180ms var(--ease-out), text-decoration-color 180ms var(--ease-out);
+}
+
+.footer-email a:hover,
+.footer-email a:focus-visible {
+  color: #815a20;
+  text-decoration-color: currentColor;
+}
+
 .footer-bottom {
   min-height: 82px;
   padding: 22px 0 26px;
