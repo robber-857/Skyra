@@ -149,12 +149,13 @@
 
 .about-hero h1 {
   margin: 20px 0 0;
+  color: var(--brand-heading);
   font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(2.65rem, 3.5vw, 3.4rem);
   font-weight: 400;
-  line-height: 1.06;
-  letter-spacing: -0.04em;
-  text-transform: uppercase;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  text-transform: none;
 }
 
 .about-hero h1 span {
@@ -756,7 +757,7 @@
   }
 
   .about-hero h1 {
-    font-size: clamp(2.35rem, 12vw, 3.35rem);
+    font-size: clamp(2.2rem, 10.5vw, 3.1rem);
   }
 
   .about-hero h1 span {

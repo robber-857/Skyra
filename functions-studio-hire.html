@@ -5,15 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Contact Skyra Studio for aerial yoga, dance, membership and studio enquiries."
+      content="Hire Skyra Studio in Burwood for selected private functions, creative projects and small-scale events."
     />
-    <title>Contact Us | Skyra Studio</title>
-    <link rel="preload" href="assets/site/contact-studio.png" as="image" />
+    <title>Functions &amp; Studio Hire | Skyra Studio</title>
+    <link rel="preload" href="assets/site/studio-hero-wide.png" as="image" />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="contact.css" />
+    <link rel="stylesheet" href="functions-studio-hire.css" />
     <script src="app.js" defer></script>
   </head>
-  <body class="contact-page">
+  <body class="functions-page">
     <a class="skip-link" href="#main">Skip to content</a>
 
     <header class="site-header site-header--complete" data-header>
@@ -26,9 +26,9 @@
         <a href="programs.html">Programs</a>
         <a href="membership.html">Membership</a>
         <a href="mv-project.html">MV Project</a>
-        <a href="functions-studio-hire.html">Functions &amp; Studio Hire</a>
+        <a href="functions-studio-hire.html" aria-current="page">Functions &amp; Studio Hire</a>
         <a href="about.html">About Skyra</a>
-        <a href="contact.html" aria-current="page">Contact</a>
+        <a href="contact.html">Contact</a>
       </nav>
 
       <div class="header-actions">
@@ -62,10 +62,10 @@
             <a href="membership.html"><strong>Membership</strong></a>
             <a href="about.html"><strong>About Skyra</strong></a>
             <a href="mv-project.html"><strong>MV Project</strong></a>
-            <a href="functions-studio-hire.html">
+            <a href="functions-studio-hire.html" aria-current="page">
               <strong>Functions &amp; Studio Hire</strong>
             </a>
-            <a href="contact.html" aria-current="page"><strong>Contact</strong></a>
+            <a href="contact.html"><strong>Contact</strong></a>
             <a href="https://skyrastudio.com.au/terms-and-conditions">
               <strong>Terms and Conditions</strong>
             </a>
@@ -78,81 +78,33 @@
       </nav>
     </header>
 
-    <main id="main" class="contact-main">
-      <section class="contact-stage" aria-labelledby="contact-title">
-        <figure class="contact-media">
+    <main id="main" class="functions-main">
+      <section class="functions-hero reveal" aria-labelledby="functions-title">
+        <div class="functions-hero__copy">
+          <p class="functions-eyebrow">Welcome to Skyra Studio</p>
+          <h1 id="functions-title">
+            <span>Studio Use &amp;</span>
+            <span>Private Functions</span>
+          </h1>
+          <span class="functions-divider" aria-hidden="true"></span>
+          <p class="functions-intro">
+            Skyra Studio is available for selected private use, creative projects and small-scale functions.
+          </p>
+          <a class="functions-button" href="contact.html">
+            <span>Enquire or book</span>
+            <span aria-hidden="true">→</span>
+          </a>
+        </div>
+
+        <figure class="functions-hero__media">
           <img
-            src="assets/site/contact-studio.png"
-            alt="Skyra Studio aerial room with peach silks and sunset light"
+            src="assets/site/studio-hero-wide.png"
+            alt="Skyra Studio aerial room with blush silks and sunset light"
             width="1672"
             height="941"
             fetchpriority="high"
           />
         </figure>
-
-        <div class="contact-panel">
-          <header class="contact-intro">
-            <p class="contact-eyebrow">Contact us</p>
-            <h1 id="contact-title">Contact us</h1>
-            <span class="contact-divider" aria-hidden="true"></span>
-            <p>We'd love to hear from you.<br />Send us a message and we'll get back to you soon.</p>
-          </header>
-
-          <form class="contact-form" novalidate data-contact-form>
-            <div class="contact-form__grid">
-              <div class="contact-field">
-                <label class="contact-visually-hidden" for="contact-name">Name</label>
-                <input id="contact-name" name="name" type="text" autocomplete="name" placeholder="Name" />
-              </div>
-              <div class="contact-field">
-                <label class="contact-visually-hidden" for="contact-phone">Phone</label>
-                <input id="contact-phone" name="phone" type="tel" autocomplete="tel" placeholder="Phone" />
-              </div>
-              <div class="contact-field contact-field--wide">
-                <label class="contact-visually-hidden" for="contact-email">Email</label>
-                <input
-                  id="contact-email"
-                  name="email"
-                  type="email"
-                  autocomplete="email"
-                  placeholder="Email*"
-                  required
-                  aria-describedby="contact-form-status"
-                  data-contact-email
-                />
-              </div>
-              <div class="contact-field contact-field--wide">
-                <label class="contact-visually-hidden" for="contact-interest">I'm interested in</label>
-                <textarea
-                  id="contact-interest"
-                  name="interest"
-                  rows="3"
-                  placeholder="I'm interested in"
-                ></textarea>
-              </div>
-              <div class="contact-field contact-field--wide">
-                <label class="contact-visually-hidden" for="contact-notes">Other notes</label>
-                <textarea id="contact-notes" name="notes" rows="3" placeholder="Other notes"></textarea>
-              </div>
-            </div>
-
-            <button class="contact-submit" type="submit" data-contact-submit>
-              <span>Send</span>
-            </button>
-            <p class="contact-form__status" id="contact-form-status" role="status" hidden data-contact-status></p>
-            <p class="contact-form__note">Preview form only. No message will be sent or stored yet.</p>
-          </form>
-
-          <div class="contact-location">
-            <span class="contact-location__mark" aria-hidden="true">S</span>
-            <div>
-              <h2>Better yet, see us in person!</h2>
-              <p>We'd love to welcome you in person. Check the current schedule before visiting.</p>
-              <h3>Skyra Studio</h3>
-              <address>Commercial Building, Level 12<br />1202/180-186 Burwood Rd<br />Burwood NSW 2134</address>
-            </div>
-          </div>
-        </div>
       </section>
     </main>
 
@@ -187,8 +139,8 @@
           <div class="footer-group">
             <p class="footer-heading">Studio</p>
             <a href="about.html">About Skyra</a>
-            <a href="functions-studio-hire.html">Functions &amp; Studio Hire</a>
-            <a href="contact.html" aria-current="page">Contact</a>
+            <a href="functions-studio-hire.html" aria-current="page">Functions &amp; Studio Hire</a>
+            <a href="contact.html">Contact</a>
           </div>
 
           <div class="footer-group">

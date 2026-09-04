@@ -85,6 +85,12 @@
   display: none;
 }
 
+@media (max-width: 1600px) {
+  .programs-page .header-links {
+    transform: none;
+  }
+}
+
 .commerce-page .header-links a[aria-current="page"] {
   color: var(--commerce-accent);
 }
