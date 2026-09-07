@@ -1,0 +1,11 @@
+{
+  "sections": {
+    "main": {
+      "type": "skyra-about-us",
+      "settings": {
+        "menu": "main-menu"
+      }
+    }
+  },
+  "order": ["main"]
+}

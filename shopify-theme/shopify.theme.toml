@@ -1,0 +1,16 @@
+[environments.development]
+store = "mf0n6s-zg.myshopify.com"
+nodelete = true
+ignore = ["config/settings_data.json"]
+
+[environments.skyra_live_code]
+store = "mf0n6s-zg.myshopify.com"
+theme = "155942944935"
+nodelete = true
+ignore = ["config/settings_data.json", "templates/*.json", "sections/*-group.json"]
+
+[environments.skyra_live_structure]
+store = "mf0n6s-zg.myshopify.com"
+theme = "155942944935"
+nodelete = true
+ignore = ["config/settings_data.json"]

@@ -1,0 +1,11 @@
+{
+  "sections": {
+    "skyra_home": {
+      "type": "skyra-home",
+      "settings": {
+        "menu": "main-menu"
+      }
+    }
+  },
+  "order": ["skyra_home"]
+}

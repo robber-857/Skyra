@@ -1,0 +1,180 @@
+{{ 'skyra.css' | asset_url | stylesheet_tag }}
+{{ 'skyra-commerce.css' | asset_url | stylesheet_tag }}
+<script src="{{ 'skyra.js' | asset_url }}" defer="defer"></script>
+<div class="skyra-home commerce-page mv-project-page" data-section-id="{{ section.id }}">
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header site-header--complete" data-header>
+      <a class="brand" href="{{ routes.root_url }}" aria-label="Skyra Studio home">
+        <img src="{{ 'skyra-logo.png' | asset_url }}" alt="" width="208" height="208" />
+      </a>
+
+      <nav class="header-links" aria-label="Featured navigation">
+        {% for link in section.settings.menu.links %}
+          <a href="{{ link.url }}"{% if link.current %} aria-current="page"{% endif %}>{{ link.title }}</a>
+        {% endfor %}
+      </nav>
+
+      <div class="header-actions">
+        <nav class="header-utilities" aria-label="Store and account navigation">
+          <a href="{{ routes.search_url }}" aria-label="Search products">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.2"></circle><path d="m15.4 15.4 4.1 4.1"></path></svg>
+          </a>
+          <a href="{{ routes.cart_url }}" aria-label="View shopping cart">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.8 5.2h2l1.7 9.2h9.2l2-6.6H7"></path><circle cx="9.3" cy="18.5" r="1"></circle><circle cx="16.2" cy="18.5" r="1"></circle></svg>
+          </a>
+          <a href="{{ routes.account_url }}" aria-label="Member account">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.4"></circle><path d="M5.8 19.2c.8-3.3 3-5 6.2-5s5.4 1.7 6.2 5"></path></svg>
+          </a>
+        </nav>
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation">
+          <span class="menu-toggle__lines" aria-hidden="true"><i></i><i></i></span>
+          <span class="menu-toggle__label">More</span>
+        </button>
+      </div>
+
+      <nav class="primary-nav" id="primary-navigation" aria-label="Menu navigation" aria-hidden="true" inert>
+        <div class="primary-nav__shell">
+          <div class="primary-nav__links">
+            {% for link in section.settings.menu.links %}
+              <a href="{{ link.url }}"{% if link.current %} aria-current="page"{% endif %}><strong>{{ link.title }}</strong></a>
+            {% endfor %}
+          </div>
+          <div class="primary-nav__meta">
+            <a href="{{ routes.collections_url }}">Online store</a>
+            <a href="{{ routes.account_url }}">Member account</a>
+          </div>
+        </div>
+      </nav>
+    </header>
+<main id="main" class="commerce-main">
+      <section class="mv-hero reveal" aria-labelledby="mv-title">
+        <div class="mv-hero__copy">
+          <p class="mv-kicker">A small-group choreo experience designed to perform on camera</p>
+          <h1 id="mv-title">Welcome to<br />SKYRA MV Project</h1>
+          <ul>
+            <li><span aria-hidden="true">✓</span>Each project includes guided rehearsals, structured preparation and a professional filmed outcome.</li>
+            <li><span aria-hidden="true">✓</span>This is a focused creative process with a clear final result.</li>
+            <li><span aria-hidden="true">✓</span>Projects suit participants who value commitment, collaboration and completion.</li>
+          </ul>
+        </div>
+        <div class="mv-film" aria-hidden="true">
+          <img src="{{ 'skyra-mv-hero-background.png' | asset_url }}" alt="" width="1448" height="1086" />
+        </div>
+      </section>
+
+      <section class="mv-upcoming commerce-panel reveal" aria-labelledby="upcoming-title">
+        <header class="panel-heading"><span aria-hidden="true">✦</span><h2 id="upcoming-title">Upcoming MV Projects</h2></header>
+        <div class="mv-featured-grid">
+          <article class="mv-product-card">
+            <img src="{{ 'skyra-mv-thriller-card.png' | asset_url }}" alt="Thriller MV project artwork" width="244" height="154" />
+            <div><h3>MV Project (Thriller)</h3><p>From <s>$319.00</s> <strong>$299.00</strong></p></div>
+          </article>
+          <article class="mv-product-card">
+            <img src="{{ 'skyra-mv-attitude-card.png' | asset_url }}" alt="Dance team performing in the Attitude MV project" width="246" height="154" />
+            <div><h3>MV Project (Attitude)</h3><p>From <s>$319.00</s> <strong>$299.00</strong></p></div>
+          </article>
+        </div>
+        <a class="outline-button" href="{{ routes.collections_url }}">View all products <span aria-hidden="true">→</span></a>
+      </section>
+
+      <section class="mv-products commerce-panel reveal" aria-labelledby="products-title">
+        <nav class="mv-product-nav" aria-label="Product categories"><a href="#products-title" aria-current="page">All products</a><a href="#upcoming-title">Skyra MV Project</a></nav>
+        <div class="mv-product-results">
+          <div class="mv-products-heading"><h2 id="products-title">All Products</h2><a href="{{ routes.collections_url }}">Newest <span aria-hidden="true">⌄</span></a></div>
+          <div class="mv-featured-grid">
+            <article class="mv-product-card"><img src="{{ 'skyra-mv-attitude-card.png' | asset_url }}" alt="Dance team performing in the Attitude MV project" width="246" height="154" loading="lazy" /><div><h3>MV Project (Attitude)</h3><p><s>$319.00</s> <strong>$299.00</strong></p><a href="{{ routes.collections_url }}">More options</a></div></article>
+            <article class="mv-product-card"><img src="{{ 'skyra-mv-thriller-card.png' | asset_url }}" alt="Thriller MV project artwork" width="244" height="154" loading="lazy" /><div><h3>MV Project (Thriller)</h3><p><s>$319.00</s> <strong>$299.00</strong></p><a href="{{ routes.collections_url }}">More options</a></div></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="mv-past commerce-panel reveal" aria-labelledby="past-title">
+        <header class="panel-heading"><span aria-hidden="true">✦</span><h2 id="past-title">Past Projects</h2></header>
+        <div class="past-projects">
+          <a href="{{ section.settings.instagram_url | default: 'https://www.instagram.com/' }}" aria-label="View past project one on Instagram"><img src="{{ 'skyra-mv-past-placeholder.png' | asset_url }}" alt="Past MV project video" width="115" height="81" loading="lazy" /></a>
+          <a href="{{ section.settings.instagram_url | default: 'https://www.instagram.com/' }}" aria-label="View past project two on Instagram"><img src="{{ 'skyra-mv-past-placeholder.png' | asset_url }}" alt="Past MV project video" width="115" height="81" loading="lazy" /></a>
+          <a href="{{ section.settings.instagram_url | default: 'https://www.instagram.com/' }}" aria-label="View past project three on Instagram"><img src="{{ 'skyra-mv-past-placeholder.png' | asset_url }}" alt="Past MV project video" width="115" height="81" loading="lazy" /></a>
+          <a href="{{ section.settings.instagram_url | default: 'https://www.instagram.com/' }}" aria-label="View past project four on Instagram"><img src="{{ 'skyra-mv-past-placeholder.png' | asset_url }}" alt="Past MV project video" width="115" height="81" loading="lazy" /></a>
+          <a href="{{ section.settings.instagram_url | default: 'https://www.instagram.com/' }}" aria-label="View past project five on Instagram"><img src="{{ 'skyra-mv-past-placeholder.png' | asset_url }}" alt="Past MV project video" width="115" height="81" loading="lazy" /></a>
+          <a href="{{ section.settings.instagram_url | default: 'https://www.instagram.com/' }}" aria-label="View past project six on Instagram"><img src="{{ 'skyra-mv-past-placeholder.png' | asset_url }}" alt="Past MV project video" width="115" height="81" loading="lazy" /></a>
+        </div>
+      </section>
+
+      <section class="mv-terms commerce-panel reveal" aria-labelledby="terms-title">
+        <span class="mv-terms__icon" aria-hidden="true">▤</span>
+        <div><h2 id="terms-title">Terms and Conditions</h2><p>Please review our terms before enrolling in any MV Project.</p></div>
+        <a class="outline-button" href="{{ shop.policies.terms_of_service.url | default: '/policies/terms-of-service' }}">View terms &amp; conditions <span aria-hidden="true">→</span></a>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <div class="footer-main">
+        <div class="footer-brand">
+          <img src="{{ 'skyra-logo.png' | asset_url }}" alt="Skyra Studio" width="208" height="208" loading="lazy" />
+          <p>Where movement becomes expression.</p>
+          <nav class="footer-socials" aria-label="Social media">
+            <a href="{{ section.settings.instagram_url | default: 'https://www.instagram.com/' }}" aria-label="Instagram"><img src="{{ 'skyra-instagram.svg' | asset_url }}" width="24" height="24" alt="" /></a>
+            <a href="{{ section.settings.xiaohongshu_url | default: 'https://www.xiaohongshu.com/' }}" aria-label="Rednote"><img src="{{ 'skyra-xiaohongshu.svg' | asset_url }}" width="24" height="24" alt="" /></a>
+            <a href="{{ section.settings.facebook_url | default: 'https://www.facebook.com/' }}" aria-label="Facebook"><img src="{{ 'skyra-facebook.svg' | asset_url }}" width="24" height="24" alt="" /></a>
+            <a href="{{ section.settings.tiktok_url | default: 'https://www.tiktok.com/' }}" aria-label="TikTok"><img src="{{ 'skyra-tiktok.svg' | asset_url }}" width="24" height="24" alt="" /></a>
+          </nav>
+        </div>
+
+        <nav class="footer-navigation" aria-label="Footer navigation">
+          <div class="footer-group">
+            <p class="footer-heading">Explore</p>
+            <a href="{{ routes.root_url }}">Home</a>
+            <a href="{{ section.settings.programs_link | default: '/pages/programs' }}">Programs</a>
+            <a href="{{ section.settings.membership_link | default: '/pages/membership' }}">Membership</a>
+            <a href="{{ section.settings.mv_project_link | default: '/pages/mv-project' }}">MV Project</a>
+          </div>
+          <div class="footer-group">
+            <p class="footer-heading">Studio</p>
+            <a href="{{ section.settings.about_link | default: '/pages/about-us' }}">About Skyra</a>
+            <a href="{{ section.settings.functions_link | default: '/pages/functions-studio-hire' }}">Functions &amp; Studio Hire</a>
+            <a href="{{ section.settings.contact_link | default: '/pages/contact' }}">Contact</a>
+          </div>
+          <div class="footer-group">
+            <p class="footer-heading">Account</p>
+            <a href="{{ routes.collections_url }}">Online store</a>
+            <a href="{{ routes.account_url }}">Member account</a>
+          </div>
+        </nav>
+
+        <address class="footer-visit">
+          <p class="footer-heading">Visit Skyra</p>
+          <p class="footer-email"><a href="mailto:hello@skyrastudio.com.au">hello@skyrastudio.com.au</a></p>
+          <p>Commercial Building, Level 12</p>
+          <p>1202/180-186 Burwood Rd</p>
+          <p>Burwood NSW 2134</p>
+        </address>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copyright">Copyright © 2026 Skyra Studio. All rights reserved.</p>
+        <nav class="footer-legal" aria-label="Legal">
+          <a href="{{ shop.policies.privacy_policy.url | default: '/policies/privacy-policy' }}">Privacy Policy</a>
+          <a href="{{ shop.policies.terms_of_service.url | default: '/policies/terms-of-service' }}">Terms &amp; Conditions</a>
+        </nav>
+      </div>
+    </footer>
+</div>
+{% schema %}
+{
+  "name": "Skyra MV project",
+  "settings": [
+    { "type": "link_list", "id": "menu", "label": "Main menu", "default": "main-menu" },
+    { "type": "url", "id": "programs_link", "label": "Programs page" },
+    { "type": "url", "id": "membership_link", "label": "Membership page" },
+    { "type": "url", "id": "mv_project_link", "label": "MV Project page" },
+    { "type": "url", "id": "functions_link", "label": "Functions and Studio Hire page" },
+    { "type": "url", "id": "about_link", "label": "About page" },
+    { "type": "url", "id": "contact_link", "label": "Contact page" },
+    { "type": "url", "id": "instagram_url", "label": "Instagram URL" },
+    { "type": "url", "id": "xiaohongshu_url", "label": "Rednote URL" },
+    { "type": "url", "id": "facebook_url", "label": "Facebook URL" },
+    { "type": "url", "id": "tiktok_url", "label": "TikTok URL" }
+  ],
+  "presets": [{ "name": "Skyra MV project" }],
+  "enabled_on": { "templates": ["page"] }
+}
+{% endschema %}

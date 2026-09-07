@@ -1,0 +1,11 @@
+{
+  "sections": {
+    "main": {
+      "type": "skyra-mv-project",
+      "settings": {
+        "menu": "main-menu"
+      }
+    }
+  },
+  "order": ["main"]
+}

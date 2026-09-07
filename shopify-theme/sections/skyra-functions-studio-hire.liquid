@@ -1,0 +1,149 @@
+{{ 'skyra.css' | asset_url | stylesheet_tag }}
+{{ 'skyra-functions-studio-hire.css' | asset_url | stylesheet_tag }}
+<script src="{{ 'skyra.js' | asset_url }}" defer="defer"></script>
+<div class="skyra-home functions-page" data-section-id="{{ section.id }}">
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header site-header--complete" data-header>
+      <a class="brand" href="{{ routes.root_url }}" aria-label="Skyra Studio home">
+        <img src="{{ 'skyra-logo.png' | asset_url }}" alt="" width="208" height="208" />
+      </a>
+
+      <nav class="header-links" aria-label="Featured navigation">
+        {% for link in section.settings.menu.links %}
+          <a href="{{ link.url }}"{% if link.current %} aria-current="page"{% endif %}>{{ link.title }}</a>
+        {% endfor %}
+      </nav>
+
+      <div class="header-actions">
+        <nav class="header-utilities" aria-label="Store and account navigation">
+          <a href="{{ routes.search_url }}" aria-label="Search products">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.2"></circle><path d="m15.4 15.4 4.1 4.1"></path></svg>
+          </a>
+          <a href="{{ routes.cart_url }}" aria-label="View shopping cart">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.8 5.2h2l1.7 9.2h9.2l2-6.6H7"></path><circle cx="9.3" cy="18.5" r="1"></circle><circle cx="16.2" cy="18.5" r="1"></circle></svg>
+          </a>
+          <a href="{{ routes.account_url }}" aria-label="Member account">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.4"></circle><path d="M5.8 19.2c.8-3.3 3-5 6.2-5s5.4 1.7 6.2 5"></path></svg>
+          </a>
+        </nav>
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation">
+          <span class="menu-toggle__lines" aria-hidden="true"><i></i><i></i></span>
+          <span class="menu-toggle__label">More</span>
+        </button>
+      </div>
+
+      <nav class="primary-nav" id="primary-navigation" aria-label="Menu navigation" aria-hidden="true" inert>
+        <div class="primary-nav__shell">
+          <div class="primary-nav__links">
+            {% for link in section.settings.menu.links %}
+              <a href="{{ link.url }}"{% if link.current %} aria-current="page"{% endif %}><strong>{{ link.title }}</strong></a>
+            {% endfor %}
+          </div>
+          <div class="primary-nav__meta">
+            <a href="{{ routes.collections_url }}">Online store</a>
+            <a href="{{ routes.account_url }}">Member account</a>
+          </div>
+        </div>
+      </nav>
+    </header>
+<main id="main" class="functions-main">
+      <section class="functions-hero reveal" aria-labelledby="functions-title">
+        <div class="functions-hero__copy">
+          <p class="functions-eyebrow">Welcome to Skyra Studio</p>
+          <h1 id="functions-title">
+            <span>Studio Use &amp;</span>
+            <span>Private Functions</span>
+          </h1>
+          <span class="functions-divider" aria-hidden="true"></span>
+          <p class="functions-intro">
+            Skyra Studio is available for selected private use, creative projects and small-scale functions.
+          </p>
+          <a class="functions-button" href="{{ section.settings.contact_link | default: '/pages/contact' }}">
+            <span>Enquire or book</span>
+            <span aria-hidden="true">→</span>
+          </a>
+        </div>
+
+        <figure class="functions-hero__media">
+          <img
+            src="{{ 'skyra-studio-hero-wide.png' | asset_url }}"
+            alt="Skyra Studio aerial room with blush silks and sunset light"
+            width="1672"
+            height="941"
+            fetchpriority="high"
+          />
+        </figure>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <div class="footer-main">
+        <div class="footer-brand">
+          <img src="{{ 'skyra-logo.png' | asset_url }}" alt="Skyra Studio" width="208" height="208" loading="lazy" />
+          <p>Where movement becomes expression.</p>
+          <nav class="footer-socials" aria-label="Social media">
+            <a href="{{ section.settings.instagram_url | default: 'https://www.instagram.com/' }}" aria-label="Instagram"><img src="{{ 'skyra-instagram.svg' | asset_url }}" width="24" height="24" alt="" /></a>
+            <a href="{{ section.settings.xiaohongshu_url | default: 'https://www.xiaohongshu.com/' }}" aria-label="Rednote"><img src="{{ 'skyra-xiaohongshu.svg' | asset_url }}" width="24" height="24" alt="" /></a>
+            <a href="{{ section.settings.facebook_url | default: 'https://www.facebook.com/' }}" aria-label="Facebook"><img src="{{ 'skyra-facebook.svg' | asset_url }}" width="24" height="24" alt="" /></a>
+            <a href="{{ section.settings.tiktok_url | default: 'https://www.tiktok.com/' }}" aria-label="TikTok"><img src="{{ 'skyra-tiktok.svg' | asset_url }}" width="24" height="24" alt="" /></a>
+          </nav>
+        </div>
+
+        <nav class="footer-navigation" aria-label="Footer navigation">
+          <div class="footer-group">
+            <p class="footer-heading">Explore</p>
+            <a href="{{ routes.root_url }}">Home</a>
+            <a href="{{ section.settings.programs_link | default: '/pages/programs' }}">Programs</a>
+            <a href="{{ section.settings.membership_link | default: '/pages/membership' }}">Membership</a>
+            <a href="{{ section.settings.mv_project_link | default: '/pages/mv-project' }}">MV Project</a>
+          </div>
+          <div class="footer-group">
+            <p class="footer-heading">Studio</p>
+            <a href="{{ section.settings.about_link | default: '/pages/about-us' }}">About Skyra</a>
+            <a href="{{ section.settings.functions_link | default: '/pages/functions-studio-hire' }}">Functions &amp; Studio Hire</a>
+            <a href="{{ section.settings.contact_link | default: '/pages/contact' }}">Contact</a>
+          </div>
+          <div class="footer-group">
+            <p class="footer-heading">Account</p>
+            <a href="{{ routes.collections_url }}">Online store</a>
+            <a href="{{ routes.account_url }}">Member account</a>
+          </div>
+        </nav>
+
+        <address class="footer-visit">
+          <p class="footer-heading">Visit Skyra</p>
+          <p class="footer-email"><a href="mailto:hello@skyrastudio.com.au">hello@skyrastudio.com.au</a></p>
+          <p>Commercial Building, Level 12</p>
+          <p>1202/180-186 Burwood Rd</p>
+          <p>Burwood NSW 2134</p>
+        </address>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copyright">Copyright © 2026 Skyra Studio. All rights reserved.</p>
+        <nav class="footer-legal" aria-label="Legal">
+          <a href="{{ shop.policies.privacy_policy.url | default: '/policies/privacy-policy' }}">Privacy Policy</a>
+          <a href="{{ shop.policies.terms_of_service.url | default: '/policies/terms-of-service' }}">Terms &amp; Conditions</a>
+        </nav>
+      </div>
+    </footer>
+</div>
+{% schema %}
+{
+  "name": "Skyra studio hire",
+  "settings": [
+    { "type": "link_list", "id": "menu", "label": "Main menu", "default": "main-menu" },
+    { "type": "url", "id": "programs_link", "label": "Programs page" },
+    { "type": "url", "id": "membership_link", "label": "Membership page" },
+    { "type": "url", "id": "mv_project_link", "label": "MV Project page" },
+    { "type": "url", "id": "functions_link", "label": "Functions and Studio Hire page" },
+    { "type": "url", "id": "about_link", "label": "About page" },
+    { "type": "url", "id": "contact_link", "label": "Contact page" },
+    { "type": "url", "id": "instagram_url", "label": "Instagram URL" },
+    { "type": "url", "id": "xiaohongshu_url", "label": "Rednote URL" },
+    { "type": "url", "id": "facebook_url", "label": "Facebook URL" },
+    { "type": "url", "id": "tiktok_url", "label": "TikTok URL" }
+  ],
+  "presets": [{ "name": "Skyra studio hire" }],
+  "enabled_on": { "templates": ["page"] }
+}
+{% endschema %}

@@ -1,0 +1,11 @@
+{
+  "sections": {
+    "main": {
+      "type": "skyra-functions-studio-hire",
+      "settings": {
+        "menu": "main-menu"
+      }
+    }
+  },
+  "order": ["main"]
+}
