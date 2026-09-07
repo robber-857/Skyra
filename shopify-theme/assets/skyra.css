@@ -2091,7 +2091,7 @@ body.is-menu-open .menu-toggle {
   .community-heading h2 {
     max-width: 100%;
     white-space: normal;
-    font-size: clamp(1.8rem, 7.8vw, 2.15rem);
+    font-size: clamp(1.55rem, 6.4vw, 1.8rem);
   }
 
   .community-heading__statement {
