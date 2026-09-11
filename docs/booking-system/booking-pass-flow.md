@@ -514,3 +514,9 @@ Booking confirmation must lock or version-check the session and entitlement in o
 8. Coach roster, attendance and notifications.
 9. Cancellation/refund/waitlist edge cases.
 10. Reports, audit and reconciliation hardening.
+
+### 付款前恢复实现进度（2026-09-11）
+
+Home/Programs 共用 Recovery 呈现：网络/503 重试保留服务器 attempt 的 opaque token；401 重新 Shopify 登录；Pass 不可用重新选 Pass；过期、满员、不可用或账号不匹配重新选课并读取最新容量。终态 attempt 从登录返回后不会继续反复检查登录。`Back to schedule` 返回原课表日期/筛选并恢复焦点。
+
+这是付款前恢复。订单处理中、已付款但无座位、退款对账、Needs Attention、已有 Pass 扣课仍未完成，不能据此打开 Checkout。

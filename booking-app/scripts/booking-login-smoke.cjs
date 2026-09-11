@@ -37,20 +37,21 @@ const server = http.createServer((req, res) => {
       for (const width of [320, 390, 430, 1440]) {
         const context = await browser.newContext({ viewport: { width, height: 900 } });
         const page = await context.newPage();
-        let signedIn = false, authError = false, delay = 0, calls = 0;
+        let signedIn = false, authError = false, delay = 0, calls = 0, attemptEnded = false;
         const errors = [];
         page.on("pageerror", e => errors.push(e.message));
         await context.route("**/apps/skyra-booking/sessions?*", route => route.fulfill({ json: { timezone: "Australia/Sydney", sessions: [session] } }));
         const attemptSurface = surface.toUpperCase();
         const fixtureToken = "a".repeat(43);
-        const snapshot = () => ({ token: fixtureToken, surface: attemptSurface, status: signedIn ? "STARTED" : "LOGIN_REQUIRED", requiresLogin: !signedIn, session: { ...session, timezone: "Australia/Sydney", bookingStatus: "OPEN" }, returnPath: (surface === "home" ? "/" : "/pages/programs") + "?skyra_attempt=" + fixtureToken + "#skyra-booking-" + surface });
+        const snapshot = () => ({ token: fixtureToken, surface: attemptSurface, status: attemptEnded ? "EXPIRED" : signedIn ? "STARTED" : "LOGIN_REQUIRED", requiresLogin: !signedIn, session: { ...session, timezone: "Australia/Sydney", bookingStatus: "OPEN" }, returnPath: (surface === "home" ? "/" : "/pages/programs") + "?skyra_attempt=" + fixtureToken + "#skyra-booking-" + surface });
         await context.route("**/apps/skyra-booking/{start,attempt}", async route => {
           calls++;
           if (delay) await new Promise(resolve => setTimeout(resolve, delay));
           await route.fulfill({ status: authError ? 503 : 200, json: authError ? { error: "We could not verify your sign-in status. Please try again." } : snapshot() });
         });
-        let passPrice = 22000;
+        let passPrice = 22000, passError = null;
         await context.route("**/apps/skyra-booking/pass-options", route => {
+          if (passError) return route.fulfill({status:passError.status, json:{code:passError.code,error:passError.message}});
           const pass = {id:"test-pass",name:"5 Aerial Classes",credits:5,validityDays:90,priceCents:passPrice,currency:"AUD"};
           return route.fulfill({json:{passes:[pass],selected:route.request().postDataJSON().passPlanId ? pass : null,checkoutAvailable:false}});
         });
@@ -64,6 +65,13 @@ const server = http.createServer((req, res) => {
         assert(overflow.scroll <= width, JSON.stringify(overflow));
         const rootBox = await page.locator("[data-skyra-booking-root]").boundingBox();
         if(width === 1440) assert(rootBox.width > 1000, "Desktop Booking must span the wide panel");
+        assert.equal(await page.getByRole("button",{name:"Previous 7 days"}).isDisabled(),true);
+        const firstDate = await page.locator("[data-booking-date]").first().getAttribute("data-booking-date");
+        for(let week=0;week<4;week++) await page.getByRole("button",{name:"Next 7 days"}).click();
+        assert.equal(await page.getByRole("button",{name:"Next 7 days"}).isDisabled(),true);
+        assert.equal(await page.locator("[data-booking-date]").count(),3);
+        for(let week=0;week<4;week++) await page.getByRole("button",{name:"Previous 7 days"}).click();
+        assert.equal(await page.locator("[data-booking-date][aria-pressed=true]").getAttribute("data-booking-date"),firstDate);
         await page.getByText("Full calendar",{exact:true}).click();
         const futureDate = await page.locator("[data-calendar-date]:not([disabled])").nth(7).getAttribute("data-calendar-date");
         await page.locator(`[data-calendar-date="${futureDate}"]`).click();
@@ -128,6 +136,9 @@ const server = http.createServer((req, res) => {
         assert.equal(await page.getByRole("radio").isChecked(),true);
         assert.equal(await page.evaluate(key => sessionStorage.getItem(key), key), null);
         await page.getByRole("button", { name: "Back to schedule" }).click();
+        assert.equal(await book.evaluate(el=>el===document.activeElement),true);
+        assert.equal(await page.locator("[data-booking-service]").inputValue(),"aerial");
+        await page.locator("[data-booking-details]").click();
         // The details CTA uses the same gate, including a session that expired.
         signedIn = false;
         await page.locator("[data-booking-continue]").click();
@@ -144,9 +155,50 @@ const server = http.createServer((req, res) => {
         await page.reload();
         await page.getByRole("heading", { name: "Select a Pass" }).waitFor();
         assert.equal(await page.locator("[data-skyra-booking-root]").count(), 1);
+        const currentFilter = "all"; // A fresh document starts with the default filters.
+        // A server outage during restoration preserves the opaque token for retry.
+        authError = true;
+        await page.reload();
+        await page.getByRole("button",{name:"Try again",exact:true}).waitFor();
+        assert.equal(await page.evaluate(k=>sessionStorage.getItem(k),"skyra-booking:"+surface+":attempt"),fixtureToken);
+        authError = false;
+        await page.getByRole("button",{name:"Try again",exact:true}).click();
+        await page.getByRole("heading",{name:"Select a Pass"}).waitFor();
+        // Pass selection re-authenticates after the Shopify session expires.
+        await page.getByRole("radio").check();
+        signedIn = false;
+        passError = {status:401,code:"LOGIN_REQUIRED",message:"Sign in with Shopify to choose a Pass."};
+        await page.locator("[data-pass-continue]").click();
+        await page.getByRole("button",{name:"Sign in again",exact:true}).click();
+        await dialog.locator("[data-login-open]").waitFor({state:"visible"});
+        signedIn = true; passError = null;
+        await dialog.getByRole("button",{name:"Check sign-in status"}).click();
+        await page.getByRole("radio").check();
+        passError = {status:409,code:"PASS_UNAVAILABLE",message:"This Pass changed. Choose another Pass."};
+        await page.locator("[data-pass-continue]").click();
+        await page.getByRole("button",{name:"Choose another Pass",exact:true}).waitFor();
+        passError = null;
+        await page.getByRole("button",{name:"Choose another Pass",exact:true}).click();
+        await page.getByRole("radio").check();
+        passError = {status:409,code:"ATTEMPT_EXPIRED",message:"This booking needs to be restarted. Choose the class again."};
+        await page.locator("[data-pass-continue]").click();
+        await page.getByRole("button",{name:"Choose a class",exact:true}).click();
+        await book.waitFor();
+        assert.equal(await page.evaluate(k=>sessionStorage.getItem(k),"skyra-booking:"+surface+":attempt"),null);
+        assert.equal(await page.locator("[data-booking-service]").inputValue(),currentFilter);
+        // A terminal 200 response on Shopify return must leave the login retry loop.
+        await page.evaluate(k=>sessionStorage.setItem(k,"a".repeat(43)),"skyra-booking:"+surface+":attempt");
+        attemptEnded = true;
+        await page.reload();
+        await page.getByRole("button",{name:"Choose a class",exact:true}).waitFor();
+        assert.equal(await dialog.count(),0);
+        assert.equal(await page.evaluate(k=>sessionStorage.getItem(k),"skyra-booking:"+surface+":attempt"),null);
+        attemptEnded = false;
+        await page.getByRole("button",{name:"Choose a class",exact:true}).click();
+        await book.waitFor();
         assert(calls >= 6);
         assert.deepEqual(errors, []);
-        results.push({ surface, width, overflow: false, dialog: true, keyboard: true, cancellation: true, retry: true, returnRecovery: true });
+        results.push({ surface, width, overflow: false, dialog: true, keyboard: true, cancellation: true, retry: true, returnRecovery: true, weekBoundaries:true, recoveryRetry:true, expiredAttempt:true, passChanged:true, passReauth:true });
         await context.close();
       }
     }

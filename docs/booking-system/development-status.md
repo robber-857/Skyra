@@ -142,3 +142,17 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 - 真实开发主题 Home：1440px 内容宽 1082px、390px 内容宽 328px，标题字体正确、课表正常、均无横向溢出。截图与结果在 `output/playwright/booking-live-*`。真实顾客登录后的 Pass/Review 仍需人工 E2E，不以 fixture 代替。
 - 开发店 `/pages/programs` 当前仍返回 404：主题模板已就绪，但 Shopify Page 资源尚未创建，未完成该真实入口验收。
 - 仅更新开发预览，生产主题未部署；原 `shopify-theme/assets/skyra.css` 修改保持原样、未纳入 Booking 提交。
+
+## 最新交付：预览诊断、翻周与付款前 Recovery（2026-09-11）
+
+- 用户报告 `9292` storefront 502；本轮检查时已自行恢复，未重启进程、修改网络配置或声称修复 Shopify CLI 根因。连续 5 轮 Home / sessions 均为 200；新增诊断又对 9292、9293、sessions 和 Shopify 上游各检查 3 次，均通过。上游根域名仍是 Horizon，不能据此判断 Booking App 正常。
+- 新增 `npm run preview:check`，分开检查本地 Theme、App host、签名代理返回的 sessions、Programs Page 与 Shopify 上游；输出所有采样，不隐藏间歇失败。Programs 404 单独标记 `NOT_READY`。
+- 新增 `preview:app` / `preview:theme` 命令，固定开发店和主题 `192227082532`。Theme 命令排除原有 `assets/skyra.css` 并使用 `--nodelete`；不启动到发布中的 Horizon。
+- Home / Programs 共用月份标题和前后 7 天导航，覆盖未来 31 天、跨月与最后不足一周；首尾按钮禁用。尚未开放的课程显示 `Opens 14 days before`，与已关闭状态区分。
+- 修复 Pass / Review 的 `Back to schedule`：现在返回课表并恢复 Book 焦点，保留当前日期和筛选。
+- 付款前 Recovery：临时网络/服务错误保留 attempt token 供重试；登录失效提供重新登录；Pass 变更重新选择；满员、过期、不可用或跨账号错误提供重新选课。登录返回收到终态 attempt 时退出登录重试循环，清理失效 token。
+- 仍不创建公开 Hold / Cart，不收款、扣课或确认预约。本轮 Recovery 不包含付款后处理，也不等于 Needs Attention 已完成。
+- 验证：`npm run check` 通过；最终修改再次 lint 和官方 8 文件扩展校验通过。11 项浏览器 fixture 场景通过，覆盖 Home/Programs × 320/390/430/1440px、3 种登录导航，以及翻周边界、断线恢复、过期、Pass 变更与重新登录。真实 Home 1440/390px 课表正常、无横向溢出。
+- Programs 真实入口仍未完成：Shopify Page 资源缺失，CLI `store auth` 的内容权限 OAuth 回调等待超时，未获得页面写入权限、未创建页面；不是代码模板缺失，也不是自动审批拒绝。Page 查询/创建 GraphQL 已通过官方 schema 校验，但没有执行 mutation。
+
+下一阶段：完成开发店 Programs 页面内容授权与 Page 创建 → 两个入口的真实 Shopify 顾客登录/退出/返回验收 → 商品渠道可售校验、Cart/Checkout 交接与 Hold → `orders/paid` 幂等处理和权益台账 → 已有 Pass 原子确认、Confirmation、付款后 Recovery / Needs Attention。保持 `onlineBookingsEnabled=false`，直到完整交易链路验收。

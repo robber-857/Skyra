@@ -674,3 +674,31 @@ body [data-skyra-booking-root] .skyra-booking__detail h3 {
     grid-column: auto;
   }
 }
+
+.skyra-booking__week-nav {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: 12px;
+  align-items: center;
+  margin-top: 28px;
+  text-align: center;
+}
+.skyra-booking__week-nav button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--sb-line);
+  border-radius: 50%;
+  background: white;
+  color: var(--sb-accent-dark);
+  font-size: 28px;
+  cursor: pointer;
+}
+.skyra-booking__week-nav + .skyra-booking__days { margin-top: 12px; }
+.skyra-booking__message h3 { margin-bottom: 20px; }
+.skyra-booking__message button + button,
+.skyra-booking__transaction-grid .skyra-booking__primary + .skyra-booking__primary { margin: 12px 0 0 12px; }
+@media (max-width: 720px) {
+  .skyra-booking__message button { width: 100%; }
+  .skyra-booking__message button + button,
+  .skyra-booking__transaction-grid .skyra-booking__primary + .skyra-booking__primary { margin: 12px 0 0; }
+}

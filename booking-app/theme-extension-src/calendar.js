@@ -115,3 +115,39 @@ window.SkyraBookingCalendar = function ({ today, selected, end, pick }) {
   return panel;
 };
 document.dispatchEvent(new Event("skyra:features-ready"));
+
+window.SkyraBookingDateRail = function ({today, selected, end, pick, element}) {
+  const add = (key, days) => new Date(new Date(key + "T12:00:00Z").getTime() + days * 86400000).toISOString().slice(0, 10);
+  const offset = Math.floor((new Date(selected) - new Date(today)) / 86400000 / 7) * 7;
+  const start = add(today, offset);
+  const last = [add(start, 6), end].sort()[0];
+  const dates = Array.from({length: Math.min(7, 31 - offset)}, (_, i) => add(start, i));
+  const format = (key, options) => new Intl.DateTimeFormat("en-AU", {timeZone:"UTC", ...options}).format(new Date(key + "T12:00:00Z"));
+  const rail = element("div"), nav = element("div", "skyra-booking__week-nav");
+  const label = element("strong", "", format(start, {month:"long",year:"numeric"}) + (start.slice(0,7) === last.slice(0,7) ? "" : " – " + format(last, {month:"long",year:"numeric"})));
+  label.setAttribute("aria-live", "polite");
+  function arrow(amount, text, symbol) {
+    const button = element("button", "", symbol);
+    button.type = "button";
+    button.setAttribute("aria-label", text);
+    button.disabled = amount < 0 ? offset === 0 : add(start, 7) > end;
+    button.addEventListener("click", () => pick(add(start, amount)));
+    return button;
+  }
+  nav.append(arrow(-7, "Previous 7 days", "‹"), label, arrow(7, "Next 7 days", "›"));
+  const days = element("div", "skyra-booking__days");
+  days.setAttribute("role", "group");
+  days.setAttribute("aria-label", "Schedule dates");
+  dates.forEach(key => {
+    const button = element("button", "skyra-booking__day" + (key === selected ? " is-active" : ""));
+    button.type = "button";
+    button.dataset.bookingDate = key;
+    button.setAttribute("aria-pressed", String(key === selected));
+    button.setAttribute("aria-label", format(key, {dateStyle:"full"}));
+    button.append(element("span", "", key === today ? "Today" : format(key, {weekday:"short"})), element("strong", "", format(key, {day:"numeric"})));
+    button.addEventListener("click", () => pick(key));
+    days.append(button);
+  });
+  rail.append(nav, days);
+  return rail;
+};

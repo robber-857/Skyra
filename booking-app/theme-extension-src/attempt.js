@@ -14,6 +14,9 @@ window.SkyraBookingAttempt = function (root) {
     if (!response.ok) {
       const error = new Error(data.error || "We could not restore your booking. Please try again.");
       error.bookingError = true;
+      error.code = data.code;
+      error.status = response.status;
+      error.restartRequired = [400, 403, 404, 409, 410].includes(response.status);
       throw error;
     }
     if (data.surface !== surface || !data.session?.id || !/^[A-Za-z0-9_-]{43}$/.test(data.token) || typeof data.requiresLogin !== "boolean") throw new Error("Invalid booking response");
@@ -43,8 +46,10 @@ window.SkyraBookingAttempt = function (root) {
       if (revision !== generation) throw new Error("Booking selection changed");
       current = data;
       if (terminal(data)) {
-        const error = new Error(data.status === "EXPIRED" ? "Your booking attempt expired. Close this window and choose the class again." : "This booking needs to be restarted. Close this window and check the latest class availability.");
+        const error = new Error(data.status === "EXPIRED" ? "Your booking attempt expired. Choose a class to check the latest availability." : "This booking needs to be restarted. Choose a class to check the latest availability.");
         error.bookingError = true;
+        error.code = "ATTEMPT_EXPIRED";
+        error.restartRequired = true;
         throw error;
       }
       return !data.requiresLogin;
@@ -71,16 +76,49 @@ window.SkyraBookingAttempt = function (root) {
       if (!token) return null;
       try {
         current = await request("/attempt", { token });
+        if (terminal(current)) {
+          forget(true);
+          const error = new Error("Your booking attempt has ended. Choose a class to check the latest availability.");
+          error.bookingError = true;
+          error.code = "ATTEMPT_EXPIRED";
+          throw error;
+        }
         sessionId = current.session.id;
         // Strip bearer material from the visible URL after the server resolves it.
         this.remember();
         cleanUrl();
         return current;
       } catch (error) {
-        forget();
+        // Temporary network/server failures must not discard a valid return token.
+        if ([400, 403, 404, 409, 410].includes(error.status)) forget(true);
         throw error;
       }
     }
   };
 };
 document.dispatchEvent(new Event("skyra:attempt-ready"));
+
+// Pre-payment recovery only; this component never infers a reservation or payment.
+window.SkyraBookingRecovery = function ({host, error, retry, restart, signIn}) {
+  const code = error.code;
+  const login = code === "LOGIN_REQUIRED" && signIn;
+  const terminal = ["ATTEMPT_EXPIRED", "NOT_FOUND", "FORBIDDEN", "VALIDATION", "SOLD_OUT", "BOOKING_CLOSED", "NOT_YET_OPEN", "RULES_NOT_READY"].includes(code) || (code === "UNAVAILABLE" && error.status === 409);
+  const title = document.createElement("h3");
+  title.textContent = login ? "Sign in to continue" : terminal ? "Let's check your booking again" : "We couldn't continue your booking";
+  title.tabIndex = -1;
+  const message = document.createElement("p");
+  message.className = "skyra-booking__notice";
+  message.setAttribute("role", "alert");
+  message.textContent = error.bookingError ? error.message : "The connection was interrupted. Please try again to check the latest availability.";
+  function action(label, callback) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "skyra-booking__primary";
+    button.textContent = label;
+    button.addEventListener("click", callback);
+    return button;
+  }
+  host.replaceChildren(title, message, action(login ? "Sign in again" : terminal ? "Choose a class" : code === "PASS_UNAVAILABLE" ? "Choose another Pass" : "Try again", login || (terminal ? restart : retry)));
+  if (!terminal) host.append(action("Return to schedule", restart));
+  title.focus({preventScroll:true});
+};

@@ -57,3 +57,5 @@
 参见 [开发预览与测试指南](preview-testing.md)：Home/Booking Admin 入口、当前可测试范围、启动命令及 Shopify 商品和支付分工。先体验当前阶段，再继续未完成交易功能。
 
 当前交付包含共享 Programs 样式、Full Calendar、新 Pass 选择和 Review；支付及已有 Pass 确认未开放。详见 [开发状态](development-status.md)。
+
+- 2026-09-11 续开发：共享月份/翻周、付款前失效恢复与预览健康检查已实现；9292 本轮连续检查正常，502 根因未确认。Programs Page 内容授权超时，真实入口仍待创建。入口及重启命令见 [开发预览与测试](preview-testing.md)，完整剩余任务见 [当前进度](development-status.md)。

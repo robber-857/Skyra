@@ -1,5 +1,5 @@
 // UI gate only: reservation and Pass APIs must authenticate every server request.
-function loginGate(root, copy, { save, cancel, proceed, url, check }) {
+function loginGate(root, copy, { save, cancel, proceed, url, check, recover }) {
   copy = Object.assign({
     signInTitle: "Sign in to continue",
     signInBody: "Use your Skyra account to select a pass and book this class.",
@@ -69,7 +69,10 @@ function loginGate(root, copy, { save, cancel, proceed, url, check }) {
       if (signedIn) return finish();
       showStatus(popup && !popup.closed ? copy.loginWaiting : copy.signInBody, true);
     } catch (error) {
-      if (current === generation) showStatus(error.bookingError ? error.message : copy.loginError);
+      if (current === generation) {
+        if (error.restartRequired && recover) { stop(); recover(error); }
+        else showStatus(error.bookingError ? error.message : copy.loginError);
+      }
     } finally {
       if (current === generation) checking = false;
     }

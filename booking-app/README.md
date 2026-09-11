@@ -84,3 +84,9 @@ The local Home/Programs templates now use the shared mounts and no longer contai
 - `scripts/booking-login-smoke.cjs` exercises the built theme assets with local API fixtures. Set PLAYWRIGHT_MODULE to the installed Playwright module path, build the theme extension first, then run it with Node.
 - `scripts/booking-http-smoke.ts` is an optional built-app test. It requires a dedicated test-database server on 127.0.0.1:3310, test Shopify API key, the script's local fixture signing key, and data from `npm run test:db`. Never point it at a live database or use real Shopify signing credentials.
 - Real Shopify hosted login and storefront cookies still need development-store E2E. No production deployment or complete purchase flow is claimed.
+
+### Development preview diagnostics (2026-09-11)
+
+Run `npm run preview:check` to sample the local theme, app host, Booking sessions and Shopify upstream separately. Programs 404 is reported as `NOT_READY`. `npm run preview:app` and `npm run preview:theme` pin the development theme 192227082532; stop the existing process before restarting. These commands do not publish Horizon.
+
+The shared frontend now has month/week navigation and pre-payment recovery for transient failures, expired attempts, changed Passes and sign-in expiry. Eleven browser fixture scenarios cover both mounts and mobile/desktop; they are not real Shopify login or payment acceptance. Programs Page creation is pending store content OAuth authorization. Checkout, paid webhooks, entitlements and post-payment recovery remain incomplete.

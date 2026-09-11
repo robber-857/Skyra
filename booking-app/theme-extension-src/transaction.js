@@ -6,6 +6,8 @@ window.SkyraBookingTransaction = function ({
   timezone,
   back,
   shell,
+  restart,
+  signIn,
 }) {
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -87,14 +89,9 @@ window.SkyraBookingTransaction = function ({
   }
   function errorView(error, retry) {
     const main = frame("Choose a Pass");
-    const notice = el(
-      "p",
-      "skyra-booking__notice",
-      error.message || "We could not load Passes. Please try again.",
-    );
-    notice.setAttribute("role", "alert");
-    main.append(notice, button("Try again", "skyra-booking__primary", retry));
+    window.SkyraBookingRecovery({host:main, error, retry, restart:()=>{revision++;restart();}, signIn});
   }
+
   async function request(passPlanId) {
     const response = await fetch(
       (root.dataset.proxyBase || "/apps/skyra-booking") + "/pass-options",
@@ -116,10 +113,13 @@ window.SkyraBookingTransaction = function ({
       },
     );
     const data = await response.json();
-    if (!response.ok)
-      throw new Error(
-        data.error || "We could not load Passes. Please try again.",
-      );
+    if (!response.ok) {
+      const error = new Error(data.error || "We could not load Passes. Please try again.");
+      error.code = data.code;
+      error.status = response.status;
+      error.bookingError = true;
+      throw error;
+    }
     if (!Array.isArray(data.passes))
       throw new Error("We could not load Passes. Please try again.");
     return data;
