@@ -169,63 +169,16 @@
         </div>
       </section>
 
-      <section class="schedule section-shell" id="schedule" aria-labelledby="schedule-title">
-        <div class="schedule-intro reveal">
-          <h2 id="schedule-title">Booking that feels like Skyra</h2>
-          <p>
-            A first look at the owned booking experience. Sessions below are illustrative, not live availability.
-          </p>
-        </div>
-
-        <div class="schedule-demo reveal" data-schedule-demo>
-          <div class="schedule-toolbar" role="group" aria-label="Filter illustrative sessions">
-            <button class="filter-button is-active" type="button" data-filter="all" aria-pressed="true">All</button>
-            <button class="filter-button" type="button" data-filter="morning" aria-pressed="false">Morning</button>
-            <button class="filter-button" type="button" data-filter="evening" aria-pressed="false">Evening</button>
-          </div>
-
-          <div class="session-list" data-session-list>
-            <article class="session-row" data-time="morning">
-              <p class="session-day">Monday</p>
-              <div>
-                <h3>Aerial Yoga Beginner</h3>
-                <p>9:30 AM · 60 minutes</p>
-              </div>
-              <button type="button" class="session-action" data-session="Aerial Yoga Beginner">Preview booking</button>
-            </article>
-            <article class="session-row" data-time="evening">
-              <p class="session-day">Wednesday</p>
-              <div>
-                <h3>Dance Fitness</h3>
-                <p>6:00 PM · 60 minutes</p>
-              </div>
-              <button type="button" class="session-action" data-session="Dance Fitness">Preview booking</button>
-            </article>
-            <article class="session-row" data-time="morning">
-              <p class="session-day">Saturday</p>
-              <div>
-                <h3>First Intro</h3>
-                <p>10:30 AM · 60 minutes</p>
-              </div>
-              <button type="button" class="session-action" data-session="First Intro">Preview booking</button>
-            </article>
-          </div>
-
-          <div class="schedule-empty" data-schedule-empty hidden>
-            <p>No sample sessions match this filter.</p>
-            <button type="button" data-reset-filter>Show all sessions</button>
-          </div>
-
-          <div class="booking-preview" data-booking-preview hidden tabindex="-1">
-            <p class="booking-preview__title">Booking preview</p>
-            <p>
-              <strong data-booking-name>Aerial Yoga Beginner</strong> selected. Live capacity, package credits and waitlist status will connect to the Skyra booking API.
-            </p>
-            <button type="button" data-close-preview>Close preview</button>
-          </div>
-        </div>
+      <section class="schedule section-shell" id="schedule" aria-label="Find a class">
+        <div
+          id="skyra-booking-home"
+          class="reveal"
+          data-skyra-booking-root
+          data-surface="home"
+          data-proxy-base="/apps/skyra-booking"
+        ></div>
+        <noscript>Enable JavaScript to view live class availability.</noscript>
       </section>
-
       <section class="membership section-shell" id="membership" aria-labelledby="membership-title">
         <div class="membership-intro reveal">
           <h2 id="membership-title">Membership options</h2>

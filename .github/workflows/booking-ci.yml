@@ -1,0 +1,39 @@
+name: Booking App
+on:
+  push:
+    paths: ["booking-app/**", ".github/workflows/booking-ci.yml"]
+  pull_request:
+    paths: ["booking-app/**", ".github/workflows/booking-ci.yml"]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: skyra
+          POSTGRES_PASSWORD: ci-test-only
+          POSTGRES_DB: skyra_booking_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U skyra -d skyra_booking_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: booking-app
+    env:
+      DATABASE_URL: postgresql://skyra:ci-test-only@localhost:5432/skyra_booking_test?schema=public&connection_limit=25
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: booking-app/package-lock.json
+      - run: npm ci
+      - run: npm run setup
+      - run: npm run check
+      - run: npm test
+

@@ -75,6 +75,18 @@ The `skyra-home` section accepts one Shopify app block in the existing `Our comm
 
 The app block selection is Theme Editor data stored remotely. Routine `skyra_live_code` pushes exclude JSON templates so the Instafeed placement is preserved.
 
+## Booking integration status
+
+Home and Programs now use explicit mounts for the shared Booking App theme-extension app embed. Static class rows, fake availability and Mindbody booking links have been removed from these two sections.
+
+- The component currently supports Browse, filters, Details, Shopify login handoff and server-backed Booking Attempts.
+- Published sessions and computed availability come from PostgreSQL through the signed App Proxy.
+- Login uses Shopify Customer Account; payment will use native Shopify Checkout. Other booking steps stay inside the originating section.
+- Pass selection, Review and purchase completion remain unfinished. These changes are for the development store; the production theme has not been updated.
+- See [preview and testing](../docs/booking-system/preview-testing.md) for the current entry points and test boundary.
+
+Do not add Booking as another app block inside `skyra-home`: that section's existing `@app` position is reserved for Instafeed. Follow [../docs/booking-system/implementation-backlog.md](../docs/booking-system/implementation-backlog.md) for the file-level migration and acceptance checks.
+
 ## Git workflow
 
 Work on `dev` and stage only the intended files:
@@ -87,7 +99,7 @@ git commit -m "<message>"
 git push origin dev
 ```
 
-The separate untracked `docs/` directory is outside the Shopify theme and must not be included unless explicitly requested.
+The `docs/booking-system/` directory is the Booking implementation source of truth but is not uploaded by Shopify theme commands. Stage documentation only when it is part of the requested change.
 
 ## References
 

@@ -1,0 +1,530 @@
+[data-skyra-booking-root] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.skyra-booking {
+  --sb-ink: #171714;
+  --sb-muted: #6c6a64;
+  --sb-line: rgba(23, 23, 20, 0.16);
+  --sb-soft: #f5f4f0;
+  --sb-accent: #ad5f20;
+  --sb-accent-dark: #864414;
+  color: var(--sb-ink);
+  font: inherit;
+  line-height: 1.5;
+}
+
+.skyra-booking *,
+.skyra-booking *::before,
+.skyra-booking *::after {
+  box-sizing: border-box;
+}
+
+.skyra-booking button,
+.skyra-booking select,
+.skyra-booking a {
+  font: inherit;
+}
+
+.skyra-booking__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 32px;
+  align-items: end;
+  padding-bottom: 26px;
+  border-bottom: 1px solid var(--sb-line);
+}
+
+.skyra-booking__header h2 {
+  max-width: none;
+  margin: 0;
+  color: var(--sb-ink);
+  font-size: clamp(2.3rem, 5vw, 5rem);
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 0.96;
+}
+
+.skyra-booking__header p {
+  max-width: 560px;
+  margin: 16px 0 0;
+  color: var(--sb-muted);
+  font-size: clamp(0.92rem, 1.2vw, 1.05rem);
+}
+
+.skyra-booking__account,
+.skyra-booking__back {
+  align-self: start;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: transparent;
+  color: var(--sb-ink);
+  cursor: pointer;
+  padding: 3px 0;
+  text-decoration: none;
+}
+
+.skyra-booking__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 24px 0 18px;
+}
+
+.skyra-booking__toolbar label {
+  display: grid;
+  gap: 6px;
+  min-width: min(220px, 100%);
+}
+
+.skyra-booking__toolbar label > span {
+  color: var(--sb-muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.skyra-booking__toolbar select {
+  min-height: 46px;
+  border: 1px solid var(--sb-line);
+  border-radius: 0;
+  background: #fff;
+  color: var(--sb-ink);
+  padding: 0 42px 0 14px;
+}
+
+.skyra-booking__days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(64px, 1fr));
+  border-block: 1px solid var(--sb-line);
+  overflow-x: auto;
+}
+
+.skyra-booking__day {
+  min-height: 82px;
+  border: 0;
+  border-right: 1px solid var(--sb-line);
+  background: transparent;
+  color: var(--sb-muted);
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+  gap: 3px;
+  text-align: center;
+}
+
+.skyra-booking__day:last-child {
+  border-right: 0;
+}
+
+.skyra-booking__day span {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.skyra-booking__day strong {
+  color: var(--sb-ink);
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.skyra-booking__day.is-active {
+  background: var(--sb-ink);
+  color: #fff;
+}
+
+.skyra-booking__day.is-active strong {
+  color: #fff;
+}
+
+.skyra-booking__date-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 0 12px;
+}
+
+.skyra-booking__date-heading strong {
+  font-weight: 550;
+}
+
+.skyra-booking__date-heading span {
+  color: var(--sb-muted);
+  font-size: 0.82rem;
+}
+
+.skyra-booking__sessions {
+  border-top: 1px solid var(--sb-line);
+}
+
+.skyra-booking__session {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.55fr) minmax(210px, 2fr) minmax(100px, 0.8fr) auto;
+  gap: 20px;
+  align-items: center;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--sb-line);
+}
+
+.skyra-booking__session time,
+.skyra-booking__session-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.skyra-booking__session time strong,
+.skyra-booking__session-copy h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 550;
+}
+
+.skyra-booking__session time span,
+.skyra-booking__session-copy p,
+.skyra-booking__availability {
+  margin: 0;
+  color: var(--sb-muted);
+  font-size: 0.84rem;
+}
+
+.skyra-booking__availability {
+  color: var(--sb-accent-dark);
+}
+
+.skyra-booking__availability.is-full {
+  color: var(--sb-muted);
+}
+
+.skyra-booking__session button,
+.skyra-booking__message button,
+.skyra-booking__primary {
+  min-height: 44px;
+  border: 1px solid var(--sb-ink);
+  border-radius: 0;
+  background: var(--sb-ink);
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.skyra-booking__session button {
+  background: transparent;
+  color: var(--sb-ink);
+}
+
+.skyra-booking__session button:hover,
+.skyra-booking__session button:focus-visible,
+.skyra-booking__account:hover,
+.skyra-booking__account:focus-visible,
+.skyra-booking__back:hover,
+.skyra-booking__back:focus-visible {
+  color: var(--sb-accent-dark);
+}
+
+.skyra-booking__session button:active,
+.skyra-booking__primary:active {
+  transform: translateY(1px);
+}
+
+.skyra-booking button:focus-visible,
+.skyra-booking select:focus-visible,
+.skyra-booking a:focus-visible {
+  outline: 2px solid var(--sb-accent);
+  outline-offset: 3px;
+}
+
+.skyra-booking button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.skyra-booking__message {
+  padding: 42px 0;
+  color: var(--sb-muted);
+}
+
+.skyra-booking__message p {
+  margin: 0;
+}
+
+.skyra-booking__message--action {
+  max-width: 680px;
+  padding-block: 46px 22px;
+}
+
+.skyra-booking__message--action h3 {
+  margin: 8px 0 12px;
+  font-size: clamp(2rem, 4vw, 3.6rem);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.skyra-booking__message--action .skyra-booking__primary {
+  margin-top: 24px;
+}
+
+.skyra-booking__eyebrow,
+.skyra-booking__detail-date {
+  color: var(--sb-accent-dark);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.skyra-booking__back {
+  margin-top: 24px;
+}
+
+.skyra-booking__detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.8fr);
+  gap: clamp(34px, 7vw, 96px);
+  padding: 34px 0 12px;
+}
+
+.skyra-booking__detail h3 {
+  margin: 10px 0 18px;
+  font-size: clamp(2.2rem, 5vw, 4.8rem);
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 0.98;
+}
+
+.skyra-booking__detail > div > p:last-child {
+  max-width: 600px;
+  color: var(--sb-muted);
+}
+
+.skyra-booking__detail dl {
+  margin: 0;
+  border-top: 1px solid var(--sb-line);
+}
+
+.skyra-booking__detail dl div {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 18px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--sb-line);
+}
+
+.skyra-booking__detail dt {
+  color: var(--sb-muted);
+}
+
+.skyra-booking__detail dd {
+  margin: 0;
+}
+
+.skyra-booking__detail .skyra-booking__primary {
+  grid-column: 2;
+}
+
+.skyra-booking__loading {
+  display: grid;
+  gap: 0;
+  padding-top: 24px;
+}
+
+.skyra-booking__loading span {
+  height: 72px;
+  border-bottom: 1px solid var(--sb-line);
+  background: linear-gradient(90deg, transparent, var(--sb-soft), transparent);
+  background-size: 220% 100%;
+  animation: skyra-booking-loading 1.4s ease-in-out infinite;
+}
+
+.skyra-booking__live {
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@keyframes skyra-booking-loading {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@media (max-width: 720px) {
+  .skyra-booking__header {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .skyra-booking__account {
+    justify-self: start;
+  }
+
+  .skyra-booking__toolbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .skyra-booking__toolbar label {
+    min-width: 0;
+  }
+
+  .skyra-booking__days {
+    grid-template-columns: repeat(7, minmax(62px, 1fr));
+  }
+
+  .skyra-booking__day {
+    min-height: 72px;
+  }
+
+  .skyra-booking__date-heading {
+    display: grid;
+    gap: 4px;
+  }
+
+  .skyra-booking__session {
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 12px 16px;
+  }
+
+  .skyra-booking__availability {
+    grid-column: 2;
+  }
+
+  .skyra-booking__session button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .skyra-booking__detail {
+    grid-template-columns: 1fr;
+  }
+
+  .skyra-booking__detail .skyra-booking__primary {
+    grid-column: 1;
+    width: 100%;
+  }
+}
+
+@media (max-width: 430px) {
+  .skyra-booking__toolbar {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skyra-booking__loading span {
+    animation: none;
+  }
+}
+/* Book stays distinct from the optional details action. */
+.skyra-booking__session .skyra-booking__primary {
+  min-width: 140px;
+  background: var(--sb-ink);
+  color: #fff;
+}
+.skyra-booking__session-copy [data-booking-details] {
+  justify-self: start;
+  width: auto;
+  padding: 8px 0;
+  border: 0;
+  color: var(--sb-accent-dark);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.skyra-booking__login {
+  position: fixed;
+  inset: 0;
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 48px 36px 28px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--sb-line);
+  border-radius: 18px;
+  background: #fffefa;
+  color: var(--sb-ink);
+  box-shadow: 0 24px 100px #17171433;
+  text-align: center;
+}
+.skyra-booking__login::backdrop {
+  background: #17171480;
+}
+.skyra-booking__login [hidden] { display: none; }
+.skyra-booking__login-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--sb-muted);
+  font-size: 28px !important;
+  cursor: pointer;
+}
+.skyra-booking__login-brand {
+  margin: 0 0 28px;
+  font-size: 24px;
+  letter-spacing: 0.2em;
+  color: #8c7041;
+}
+.skyra-booking__login h3 {
+  margin: 0 0 16px;
+  font-size: clamp(26px, 4vw, 34px);
+  line-height: 1.15;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+}
+.skyra-booking__login-summary {
+  padding: 14px;
+  margin: 0 0 20px;
+  border-block: 1px solid var(--sb-line);
+  overflow-wrap: anywhere;
+}
+.skyra-booking__login-status {
+  min-height: 3em;
+  margin: 0 0 24px;
+  color: var(--sb-muted);
+}
+.skyra-booking__login .skyra-booking__primary {
+  width: 100%;
+  min-height: 50px;
+  white-space: normal;
+  background: #8c7041;
+  border-color: #8c7041;
+  border-radius: 7px;
+}
+.skyra-booking__login-link {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 0;
+  border: 0;
+  background: transparent;
+  color: var(--sb-muted);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+@media (max-width: 720px) {
+  .skyra-booking__login {
+    width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+    padding: 48px 22px max(20px, env(safe-area-inset-bottom));
+  }
+  .skyra-booking__session-copy [data-booking-details] { grid-column: auto; }
+}
+
+.skyra-booking__toolbar select {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}

@@ -229,50 +229,6 @@ restartGalleryAutoplay();
 window.addEventListener("resize", renderGallery);
 window.addEventListener("pagehide", stopGalleryAutoplay, { once: true });
 
-const filterButtons = [...document.querySelectorAll("[data-filter]")];
-const sessionRows = [...document.querySelectorAll(".session-row")];
-const scheduleEmpty = document.querySelector("[data-schedule-empty]");
-const resetFilter = document.querySelector("[data-reset-filter]");
-
-function applySessionFilter(filter) {
-  let visibleCount = 0;
-
-  filterButtons.forEach((button) => {
-    const active = button.dataset.filter === filter;
-    button.classList.toggle("is-active", active);
-    button.setAttribute("aria-pressed", String(active));
-  });
-
-  sessionRows.forEach((row) => {
-    const visible = filter === "all" || row.dataset.time === filter;
-    row.hidden = !visible;
-    if (visible) visibleCount += 1;
-  });
-
-  if (scheduleEmpty) scheduleEmpty.hidden = visibleCount > 0;
-}
-
-filterButtons.forEach((button) => {
-  button.addEventListener("click", () => applySessionFilter(button.dataset.filter || "all"));
-});
-
-resetFilter?.addEventListener("click", () => applySessionFilter("all"));
-
-const bookingPreview = document.querySelector("[data-booking-preview]");
-const bookingName = document.querySelector("[data-booking-name]");
-
-document.querySelectorAll("[data-session]").forEach((button) => {
-  button.addEventListener("click", () => {
-    if (!bookingPreview || !bookingName) return;
-    bookingName.textContent = button.dataset.session || "Session";
-    bookingPreview.hidden = false;
-    bookingPreview.focus();
-  });
-});
-
-document.querySelector("[data-close-preview]")?.addEventListener("click", () => {
-  if (bookingPreview) bookingPreview.hidden = true;
-});
 const communityForm = document.querySelector("[data-community-form]");
 const communityEmail = document.querySelector("[data-community-email]");
 const communityStatus = document.querySelector("[data-community-status]");

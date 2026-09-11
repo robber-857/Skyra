@@ -1,0 +1,270 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+model Session {
+  id String @id
+  shop String
+  state String
+  isOnline Boolean @default(false)
+  scope String?
+  expires DateTime?
+  accessToken String
+  userId BigInt?
+  firstName String?
+  lastName String?
+  email String?
+  accountOwner Boolean @default(false)
+  locale String?
+  collaborator Boolean? @default(false)
+  emailVerified Boolean? @default(false)
+  refreshToken String?
+  refreshTokenExpires DateTime?
+}
+model Shop {
+  id String @id @default(uuid()) @db.Uuid
+  domain String @unique
+  timezone String @default("Australia/Sydney")
+  status String @default("ACTIVE")
+  rules Json @default("{}")
+  rulesApprovedAt DateTime? @db.Timestamptz
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+}
+model StaffAccount {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  subject String
+  role String
+  status String @default("ACTIVE")
+  displayName String
+  @@unique([shopId, subject])
+}
+model Category {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  name String
+  @@unique([shopId, name])
+}
+model Coach {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  name String
+  status String @default("ACTIVE")
+  bufferBeforeMin Int @default(0)
+  bufferAfterMin Int @default(0)
+  services ServiceCoach[]
+  sessions ClassSession[]
+  @@unique([shopId, id])
+}
+model Location {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  name String
+  timezone String @default("Australia/Sydney")
+  services Service[]
+  sessions ClassSession[]
+  @@unique([shopId, id])
+  @@unique([shopId, name])
+}
+model Service {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  categoryId String? @db.Uuid
+  name String
+  kind String @default("CLASS")
+  description String @default("")
+  level String @default("")
+  durationMin Int
+  capacity Int
+  locationId String @db.Uuid
+  status String @default("DRAFT")
+  requestedPriceCents Int
+  version Int @default(1)
+  location Location @relation(fields: [shopId, locationId], references: [shopId, id])
+  coaches ServiceCoach[]
+  passes PassEligibility[]
+  sessions ClassSession[]
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  @@unique([shopId, id])
+}
+model ServiceCoach {
+  shopId String @db.Uuid
+  serviceId String @db.Uuid
+  coachId String @db.Uuid
+  service Service @relation(fields: [shopId, serviceId], references: [shopId, id])
+  coach Coach @relation(fields: [shopId, coachId], references: [shopId, id])
+  @@id([shopId, serviceId, coachId])
+}
+model PassPlan {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  name String
+  credits Int
+  validityDays Int
+  introOnly Boolean @default(false)
+  status String @default("DRAFT")
+  requestedPriceCents Int
+  version Int @default(1)
+  services PassEligibility[]
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  @@unique([shopId, id])
+  holds BookingHold[]
+}
+model PassEligibility {
+  shopId String @db.Uuid
+  passPlanId String @db.Uuid
+  serviceId String @db.Uuid
+  passPlan PassPlan @relation(fields: [shopId, passPlanId], references: [shopId, id])
+  service Service @relation(fields: [shopId, serviceId], references: [shopId, id])
+  @@id([shopId, passPlanId, serviceId])
+}
+model ProductMapping {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  ownerType String
+  ownerId String @db.Uuid
+  productGid String?
+  variantGid String?
+  syncStatus String @default("PENDING")
+  requestedVersion Int @default(1)
+  shopifyVersion Int @default(0)
+  publishedPrice String?
+  publishedTitle String?
+  productStatus String?
+  lastError String?
+  syncedAt DateTime? @db.Timestamptz
+  @@unique([shopId, ownerType, ownerId])
+  @@unique([shopId, variantGid])
+}
+model ClassSession {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  serviceId String @db.Uuid
+  coachId String @db.Uuid
+  locationId String @db.Uuid
+  startsAt DateTime @db.Timestamptz
+  endsAt DateTime @db.Timestamptz
+  busyStartsAt DateTime @db.Timestamptz
+  busyEndsAt DateTime @db.Timestamptz
+  timezone String
+  capacity Int
+  status String @default("DRAFT")
+  version Int @default(1)
+  dedupeKey String
+  service Service @relation(fields: [shopId, serviceId], references: [shopId, id])
+  coach Coach @relation(fields: [shopId, coachId], references: [shopId, id])
+  location Location @relation(fields: [shopId, locationId], references: [shopId, id])
+  createdAt DateTime @default(now()) @db.Timestamptz
+  @@unique([shopId, dedupeKey])
+  @@unique([shopId, id])
+  @@index([shopId, startsAt])
+  attempts BookingAttempt[]
+  holds BookingHold[]
+  bookings Booking[]
+}
+model OutboxEvent {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  kind String
+  aggregateId String @db.Uuid
+  version Int
+  payload Json @default("{}")
+  status String @default("PENDING")
+  attempts Int @default(0)
+  availableAt DateTime @default(now()) @db.Timestamptz
+  lastError String?
+  createdAt DateTime @default(now()) @db.Timestamptz
+  @@unique([shopId, kind, aggregateId, version])
+  @@index([status, availableAt])
+}
+model WebhookReceipt {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  webhookId String
+  topic String
+  payloadHash String
+  status String @default("RECEIVED")
+  receivedAt DateTime @default(now()) @db.Timestamptz
+  @@unique([shopId, webhookId])
+}
+model AuditLog {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  actorId String
+  action String
+  entityId String
+  before Json?
+  after Json?
+  createdAt DateTime @default(now()) @db.Timestamptz
+  @@index([shopId, createdAt])
+}
+
+
+model CustomerProfile {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  shopifyCustomerGid String
+  attempts BookingAttempt[]
+  holds BookingHold[]
+  bookings Booking[]
+  createdAt DateTime @default(now()) @db.Timestamptz
+  @@unique([shopId, shopifyCustomerGid])
+  @@unique([shopId, id])
+}
+model BookingAttempt {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  tokenHash String @unique
+  sessionId String @db.Uuid
+  customerId String? @db.Uuid
+  surface String
+  status String @default("LOGIN_REQUIRED")
+  expiresAt DateTime @db.Timestamptz
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  session ClassSession @relation(fields: [shopId, sessionId], references: [shopId, id])
+  customer CustomerProfile? @relation(fields: [shopId, customerId], references: [shopId, id])
+  hold BookingHold?
+  @@unique([shopId, id])
+  @@unique([shopId, id, sessionId, customerId])
+  @@index([status, expiresAt])
+}
+model BookingHold {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  attemptId String @unique @db.Uuid
+  sessionId String @db.Uuid
+  customerId String @db.Uuid
+  passPlanId String @db.Uuid
+  idempotencyKey String @db.Uuid
+  status String @default("ACTIVE")
+  expiresAt DateTime @db.Timestamptz
+  createdAt DateTime @default(now()) @db.Timestamptz
+  attempt BookingAttempt @relation(fields: [shopId, attemptId], references: [shopId, id])
+  session ClassSession @relation(fields: [shopId, sessionId], references: [shopId, id])
+  customer CustomerProfile @relation(fields: [shopId, customerId], references: [shopId, id])
+  passPlan PassPlan @relation(fields: [shopId, passPlanId], references: [shopId, id])
+  @@unique([shopId, attemptId])
+  @@unique([shopId, customerId, idempotencyKey])
+  @@index([shopId, sessionId, status, expiresAt])
+  @@index([status, expiresAt])
+}
+// Capacity projection only. Entitlement confirmation / cancellation APIs are M3/M4 follow-ups.
+model Booking {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  sessionId String @db.Uuid
+  customerId String @db.Uuid
+  status String @default("CONFIRMED")
+  createdAt DateTime @default(now()) @db.Timestamptz
+  session ClassSession @relation(fields: [shopId, sessionId], references: [shopId, id])
+  customer CustomerProfile @relation(fields: [shopId, customerId], references: [shopId, id])
+  @@index([shopId, sessionId, status])
+  @@unique([shopId, id])
+}

@@ -1,7 +1,6 @@
 {{ 'skyra.css' | asset_url | stylesheet_tag }}
 {{ 'skyra-commerce.css' | asset_url | stylesheet_tag }}
 <script src="{{ 'skyra.js' | asset_url }}" defer="defer"></script>
-{% assign booking_url = section.settings.booking_url | default: 'https://clients.mindbodyonline.com/LoginLaunch?studioid=5752635' %}
 <div class="skyra-home commerce-page programs-page" data-section-id="{{ section.id }}">
     <a class="skip-link" href="#main">Skip to content</a>
 
@@ -17,7 +16,7 @@
       </nav>
 
       <div class="header-actions">
-        <a class="header-booking" href="{{ booking_url }}">Booking now</a>
+        <a class="header-booking" href="#skyra-booking-programs">Booking now</a>
         <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation">
           <span class="menu-toggle__lines" aria-hidden="true"><i></i><i></i></span>
           <span class="menu-toggle__label">More</span>
@@ -43,60 +42,22 @@
         <div class="programs-hero__copy">
           <h1 id="programs-title"><span>Welcome to</span><span>Skyra Studio Dance Studio!</span></h1>
           <p>Build clarity, structure and confidence through every class. Small groups allow space for personal attention and steady progress.</p>
-          <a class="commerce-button" href="{{ booking_url }}">Booking now <span aria-hidden="true">→</span></a>
+          <a class="commerce-button" href="#skyra-booking-programs">Booking now <span aria-hidden="true">→</span></a>
         </div>
         <figure class="programs-hero__media">
           <img src="{{ 'skyra-programs-hero-wide.png' | asset_url }}" alt="Aerial dancer performing with white silk at Skyra Studio" width="2043" height="770" fetchpriority="high" />
         </figure>
       </section>
 
-      <section class="schedule-panel reveal" aria-labelledby="schedule-title">
-        <div class="schedule-panel__header">
-          <div>
-            <h2 id="schedule-title">Find a Class</h2>
-            <p>Upcoming class calendar</p>
-          </div>
-          <div class="schedule-panel__actions">
-            <a href="{{ routes.account_url }}">My account</a>
-            <a class="schedule-filter" href="{{ booking_url }}">Class type <span aria-hidden="true">⌄</span></a>
-            <a class="schedule-filter" href="{{ booking_url }}">Instructor <span aria-hidden="true">⌄</span></a>
-            <a class="schedule-filter" href="{{ booking_url }}">Full calendar</a>
-          </div>
-        </div>
-
-        <div class="schedule-days" aria-label="Schedule dates">
-          <a href="{{ booking_url }}" aria-current="date"><span>Today</span><strong>2</strong></a>
-          <a href="{{ booking_url }}"><span>Thu</span><strong>3</strong></a>
-          <a href="{{ booking_url }}"><span>Fri</span><strong>4</strong></a>
-          <a href="{{ booking_url }}"><span>Sat</span><strong>5</strong></a>
-          <a href="{{ booking_url }}"><span>Sun</span><strong>6</strong></a>
-          <a href="{{ booking_url }}"><span>Mon</span><strong>7</strong></a>
-          <a href="{{ booking_url }}"><span>Tue</span><strong>8</strong></a>
-        </div>
-
-        <div class="schedule-date"><span aria-hidden="true">▣</span> Wednesday, Sep 2 <small>Times are shown in the studio timezone.</small></div>
-        <div class="schedule-list">
-          <article class="schedule-row">
-            <div class="schedule-time"><strong>5:45 PM</strong><span>55 min</span></div>
-            <div class="schedule-class"><strong>Aerial Flow Basics+ (Beginner+ Level)</strong><span>Karen Song</span></div>
-            <span class="schedule-location">Skyra Studio</span>
-            <a href="{{ booking_url }}">Book</a>
-          </article>
-          <article class="schedule-row">
-            <div class="schedule-time"><strong>7:00 PM</strong><span>90 min</span></div>
-            <div class="schedule-class"><strong>K-Pop Performance</strong><span>Winny Wang</span></div>
-            <span class="schedule-location">Skyra Studio</span>
-            <a href="{{ booking_url }}">Book</a>
-          </article>
-          <article class="schedule-row">
-            <div class="schedule-time"><strong>8:30 PM</strong><span>55 min</span></div>
-            <div class="schedule-class"><strong>Aerial Tone &amp; Stretch</strong><span>Stacie Wang</span></div>
-            <span class="schedule-location">Skyra Studio</span>
-            <a href="{{ booking_url }}">Book</a>
-          </article>
-        </div>
+      <section class="schedule-panel reveal" aria-label="Find a class">
+        <div
+          id="skyra-booking-programs"
+          data-skyra-booking-root
+          data-surface="programs"
+          data-proxy-base="/apps/skyra-booking"
+        ></div>
+        <noscript>Enable JavaScript to view live class availability.</noscript>
       </section>
-
       <section class="programs-listing" aria-labelledby="our-programs-title">
         <header class="section-heading reveal">
           <p>Experience the joy of dance at Skyra Studio</p>
@@ -105,27 +66,27 @@
         <div class="program-grid">
           <article class="program-card reveal">
             <img src="{{ 'skyra-program-kpop.png' | asset_url }}" alt="K-Pop choreography class" width="1536" height="1024" loading="lazy" />
-            <div><h3>K-Pop Program</h3><p>Learn current K-Pop choreography with energy, style and confidence.</p><a href="{{ booking_url }}">Learn more <span aria-hidden="true">→</span></a></div>
+            <div><h3>K-Pop Program</h3><p>Learn current K-Pop choreography with energy, style and confidence.</p><a href="#skyra-booking-programs">Learn more <span aria-hidden="true">→</span></a></div>
           </article>
           <article class="program-card reveal">
             <img src="{{ 'skyra-program-aerial.png' | asset_url }}" alt="Aerial movement class" width="1536" height="1024" loading="lazy" />
-            <div><h3>Aerial Movement</h3><p>Build strength, flexibility and grace through aerial skills and hammock training.</p><a href="{{ booking_url }}">Learn more <span aria-hidden="true">→</span></a></div>
+            <div><h3>Aerial Movement</h3><p>Build strength, flexibility and grace through aerial skills and hammock training.</p><a href="#skyra-booking-programs">Learn more <span aria-hidden="true">→</span></a></div>
           </article>
           <article class="program-card reveal">
             <img src="{{ 'skyra-program-chinese-fusion.png' | asset_url }}" alt="Expressive fusion dance class" width="1536" height="1024" loading="lazy" />
-            <div><h3>Chinese Fusion Dance</h3><p>Explore traditional movement blended with modern expression.</p><a href="{{ booking_url }}">Learn more <span aria-hidden="true">→</span></a></div>
+            <div><h3>Chinese Fusion Dance</h3><p>Explore traditional movement blended with modern expression.</p><a href="#skyra-booking-programs">Learn more <span aria-hidden="true">→</span></a></div>
           </article>
           <article class="program-card reveal">
             <img src="{{ 'skyra-program-hip-hop.png' | asset_url }}" alt="Choreography and hip-hop movement" width="1536" height="1024" loading="lazy" />
-            <div><h3>Hip-Hop Program</h3><p>Develop rhythm, groove and stage presence through urban dance styles.</p><a href="{{ booking_url }}">Learn more <span aria-hidden="true">→</span></a></div>
+            <div><h3>Hip-Hop Program</h3><p>Develop rhythm, groove and stage presence through urban dance styles.</p><a href="#skyra-booking-programs">Learn more <span aria-hidden="true">→</span></a></div>
           </article>
           <article class="program-card reveal">
             <img src="{{ 'skyra-program-jazz.png' | asset_url }}" alt="Floorwork and jazz technique" width="1536" height="1024" loading="lazy" />
-            <div><h3>Jazz Dance</h3><p>Improve technique, strength and musicality with dynamic jazz routines.</p><a href="{{ booking_url }}">Learn more <span aria-hidden="true">→</span></a></div>
+            <div><h3>Jazz Dance</h3><p>Improve technique, strength and musicality with dynamic jazz routines.</p><a href="#skyra-booking-programs">Learn more <span aria-hidden="true">→</span></a></div>
           </article>
           <article class="program-card reveal">
             <img src="{{ 'skyra-program-heels.png' | asset_url }}" alt="Flexibility and heels movement" width="1536" height="1024" loading="lazy" />
-            <div><h3>Heels</h3><p>Build confidence and elegance through strong, expressive movement.</p><a href="{{ booking_url }}">Learn more <span aria-hidden="true">→</span></a></div>
+            <div><h3>Heels</h3><p>Build confidence and elegance through strong, expressive movement.</p><a href="#skyra-booking-programs">Learn more <span aria-hidden="true">→</span></a></div>
           </article>
         </div>
       </section>
@@ -133,7 +94,7 @@
       <section class="commerce-cta reveal" aria-labelledby="program-cta-title">
         <span class="commerce-cta__icon" aria-hidden="true">□</span>
         <div><h2 id="program-cta-title">Ready to move with us?</h2><p>Explore the schedule and choose the class that fits you.</p></div>
-        <a class="commerce-button" href="{{ booking_url }}">Book your class now <span aria-hidden="true">→</span></a>
+        <a class="commerce-button" href="#skyra-booking-programs">Book your class now <span aria-hidden="true">→</span></a>
       </section>
     </main>
     <footer class="site-footer">
@@ -192,7 +153,6 @@
   "name": "Skyra programs",
   "settings": [
     { "type": "link_list", "id": "menu", "label": "Main menu", "default": "main-menu" },
-    { "type": "url", "id": "booking_url", "label": "Booking URL" },
     { "type": "url", "id": "programs_link", "label": "Programs page" },
     { "type": "url", "id": "membership_link", "label": "Membership page" },
     { "type": "url", "id": "mv_project_link", "label": "MV Project page" },

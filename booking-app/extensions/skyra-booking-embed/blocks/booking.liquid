@@ -1,0 +1,48 @@
+<script src="{{ 'attempt.js' | asset_url }}" defer></script>
+<script src="{{ 'login.js' | asset_url }}" defer></script>
+<script type="application/json" data-skyra-booking-config>
+{
+  "copy": {
+    "book": {{ 'booking.book' | t | json }},
+    "loginClose": {{ 'booking.login_close' | t | json }},
+    "loginChecking": {{ 'booking.login_checking' | t | json }},
+    "loginWaiting": {{ 'booking.login_waiting' | t | json }},
+    "loginBlocked": {{ 'booking.login_blocked' | t | json }},
+    "loginSameTab": {{ 'booking.login_same_tab' | t | json }},
+    "loginCheckAgain": {{ 'booking.login_check_again' | t | json }},
+    "loginError": {{ 'booking.login_error' | t | json }},
+    "title": {{ 'booking.title' | t | json }},
+    "subtitle": {{ 'booking.subtitle' | t | json }},
+    "account": {{ 'booking.account' | t | json }},
+    "classType": {{ 'booking.class_type' | t | json }},
+    "allClasses": {{ 'booking.all_classes' | t | json }},
+    "instructor": {{ 'booking.instructor' | t | json }},
+    "allInstructors": {{ 'booking.all_instructors' | t | json }},
+    "loading": {{ 'booking.loading' | t | json }},
+    "empty": {{ 'booking.empty' | t | json }},
+    "error": {{ 'booking.error' | t | json }},
+    "retry": {{ 'booking.retry' | t | json }},
+    "spots": {{ 'booking.spots' | t | json }},
+    "spot": {{ 'booking.spot' | t | json }},
+    "full": {{ 'booking.full' | t | json }},
+    "details": {{ 'booking.details' | t | json }},
+    "back": {{ 'booking.back' | t | json }},
+    "continue": {{ 'booking.continue' | t | json }},
+    "signInTitle": {{ 'booking.sign_in_title' | t | json }},
+    "signInBody": {{ 'booking.sign_in_body' | t | json }},
+    "signIn": {{ 'booking.sign_in' | t | json }},
+    "passTitle": {{ 'booking.pass_title' | t | json }},
+    "passUnavailable": {{ 'booking.pass_unavailable' | t | json }},
+    "studioTimezone": {{ 'booking.studio_timezone' | t | json }}
+  }
+}
+</script>
+{% schema %}
+{
+  "name": "Skyra Booking",
+  "target": "body",
+  "javascript": "booking.js",
+  "stylesheet": "booking.css",
+  "settings": []
+}
+{% endschema %}
