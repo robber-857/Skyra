@@ -13,12 +13,12 @@
 ## 当前可测试的内容
 
 1. Home 的 Find a Class 选择 **2026-09-12**：测试课 `[DEV] Aerial Foundations`，18:30，Development Coach，60 分钟。
-2. 切换日期、Class type 和 Instructor；查看空状态、剩余名额与 Details。
+2. 切换日期、Class type 和 Instructor；打开 Full Calendar 选择未来 31 天日期（支持跨月）；查看空状态、剩余名额与 Details。
 3. 未登录时点击 Book / Continue to booking，检查登录弹层和 Shopify 登录入口。完成真实顾客登录及返回恢复仍待用户联调，不代表已验收。
 4. Admin 测试 Settings、People、Classes & Passes、Weekly Schedule。编辑开发数据后，观察 Shopify 商品同步状态。
-5. 窄屏检查日期横滑、信息换行、详情和登录弹层。完整 Pass/Review 的桌面与手机 UI 尚未完成。
+5. 窄屏检查日期横滑、信息换行、详情和登录弹层。登录后可测试新 Pass cards 与 Review（需要可用的 Shopify 顾客会话）；手机 Booking Details 可折叠。
 
-当前不能完整选 Pass、支付、扣课、确认预约或操作 Customer/Coach 个人中心。`onlineBookingsEnabled` 保持关闭；内部 15 分钟 Hold 与并发容量已通过数据库测试，但尚未开放付款流程。
+已实现新 Pass 选择和 Review；当前不能支付、使用已有 Pass 扣课、确认预约或操作 Customer/Coach 个人中心。`onlineBookingsEnabled` 保持关闭；内部 15 分钟 Hold 与并发容量已通过数据库测试，但尚未开放付款流程。
 
 ## 重启预览
 
@@ -47,3 +47,5 @@ shopify theme dev --store skyra-booking-dev.myshopify.com --port 9292 --ignore a
 - **已有 Pass**：核验余额与资格后直接确认并扣课，不进入 A$0 Checkout。
 
 官方依据：[productSet 商品同步](https://shopify.dev/docs/api/admin-graphql/latest/mutations/productSet)、[Cart API](https://shopify.dev/docs/api/ajax/reference/cart)、[本地 App 预览](https://shopify.dev/docs/apps/build/cli-for-apps/test-apps-locally)。
+
+本轮验证：61 项测试、构建与官方扩展校验通过；Home 真实开发主题桌面/手机无溢出。两个 surface 的 Calendar/Pass/Review 在本地 fixture 验证，未冒充真实 Shopify 登录或付款成功。

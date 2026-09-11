@@ -139,18 +139,24 @@ Home and Programs use the same component, state machine and API client. `data-su
 7. Escape, close and backdrop dismissal retain the original date, filters and class, restore focus and stop polling. A delayed response must not reopen a cancelled flow. Network errors fail closed and offer retry.
 8. Login never reserves capacity, consumes a Pass or creates a Checkout. Every subsequent protected API must independently authenticate and authorize the Shopify customer.
 
-### Current implementation and remaining work (2026-09-10)
+### Current implementation and remaining work (2026-09-11)
 
 - `POST /apps/skyra-booking/start` creates a server BookingAttempt without holding a seat. `POST /apps/skyra-booking/attempt` resumes it and atomically binds an authenticated Shopify customer. Both validate App Proxy identity, accept JSON with `X-Skyra-Booking: 1`, reject cross-site/simple-form writes and return private/no-store JSON.
 - The random 32-byte token is stored only as SHA-256 in PostgreSQL. HOME maps to `/?skyra_attempt=...#skyra-booking-home`; PROGRAMS maps to `/pages/programs?skyra_attempt=...#skyra-booking-programs`. Arbitrary return URLs and client customer IDs are rejected.
 - Default attempt recovery lasts 30 minutes. A bound attempt cannot change customer, shop or Session. Hold creation may extend recovery only far enough to cover that Hold's existing 15-minute deadline.
 - The browser restores the server-selected class, current capacity and status. sessionStorage holds the opaque token plus optional date/filter UI preferences, never a trusted customer or booking. A Shopify return URL can restore the attempt even when browser storage is blocked; the token is removed from the visible URL after successful resolution.
 - `/sessions` is now non-cacheable and reports capacity less confirmed Bookings and unexpired active Holds, plus the 14-day / two-hour booking-window state. The signed mutation remains authoritative when another customer takes the last place.
-- Internal Hold creation/release/expiry and database capacity constraints are implemented and tested. There is no public Hold/Checkout endpoint yet; the development shop's online booking switch remains false. Pass/Review UI and entitlement/confirmation/payment processing are still pending.
+- Internal Hold creation/release/expiry and database capacity constraints are implemented and tested. There is no public Hold/Checkout endpoint yet; the development shop's online booking switch remains false. New-Pass selection/Review UI is implemented; owned-Pass entitlements, confirmation and payment processing are still pending.
 - Current DB attempt states: LOGIN_REQUIRED / STARTED / HOLD_ACTIVE / RECOVERY / EXPIRED. The final Checkout/PROCESSING/CONFIRMED states in the target design are not implemented yet.
 - PostgreSQL concurrency tests, built-app HTTP tests with the real Shopify signature validator, and responsive browser fixtures pass. Real Shopify hosted customer login/logout and cross-domain cookie/return behavior still need development-store integration; production is not deployed.
 
 Shopify references: [Customer sign-in links and redirects](https://shopify.dev/docs/storefronts/themes/sign-in), [App Proxy authentication](https://shopify.dev/docs/apps/build/online-store/app-proxies/authenticate-app-proxies).
+
+### Delivered selection / Review slice (2026-09-11)
+
+Home and Programs use the same responsive Programs-style component and a 31-day in-section Full Calendar. `POST /apps/skyra-booking/pass-options` requires the verified, bound Shopify customer and opaque Attempt. It validates current session availability and returns eligible active, synchronized non-Intro new Passes with matching price/version and adequate validity. An optional `passPlanId` revalidates the selection for Review; arbitrary client fields/prices are rejected.
+
+The new-Pass cards and Review summary are implemented for desktop and mobile. Checkout is explicitly unavailable: selection/review create no Hold, Cart, payment or booking. Owned Passes, Intro history, Drop-in, customer identity summary, final Shopify channel availability and checkout recovery remain pending. This is a partial implementation of the full target contract below.
 
 ## 3. PASS_SELECTION state inside the Booking section
 

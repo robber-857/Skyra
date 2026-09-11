@@ -4,6 +4,7 @@ import { DateTime } from "luxon";
 import db from "../app/db.server";
 import {
   startAttempt,
+  bookingPassOptions,
   resumeAttempt,
   createSeatHold,
   releaseSeatHold,
@@ -490,4 +491,109 @@ test("an expired anonymous attempt cannot bind a customer or extend its lifetime
   });
   expect(record.customerId).toBeNull();
   expect(record.expiresAt).toEqual(expiresAt);
+});
+
+async function selectablePass(f: Awaited<ReturnType<typeof fixture>>) {
+  await db.productMapping.updateMany({
+    where: { shopId: f.shopId, ownerType: "PASS_PLAN" },
+    data: {
+      productGid: "gid://shopify/Product/123",
+      publishedPrice: "220.00",
+      shopifyVersion: 1,
+      requestedVersion: 1,
+    },
+  });
+}
+test("Pass options require the bound Shopify customer and isolate shops", async () => {
+  const f = await fixture(),
+    other = await fixture();
+  await selectablePass(f);
+  const { token } = await f.start();
+  await expect(
+    bookingPassOptions(f.actor(null), { token }),
+  ).rejects.toMatchObject({ code: "LOGIN_REQUIRED" });
+  await expect(bookingPassOptions(f.actor(2), { token })).rejects.toMatchObject(
+    { code: "FORBIDDEN" },
+  );
+  await expect(
+    bookingPassOptions(other.actor(), { token }),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  const result = await bookingPassOptions(f.actor(), { token });
+  expect(result.passes).toHaveLength(1);
+  expect(result.checkoutAvailable).toBe(false);
+  expect(await db.bookingHold.count({ where: { shopId: f.shopId } })).toBe(0);
+});
+test("Review rejects expired attempts and closed or full classes", async () => {
+  const f = await fixture(1);
+  await selectablePass(f);
+  const a = await f.start(),
+    b = await f.start(2);
+  await f.hold(b.token, 2);
+  await expect(
+    bookingPassOptions(f.actor(), { token: a.token, passPlanId: f.pass.id }),
+  ).rejects.toMatchObject({ code: "SOLD_OUT" });
+  await db.bookingAttempt.updateMany({
+    where: { shopId: f.shopId },
+    data: {
+      createdAt: new Date(Date.now() - 31 * 60000),
+      expiresAt: new Date(Date.now() - 60000),
+    },
+  });
+  await expect(
+    bookingPassOptions(f.actor(), { token: a.token }),
+  ).rejects.toMatchObject({ code: "ATTEMPT_EXPIRED" });
+});
+test("Only eligible active synchronized non-intro Passes are shown", async () => {
+  const f = await fixture();
+  await selectablePass(f);
+  const { token } = await f.start();
+  for (const change of [
+    { introOnly: true },
+    { status: "DRAFT" },
+    { validityDays: 1 },
+  ]) {
+    await db.passPlan.update({ where: { id: f.pass.id }, data: change });
+    expect((await bookingPassOptions(f.actor(), { token })).passes).toEqual([]);
+    await db.passPlan.update({
+      where: { id: f.pass.id },
+      data: { introOnly: false, status: "ACTIVE", validityDays: 90 },
+    });
+  }
+  await db.passEligibility.deleteMany({ where: { passPlanId: f.pass.id } });
+  expect((await bookingPassOptions(f.actor(), { token })).passes).toEqual([]);
+});
+test("Review revalidates price and mapping version without trusting a browser amount", async () => {
+  const f = await fixture();
+  await selectablePass(f);
+  const { token } = await f.start();
+  expect(
+    (await bookingPassOptions(f.actor(), { token, passPlanId: f.pass.id }))
+      .selected?.priceCents,
+  ).toBe(22000);
+  await db.passPlan.update({
+    where: { id: f.pass.id },
+    data: { requestedPriceCents: 22500, version: 2 },
+  });
+  await expect(
+    bookingPassOptions(f.actor(), { token, passPlanId: f.pass.id }),
+  ).rejects.toMatchObject({ code: "PASS_UNAVAILABLE" });
+  await db.productMapping.updateMany({
+    where: { shopId: f.shopId },
+    data: { publishedPrice: "225.00", shopifyVersion: 2, requestedVersion: 2 },
+  });
+  expect(
+    (await bookingPassOptions(f.actor(), { token, passPlanId: f.pass.id }))
+      .selected?.priceCents,
+  ).toBe(22500);
+  await expect(
+    bookingPassOptions(f.actor(), {
+      token,
+      passPlanId: f.pass.id,
+      priceCents: 1,
+    }),
+  ).rejects.toThrow();
+  const foreign = await fixture();
+  await expect(
+    bookingPassOptions(f.actor(), { token, passPlanId: foreign.pass.id }),
+  ).rejects.toMatchObject({ code: "PASS_UNAVAILABLE" });
 });

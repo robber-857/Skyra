@@ -49,9 +49,11 @@
 - 不再使用“Home 只有三条静态 Preview、Programs 的 Book 按钮跳 Mindbody”的方案。
 - 不再设计独立的 Class Details、Select a Pass、Cart 或 Confirm Payment 页面；它们是同一区块内的状态，支付表单只属于 Shopify Checkout。
 - 不为每周的每一场 Session 创建 Shopify Product。Class/Pass 定义可同步 Product/Variant，实际排课只进入 Booking DB。
-- `shopify-theme/sections/skyra-home.liquid` 和 `shopify-theme/sections/skyra-programs.liquid` 里的现有静态排课属于待迁移代码，不是后端实现依据。
+- `shopify-theme/sections/skyra-home.liquid` 和 `shopify-theme/sections/skyra-programs.liquid` 已替换为共享挂载节点；根目录静态 HTML 原型不作为后端实现依据。
 
 
 ## 当前测试入口（2026-09-11）
 
 参见 [开发预览与测试指南](preview-testing.md)：Home/Booking Admin 入口、当前可测试范围、启动命令及 Shopify 商品和支付分工。先体验当前阶段，再继续未完成交易功能。
+
+当前交付包含共享 Programs 样式、Full Calendar、新 Pass 选择和 Review；支付及已有 Pass 确认未开放。详见 [开发状态](development-status.md)。

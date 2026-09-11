@@ -226,11 +226,11 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 - [x] M5-01 创建 Theme App Extension app embed，加载一份版本化 Booking JS/CSS，自动挂载所有 `data-skyra-booking-root` 节点。
 - [x] M5-02 Home：用 `data-surface="home"` 占位节点替换静态 “Booking that feels like Skyra” rows、preview UI 与相关 demo JavaScript。
 - [x] M5-03 Programs：用 `data-surface="programs"` 占位节点替换硬编码 Find a Class 和所有 Mindbody Book/filter/date links。
-- [ ] M5-04 完成共享 BROWSE：按 Programs Find a Class 视觉实现月标题、七日日期条、前后周、Class type/Instructor filters、实时容量、loading/empty/error 和区块内 Full calendar。七日条、筛选和实时 Session 已联调；本轮补充独立 Book 与 Show details，剩余 Full calendar 与最终视觉精修。
+- [ ] M5-04 完成共享 BROWSE：按 Programs Find a Class 视觉实现月标题、七日日期条、前后周、Class type/Instructor filters、实时容量、loading/empty/error 和区块内 Full calendar。七日条、筛选和实时 Session 已联调；本轮补充独立 Book 与 Show details，2026-09-11 已完成 Programs 共享宽面板、31 天 Full Calendar 和跨月选择；剩余独立前后周、未开放文案与完整 E2E。
 - [ ] M5-05 完成 DETAILS：Show details 在 Session 行内展开或在同一 surface 替换内容，显示课程、老师、地点、level、policy、剩余名额；Back 恢复日期、筛选、滚动和焦点。
 - [ ] M5-06 完成 LOGIN_REQUIRED：Shopify 登录 modal/popup/手机同页登录已实现，并已接服务器 opaque Attempt 与固定返回路径；签名身份绑定、无 storage 恢复通过本地验证。真实开发店客户登录/退出、跨域 cookie 与返回联调尚未完成，保持部分完成。
-- [ ] M5-07 完成 PASS_SELECTION：采用参考图的主栏 Pass cards + 右栏 Booking Details；已有适用 Pass 优先显示余额、到期与 `A$0 due today`，购买选项显示已同步 Shopify Variant 实时价格，未选择时 Continue 禁用。
-- [ ] M5-08 新增 REVIEW：采用参考图的交易摘要结构，显示 Customer、Class、日期时间、Coach、Location、选中 Pass/Drop-in、价格与 Edit；这是当前 Booking section 的状态，不是 Customer Account 或独立 Cart 页面。
+- [ ] M5-07 完成 PASS_SELECTION：采用参考图的主栏 Pass cards + 右栏 Booking Details；已有适用 Pass 优先显示余额、到期与 `A$0 due today`，购买选项显示已同步 Shopify Variant 实时价格，未选择时 Continue 禁用。2026-09-11 已完成新 Pass cards、资格/同步价格检查和响应式 Booking Details；已有 Pass/Drop-in/最终 Shopify 可售校验待接。
+- [ ] M5-08 新增 REVIEW：采用参考图的交易摘要结构，显示 Customer、Class、日期时间、Coach、Location、选中 Pass/Drop-in、价格与 Edit；这是当前 Booking section 的状态，不是 Customer Account 或独立 Cart 页面。2026-09-11 已完成新 Pass 摘要、服务端价格/名额复核及 Edit；Customer/已有 Pass/Drop-in 与支付交接未完成。
 - [ ] M5-09 已有 Pass 从 REVIEW 走原子确认并显示 CONFIRMING → CONFIRMED，不创建 A$0 Checkout。
 - [ ] M5-10 新 Pass/Drop-in 从 REVIEW 创建 15 分钟 Hold、写 Cart line attribute，并通过 `checkoutUrl` 进入原生 Shopify Checkout；Booking App 不渲染支付表单。
 - [ ] M5-11 Checkout 返回后恢复 attempt，显示 webhook processing、confirmed、payment complete but seat unavailable、Needs Attention 和 retry/recovery。
@@ -379,3 +379,9 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 - 不泄露 Token、客户 PII、健康信息或内部备注。
 - 移动端和桌面端均验证。
 - 产品规则与文档同步更新。
+
+### 2026-09-11 验收补充
+
+- M5-04/07/08/12/13 保持部分完成：本轮共享 Browse / Calendar / 新 Pass / Review 的代码和响应式检查通过；完整交易、analytics、浏览器 Back、真实 Shopify 登录及 Programs Page 资源仍有剩余任务，不提前勾选全部完成。
+- 真实 Home 桌面/手机验证通过；两个 surface 的 fixture 通过。61 项测试与官方扩展校验通过。
+- 新增只读 `/pass-options`：跨店、跨客户、售罄、过期、Pass 资格和同步版本/价格变化均覆盖。Review 请求不锁座、不创建 Cart。

@@ -538,3 +538,88 @@ export async function expireBookingWork(batchSize = 100) {
   }
   return { released, expired };
 }
+
+// Read-only selection/review. No Hold or Shopify Cart is created by this endpoint.
+export const passOptionsInput = z
+  .object({
+    token: tokenSchema,
+    passPlanId: z.string().uuid().optional(),
+  })
+  .strict();
+export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
+  const input = passOptionsInput.parse(raw);
+  return withAttempt(actor, input.token, async (tx, attempt, shop, now) => {
+    if (!actor.customerGid || !attempt.customerId)
+      fail("LOGIN_REQUIRED", "Sign in with Shopify to choose a Pass.", 401);
+    if (attempt.expiresAt <= now || attempt.status !== "STARTED")
+      fail(
+        "ATTEMPT_EXPIRED",
+        "This booking needs to be restarted. Choose the class again.",
+      );
+    const session = await classForBooking(tx, shop, attempt.sessionId, now);
+    const spots =
+      (await classAvailability(shop.id, [session.id], tx)).get(session.id) || 0;
+    if (!spots) fail("SOLD_OUT", "This class is full. Choose another class.");
+    const plans = await tx.passPlan.findMany({
+      where: {
+        shopId: shop.id,
+        status: "ACTIVE",
+        introOnly: false,
+        services: { some: { shopId: shop.id, serviceId: session.serviceId } },
+      },
+      orderBy: [{ requestedPriceCents: "asc" }, { id: "asc" }],
+    });
+    const mappings = await tx.productMapping.findMany({
+      where: {
+        shopId: shop.id,
+        ownerType: "PASS_PLAN",
+        ownerId: { in: plans.map((p) => p.id) },
+        syncStatus: "SYNCED",
+        productStatus: "ACTIVE",
+      },
+    });
+    const passes = plans.flatMap((plan) => {
+      const mapping = mappings.find((m) => m.ownerId === plan.id);
+      if (
+        !mapping?.variantGid ||
+        !mapping.productGid ||
+        mapping.shopifyVersion !== plan.version ||
+        mapping.requestedVersion !== plan.version ||
+        !/^\d+(\.\d{1,2})?$/.test(mapping.publishedPrice || "") ||
+        Math.round(Number(mapping.publishedPrice) * 100) !==
+          plan.requestedPriceCents ||
+        DateTime.fromJSDate(now, { zone: session.timezone })
+          .plus({ days: plan.validityDays })
+          .toJSDate() < session.startsAt
+      )
+        return [];
+      return [
+        {
+          id: plan.id,
+          name: plan.name,
+          credits: plan.credits,
+          validityDays: plan.validityDays,
+          priceCents: plan.requestedPriceCents,
+          currency: "AUD",
+          kind: "NEW_PASS" as const,
+        },
+      ];
+    });
+    const selected = input.passPlanId
+      ? passes.find((p) => p.id === input.passPlanId)
+      : null;
+    if (input.passPlanId && !selected)
+      fail(
+        "PASS_UNAVAILABLE",
+        "This Pass has changed or is no longer available. Choose another Pass.",
+      );
+    return {
+      attemptExpiresAt: attempt.expiresAt.toISOString(),
+      spotsRemaining: spots,
+      passes,
+      selected,
+      checkoutAvailable: false,
+      ownedPassesAvailable: false,
+    };
+  });
+}

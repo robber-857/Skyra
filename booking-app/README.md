@@ -2,7 +2,7 @@
 
 Booking V3 application for the Skyra Shopify storefront. Generated from the official Shopify React Router TypeScript template; PostgreSQL + Prisma, Redis + BullMQ.
 
-**Current state:** foundation, Admin catalogue/schedule, storefront Browse/Details and Shopify login handoff, server-backed Booking Attempts, computed capacity and internal 15-minute Holds. Not a production-ready booking system. Pass selection, confirmed booking, payment, entitlement ledger and role portals are not implemented yet. See [development status](../docs/booking-system/development-status.md) and [preview and testing](../docs/booking-system/preview-testing.md).
+**Current state:** foundation, Admin catalogue/schedule, storefront Browse/Details and Shopify login handoff, server-backed Booking Attempts, computed capacity and internal 15-minute Holds. Not a production-ready booking system. Full Calendar and new-Pass selection/Review are implemented. Confirmed booking, payment, owned-Pass entitlement ledger and role portals are not implemented yet. See [development status](../docs/booking-system/development-status.md) and [preview and testing](../docs/booking-system/preview-testing.md).
 
 ## Shopify identity
 
@@ -48,8 +48,8 @@ New Class/Pass/Coach creation forms have no automatic network retry. An uncertai
 
 ## Tests and validation
 
-- `npm.cmd run test:db`: creates/uses only `skyra_booking_test` and runs 57 tests, including PostgreSQL integration and proxy/auth unit tests. Tests refuse any other database name.
-- `npm.cmd run build:theme-extension`: builds `theme-extension-src/booking.js`, `login.js` and `attempt.js` into three minified Theme App Extension assets, each under Shopify's 10 KB limit.
+- `npm.cmd run test:db`: creates/uses only `skyra_booking_test` and runs 61 tests, including PostgreSQL integration and proxy/auth unit tests. Tests refuse any other database name.
+- `npm.cmd run build:theme-extension`: builds `theme-extension-src/booking.js`, `login.js`, `attempt.js`, `calendar.js` and `transaction.js` into five minified Theme App Extension assets, each under Shopify's 10 KB limit.
 - npm.cmd run check: typecheck, ESLint, production build.
 - `shopify app config validate --json`: official app and extension config validation.
 - `scripts/validate-graphql.ts`: uses the installed Shopify AI Toolkit validator specified in `SHOPIFY_GRAPHQL_VALIDATOR`; all seven catalogue operations were validated.
@@ -61,7 +61,7 @@ New Class/Pass/Coach creation forms have no automatic network retry. An uncertai
 
 ## Extension and release boundary
 
-The Theme App Extension now loads one shared storefront bundle into explicit Home and Programs mounts. It reads published PostgreSQL Sessions through the signed /apps/skyra-booking/sessions App Proxy and renders Browse, filters, Details, Shopify sign-in guidance, and full loading/empty/error states. Availability subtracts confirmed bookings and unexpired Holds. Pass selection and confirmed booking are still unavailable.
+The Theme App Extension now loads one shared storefront bundle into explicit Home and Programs mounts. It reads published PostgreSQL Sessions through the signed /apps/skyra-booking/sessions App Proxy and renders Browse, filters, Details, Shopify sign-in guidance, and full loading/empty/error states. Availability subtracts confirmed bookings and unexpired Holds. The signed `/pass-options` endpoint supplies eligible synchronized new Passes and revalidates Review prices; checkout remains disabled. Owned Passes and confirmed booking are still unavailable.
 
 The local Home/Programs templates now use the shared mounts and no longer contain static availability, preview handlers, or Mindbody URLs. These theme changes are not deployed to the production store. The existing dirty shopify-theme/assets/skyra.css remains untouched. The development store must approve write_app_proxy and save the app embed before storefront visual testing.
 ## Sources

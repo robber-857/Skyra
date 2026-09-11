@@ -15,14 +15,17 @@ const session = {
 };
 const server = http.createServer((req, res) => {
   const pathname = new URL(req.url, "http://localhost").pathname;
-  if (["/booking.js", "/login.js", "/attempt.js", "/booking.css"].includes(pathname)) {
+  if (["/booking.js", "/login.js", "/attempt.js", "/calendar.js", "/transaction.js", "/booking.css"].includes(pathname)) {
     res.setHeader("Content-Type", pathname.endsWith("css") ? "text/css" : "text/javascript");
     return res.end(fs.readFileSync(path.join(app, "extensions/skyra-booking-embed/assets", pathname.slice(1))));
   }
   if (pathname === "/theme.css") { res.setHeader("Content-Type", "text/css"); return res.end(fs.readFileSync(path.resolve(app, "../shopify-theme/assets/skyra.css"))); }
   res.setHeader("Content-Type", "text/html");
   const surface = pathname === "/" ? "home" : "programs";
-  res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/theme.css"><link rel="stylesheet" href="/booking.css"><style>body{margin:0;padding:24px;background:#f3f2ef;font-family:Arial,sans-serif}.qa-label{font:12px Arial;color:#666;margin:0 0 24px}.qa-panel{max-width:1400px;margin:auto;padding:clamp(16px,4vw,60px);background:white;border-radius:20px}h2,h3,p{overflow-wrap:break-word}@media(max-width:720px){body{padding:12px}}</style></head><body><p class="qa-label">LOCAL UI TEST · Sample schedule · No live booking or payment</p><main class="qa-panel"><div id="skyra-booking-${surface}" data-skyra-booking-root data-surface="${surface}"></div></main><script src="/booking.js" defer></script><script src="/login.js" defer></script><script src="/attempt.js" defer></script></body></html>`);
+  const template = fs.readFileSync(path.resolve(app, "../shopify-theme/sections/skyra-" + surface + ".liquid"), "utf8");
+  const prefix = template.slice(0, template.indexOf('id="skyra-booking-' + surface + '"'));
+  const wrapper = [...prefix.matchAll(/<section[^>]*class="([^"]+)"/g)].at(-1)[1];
+  res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/theme.css"><link rel="stylesheet" href="/booking.css"><style>body{margin:0;padding:24px;background:#f3f2ef;font-family:Arial,sans-serif}.qa-label{font:12px Arial;color:#666;margin:0 0 24px}.qa-panel{max-width:1400px;margin:auto;padding:clamp(16px,4vw,60px);background:white;border-radius:20px}h2,h3,p{overflow-wrap:break-word}@media(max-width:720px){body{padding:12px}}</style></head><body><p class="qa-label">LOCAL UI TEST · Sample schedule · No live booking or payment</p><main class="${wrapper}"><div id="skyra-booking-${surface}" data-skyra-booking-root data-surface="${surface}"></div></main><script src="/calendar.js" defer></script><script src="/transaction.js" defer></script><script src="/booking.js" defer></script><script src="/login.js" defer></script><script src="/attempt.js" defer></script></body></html>`);
 });
 (async () => {
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
@@ -37,7 +40,7 @@ const server = http.createServer((req, res) => {
         let signedIn = false, authError = false, delay = 0, calls = 0;
         const errors = [];
         page.on("pageerror", e => errors.push(e.message));
-        await context.route("**/apps/skyra-booking/sessions", route => route.fulfill({ json: { timezone: "Australia/Sydney", sessions: [session] } }));
+        await context.route("**/apps/skyra-booking/sessions?*", route => route.fulfill({ json: { timezone: "Australia/Sydney", sessions: [session] } }));
         const attemptSurface = surface.toUpperCase();
         const fixtureToken = "a".repeat(43);
         const snapshot = () => ({ token: fixtureToken, surface: attemptSurface, status: signedIn ? "STARTED" : "LOGIN_REQUIRED", requiresLogin: !signedIn, session: { ...session, timezone: "Australia/Sydney", bookingStatus: "OPEN" }, returnPath: (surface === "home" ? "/" : "/pages/programs") + "?skyra_attempt=" + fixtureToken + "#skyra-booking-" + surface });
@@ -45,6 +48,11 @@ const server = http.createServer((req, res) => {
           calls++;
           if (delay) await new Promise(resolve => setTimeout(resolve, delay));
           await route.fulfill({ status: authError ? 503 : 200, json: authError ? { error: "We could not verify your sign-in status. Please try again." } : snapshot() });
+        });
+        let passPrice = 22000;
+        await context.route("**/apps/skyra-booking/pass-options", route => {
+          const pass = {id:"test-pass",name:"5 Aerial Classes",credits:5,validityDays:90,priceCents:passPrice,currency:"AUD"};
+          return route.fulfill({json:{passes:[pass],selected:route.request().postDataJSON().passPlanId ? pass : null,checkoutAvailable:false}});
         });
         const url = base + (surface === "home" ? "/" : "/pages/programs");
         const key = "skyra-booking:" + surface + ":selection";
@@ -54,6 +62,14 @@ const server = http.createServer((req, res) => {
         const overflow = await page.evaluate(() => ({ width: innerWidth, scroll: document.documentElement.scrollWidth,
           elements: [...document.querySelectorAll("body *")].filter(el => el.getBoundingClientRect().right > innerWidth + 1).map(el => [el.tagName, el.className, el.getBoundingClientRect().width]) }));
         assert(overflow.scroll <= width, JSON.stringify(overflow));
+        const rootBox = await page.locator("[data-skyra-booking-root]").boundingBox();
+        if(width === 1440) assert(rootBox.width > 1000, "Desktop Booking must span the wide panel");
+        await page.getByText("Full calendar",{exact:true}).click();
+        const futureDate = await page.locator("[data-calendar-date]:not([disabled])").nth(7).getAttribute("data-calendar-date");
+        await page.locator(`[data-calendar-date="${futureDate}"]`).click();
+        await page.getByText("No published classes",{exact:false}).waitFor();
+        await page.getByText("Full calendar",{exact:true}).click();
+        await page.locator("[data-calendar-date]:not([disabled])").first().click();
         await page.locator("[data-booking-service]").selectOption("aerial");
         await page.locator("[data-booking-coach]").selectOption("karen");
         await book.click();
@@ -101,6 +117,15 @@ const server = http.createServer((req, res) => {
         await dialog.getByRole("button", { name: "Check sign-in status" }).click();
         await page.getByRole("heading", { name: "Select a Pass" }).waitFor();
         assert.equal(await dialog.count(), 0);
+        await page.getByRole("radio").check();
+        passPrice = 22500;
+        await page.locator("[data-pass-continue]").click();
+        await page.getByRole("heading", { name: "Review your booking" }).waitFor();
+        assert.equal(await page.getByRole("button", {name:"Continue to Shopify Checkout"}).isDisabled(),true);
+        await page.getByText("$225.00", {exact:true}).waitFor();
+        await page.screenshot({path:path.join(output, `${surface}-${width}-review.png`),fullPage:true});
+        await page.getByRole("button",{name:"Edit Pass"}).click();
+        assert.equal(await page.getByRole("radio").isChecked(),true);
         assert.equal(await page.evaluate(key => sessionStorage.getItem(key), key), null);
         await page.getByRole("button", { name: "Back to schedule" }).click();
         // The details CTA uses the same gate, including a session that expired.
@@ -132,7 +157,7 @@ const server = http.createServer((req, res) => {
         Object.defineProperty(window, "sessionStorage", { get() { throw new DOMException("Storage blocked", "SecurityError"); } });
       });
       let signedIn = false;
-      await context.route("**/apps/skyra-booking/sessions", route => route.fulfill({ json: { timezone: "Australia/Sydney", sessions: [session] } }));
+      await context.route("**/apps/skyra-booking/sessions?*", route => route.fulfill({ json: { timezone: "Australia/Sydney", sessions: [session] } }));
       await context.route("**/apps/skyra-booking/{start,attempt}", route => route.fulfill({ json: {
         token: "b".repeat(43), surface: "PROGRAMS", status: signedIn ? "STARTED" : "LOGIN_REQUIRED", requiresLogin: !signedIn,
         session: { ...session, timezone: "Australia/Sydney", bookingStatus: "OPEN" }, returnPath: "/pages/programs?skyra_attempt=" + "b".repeat(43) + "#skyra-booking-programs"
@@ -142,6 +167,7 @@ const server = http.createServer((req, res) => {
         const destination = new URL(route.request().url()).searchParams.get("return_to");
         return route.fulfill({ status: 302, headers: { location: destination } });
       });
+      await context.route("**/apps/skyra-booking/pass-options", route => route.fulfill({json:{passes:[],selected:null,checkoutAvailable:false}}));
       const page = await context.newPage();
       await page.goto(base + "/pages/programs");
       await page.locator("[data-booking-book]").click();

@@ -1,6 +1,6 @@
 # Booking V3 — 开发状态
 
-更新：2026-09-10。此页记录实际代码、开发店联调与验证证据；完整范围仍以 `implementation-backlog.md` 为准。
+更新：2026-09-11。此页记录实际代码、开发店联调与验证证据；完整范围仍以 `implementation-backlog.md` 为准。
 
 ## 已创建与已绑定
 
@@ -18,7 +18,7 @@
 | M2 Classes & Passes | Class/Pass 创建与编辑、跨店校验、Coach/Location、Coach 与 Pass eligibility、乐观版本检查 | Category/Resource、Appointment/Course 完整表单未完成；Admin iframe 尚未做完整人工视觉验收 |
 | M2 商品同步 | 事务 Outbox、`productSet`、稳定 Product/Variant 映射、`metafieldsSet`、app-owned Service content definition 自愈、Metaobject upsert/read-back、重试和状态刷新 | Coach public Metaobject 与 `products/update` 对账尚未实现 |
 | M2 Weekly Schedule | 按周日期/时间/教练、草稿、发布、删除草稿、4/8/13 周生成、复制上周、时区/DST 校验 | 持久化 Series 编辑、资源分配、Appointment slots、教练可用时间例外未完成 |
-| M5 Storefront 首个 slice | Theme App Extension app embed、Home/Programs 共享 mount、公开 Session App Proxy、七日 Browse、Class/Coach 筛选、Details、登录提示、loading/empty/error、移动端布局 | 开发店已授权 App Proxy 并启用 app embed；Home 的真实 Browse/Details/Login UI 已联调，后续交易 UI 规范已冻结；本轮已接服务器 Attempt 与真实占位计算，Full calendar、Pass selection、Review 和真实客户登录仍未完成 |
+| M5 Storefront 首个 slice | Theme App Extension app embed、Home/Programs 共享 mount、公开 Session App Proxy、七日 Browse、Class/Coach 筛选、Details、登录提示、loading/empty/error、移动端布局 | 开发店已授权 App Proxy 并启用 app embed；Home 的真实 Browse/Details/Login UI 已联调，后续交易 UI 规范已冻结；本轮已接服务器 Attempt 与真实占位计算，本轮已交付 31 天 Full Calendar、新 Pass selection/Review；已有 Pass、真实客户登录完成/返回验收及 Checkout 仍未完成 |
 
 ## 本轮交付：M3 Class Booking 基础（2026-09-10）
 
@@ -107,8 +107,8 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 ## 下一阶段执行顺序
 
 1. M3-09 / M3-10：实现 Entitlement grant/reserve/consume/release ledger、余额/有效期/服务匹配与 Intro 资格。当前基础 Hold 不能代替已有 Pass 确认。
-2. M5-04 / M5-05：精修 Find a Class / Details，补 Full calendar、前后周与完整关闭/售罄文案。
-3. M5-07 / M5-08：接真实 Pass 数据，完成桌面双栏和手机单栏 Select a Pass / Review。
+2. M5-04 / M5-05：Full Calendar 与 Programs 共享视觉已完成；补直接前后周导航、完整 policy、关闭/未开放文案及 Details 返回位置验收。
+3. M5-07 / M5-08：新 Pass 实时本地同步价格与 Review 双栏/单栏 UI 已完成；接已有 Pass 余额/有效期、Drop-in、Customer 摘要及最终 Shopify 可售资格校验。
 4. M5-09：已有 Pass 原子确认、credit reserve、Booking 事件与 CONFIRMED；不走 A$0 Checkout。
 5. M4 + M5-10 / M5-11：Review 后创建 Hold + Shopify Cart，接入 `orders/paid`、Entitlement、确认/过期付款恢复与 Needs Attention。
 6. M5-06 / M5-13：启动开发店 App/Theme 联调，实测真实客户登录/退出、跨域 cookie/弹窗返回，创建 Programs 页面资源并完成两入口 E2E。当前 HTTP 和浏览器 fixture 不能替代这一验收。
@@ -127,3 +127,18 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 - 新增 [开发预览与测试指南](preview-testing.md)，明确手工测试入口、尚未完成的 Pass/Checkout/确认流程，以及 Admin 自动同步 Shopify 商品的职责。
 
 - 提交前复核：57 项测试通过，TypeScript、ESLint、生产构建通过。开发预览默认主题与 Skyra 模板的入口混淆已定位，启动指南已显式指定开发主题。真实 Shopify 登录完成与返回仍待联调验收。
+
+## 本轮交付：共享 UI、Full Calendar、Pass / Review（2026-09-11）
+
+- 已将基础提交 `7c3ff67` 推送至用户指定的 `https://github.com/robber-857/Skyra.git` / `bookingdev`；远程 SHA 与本地一致。
+- 修复 Home 的旧 `.schedule` 两栏父容器，使 Booking 不再只占左栏；两页共用 `skyra-booking-section` 容器、同一个组件和 API。显式隔离首页展示字体，使用 Programs 的衬线标题、圆日期、暖色按钮、横向课表。
+- Full Calendar：在区块内按月选择未来 31 天日期，支持跨月，七日条随所选日期切换；超过预约开放期仍由服务端窗口规则拒绝 Book。
+- 新增签名 App Proxy `POST /apps/skyra-booking/pass-options`，读取已绑定客户的当前 Attempt；校验跨店/跨客户、过期、课程窗口和名额，只返回适用且 ACTIVE/SYNCED、价格/版本一致、有效期覆盖课程的非 Intro Pass。
+- 新 Pass 选择：真实数据库配置的 Pass cards、价格、次数、有效期，未选时 Continue 禁用。Review 再次从服务端验证名额和价格，支持 Edit Pass。桌面主栏加右侧 Booking Details，手机单栏加可折叠 Details。
+- 保留登录后的服务器 Attempt token 用于选 Pass 和恢复；浏览器不持有可用于伪造身份/价格的授权字段。
+- 当前 `checkoutAvailable=false`，所有选择与 Review 请求均不创建 Hold/Cart，不收款、不扣课，不宣称预约确认；已有 Pass、Intro 历史资格与 Drop-in 尚未接入。
+- 验证：61 项数据库/接口单元测试通过；类型、ESLint、生产构建通过；官方 Shopify 扩展 8 文件校验通过（关闭验证遥测）；UI 机械检查无发现。
+- 浏览器 fixture：Home/Programs × 320/390/430/1440px，含真实模板父容器、Full Calendar、Review 价格刷新/Edit、禁用 Checkout、登录取消/恢复；另有 3 项模拟登录导航验证。
+- 真实开发主题 Home：1440px 内容宽 1082px、390px 内容宽 328px，标题字体正确、课表正常、均无横向溢出。截图与结果在 `output/playwright/booking-live-*`。真实顾客登录后的 Pass/Review 仍需人工 E2E，不以 fixture 代替。
+- 开发店 `/pages/programs` 当前仍返回 404：主题模板已就绪，但 Shopify Page 资源尚未创建，未完成该真实入口验收。
+- 仅更新开发预览，生产主题未部署；原 `shopify-theme/assets/skyra.css` 修改保持原样、未纳入 Booking 提交。

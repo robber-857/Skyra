@@ -18,8 +18,6 @@
     back: "Back to schedule",
     continue: "Continue to booking",
     book: "Book",
-    passTitle: "Select a Pass",
-    passUnavailable: "Pass selection is not available yet. Please contact Skyra Studio to book.",
     studioTimezone: "Times are shown in the studio timezone."
   };
 
@@ -42,16 +40,7 @@
     return node;
   }
 
-  function dateKey(date, timeZone) {
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: timeZone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    }).formatToParts(date);
-    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-    return values.year + "-" + values.month + "-" + values.day;
-  }
+  const dateKey = (...args) => window.SkyraBookingDateKey(...args);
 
   function addDays(key, amount) {
     const parts = key.split("-").map(Number);
@@ -76,7 +65,7 @@
   }
 
   function mount(root) {
-    if (root.dataset.skyraMounted || !window.SkyraBookingLogin || !window.SkyraBookingAttempt) return;
+    if (root.dataset.skyraMounted || !window.SkyraBookingLogin || !window.SkyraBookingAttempt || !window.SkyraBookingTransaction || !window.SkyraBookingCalendar) return;
     root.dataset.skyraMounted = "true";
     root.classList.add("skyra-booking");
     root.setAttribute("role", "region");
@@ -118,7 +107,7 @@
       proceed: () => {
         state.view = "pass";
         clearSelection();
-        attempt.forget();
+        attempt.remember();
         render();
         const heading = root.querySelector(".skyra-booking__message h3");
         heading?.setAttribute("tabindex", "-1");
@@ -139,6 +128,11 @@
       const account = element("a", "skyra-booking__account", copy.account);
       account.href = "/account";
       header.append(heading, account);
+      if (state.view === "browse" && content.querySelector(".skyra-booking__toolbar")) {
+        const actions = element("div", "skyra-booking__header-actions");
+        actions.append(account, content.querySelector(".skyra-booking__toolbar"));
+        header.replaceChildren(heading, actions);
+      }
       root.append(header, content);
       const live = element("p", "skyra-booking__live", statusText || "");
       live.setAttribute("role", "status");
@@ -159,24 +153,7 @@
       return state.sessions.find((session) => session.id === state.selectedId);
     }
 
-    function selectControl(labelText, allText, items, selectedValue, dataName) {
-      const label = element("label");
-      label.append(element("span", "", labelText));
-      const select = element("select");
-      select.dataset[dataName] = "";
-      const allOption = element("option", "", allText);
-      allOption.value = "all";
-      select.append(allOption);
-      const unique = [...new Map(items.map((item) => [item.id, item])).values()];
-      unique.forEach((item) => {
-        const option = element("option", "", item.name);
-        option.value = item.id;
-        select.append(option);
-      });
-      select.value = selectedValue;
-      label.append(select);
-      return label;
-    }
+    const selectControl = window.SkyraBookingSelectControl.bind(null, element);
 
     function renderLoading() {
       const loading = element("div", "skyra-booking__loading");
@@ -197,8 +174,10 @@
 
     function renderBrowse(focusName) {
       const today = dateKey(new Date(), state.timezone);
-      const dates = Array.from({ length: 7 }, (_, index) => addDays(today, index));
-      if (!state.selectedDate || !dates.includes(state.selectedDate)) state.selectedDate = dates[0];
+      const end = addDays(today, 30);
+      if (!state.selectedDate || state.selectedDate < today || state.selectedDate > end) state.selectedDate = today;
+      const offset = Math.floor((dateFromKey(state.selectedDate) - dateFromKey(today)) / 86400000 / 7) * 7;
+      const dates = Array.from({ length: Math.min(7, 31 - offset) }, (_, index) => addDays(today, offset + index));
 
       const content = element("div");
       const toolbar = element("div", "skyra-booking__toolbar");
@@ -216,19 +195,19 @@
         state.coach,
         "bookingCoach"
       );
-      toolbar.append(serviceSelect, coachSelect);
+      toolbar.append(serviceSelect, coachSelect, window.SkyraBookingCalendar({today, selected:state.selectedDate, end, pick:key=>{state.selectedDate=key;renderBrowse("date:"+key);}}));
 
       const days = element("div", "skyra-booking__days");
       days.setAttribute("role", "group");
       days.setAttribute("aria-label", "Schedule dates");
-      dates.forEach((key, index) => {
+      dates.forEach((key) => {
         const active = key === state.selectedDate;
         const button = element("button", "skyra-booking__day" + (active ? " is-active" : ""));
         button.type = "button";
         button.dataset.bookingDate = key;
         button.setAttribute("aria-pressed", String(active));
         button.append(
-          element("span", "", index === 0 ? "Today" : formatDate(key, state.timezone, { weekday: "short" })),
+          element("span", "", key === today ? "Today" : formatDate(key, state.timezone, { weekday: "short" })),
           element("strong", "", formatDate(key, state.timezone, { day: "numeric" }))
         );
         button.addEventListener("click", () => {
@@ -268,7 +247,7 @@
           const sessionCopy = element("div", "skyra-booking__session-copy");
           sessionCopy.append(
             element("h3", "", session.service.name),
-            element("p", "", session.coach.name + " · " + session.location.name)
+            element("p", "", session.coach.name)
           );
           const availability = element(
             "span",
@@ -291,7 +270,9 @@
           bookButton.disabled = spots <= 0 || Boolean(closed);
           bookButton.addEventListener("click", () => book(session, bookButton));
           sessionCopy.append(details);
-          row.append(time, sessionCopy, availability, bookButton);
+          const location = element("div", "skyra-booking__location");
+          location.append(element("span", "", session.location.name), availability);
+          row.append(time, sessionCopy, location, bookButton);
           list.append(row);
         });
       }
@@ -367,20 +348,9 @@
     }
 
     function renderAction(session) {
-      const content = element("div");
-      content.append(backButton(() => {
-        state.view = "details";
-        render();
-        root.querySelector("[data-booking-continue]")?.focus();
-      }));
-      const message = element("div", "skyra-booking__message skyra-booking__message--action");
-      message.append(
-        element("p", "skyra-booking__eyebrow", session.service.name),
-        element("h3", "", copy.passTitle),
-        element("p", "", copy.passUnavailable)
-      );
-      content.append(message);
-      appendShell(content);
+      window.SkyraBookingTransaction({root, attempt, session, timezone:state.timezone, shell:appendShell, back:()=>{
+        state.view = "details"; render(); root.querySelector("[data-booking-continue]")?.focus();
+      }});
     }
 
     function render() {
@@ -397,7 +367,7 @@
       state.status = "loading";
       render();
       try {
-        const response = await fetch((root.dataset.proxyBase || "/apps/skyra-booking") + "/sessions", {
+        const response = await fetch((root.dataset.proxyBase || "/apps/skyra-booking") + "/sessions?from=" + dateKey(new Date(), state.timezone) + "&to=" + addDays(dateKey(new Date(), state.timezone), 30), {
           headers: { Accept: "application/json" },
           credentials: "same-origin"
         });
@@ -462,6 +432,7 @@
     boot(document);
   }
   document.addEventListener("skyra:attempt-ready", () => boot(document));
+  document.addEventListener("skyra:features-ready", () => boot(document));
   document.addEventListener("skyra:login-ready", () => boot(document));
   document.addEventListener("shopify:section:load", (event) => boot(event.target));
 })();

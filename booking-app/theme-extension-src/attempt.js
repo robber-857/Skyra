@@ -61,6 +61,7 @@ window.SkyraBookingAttempt = function (root) {
       try { sessionStorage.setItem(storageKey, current.token); } catch { /* Token also travels in the server-generated Shopify return URL. */ }
     },
     forget,
+    token: () => current?.token,
     async restore() {
       const url = new URL(window.location.href);
       // A page with two mounts restores only the originating surface.

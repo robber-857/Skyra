@@ -82,7 +82,7 @@ Home and Programs now use explicit mounts for the shared Booking App theme-exten
 - The component currently supports Browse, filters, Details, Shopify login handoff and server-backed Booking Attempts.
 - Published sessions and computed availability come from PostgreSQL through the signed App Proxy.
 - Login uses Shopify Customer Account; payment will use native Shopify Checkout. Other booking steps stay inside the originating section.
-- Pass selection, Review and purchase completion remain unfinished. These changes are for the development store; the production theme has not been updated.
+- Full Calendar and new-Pass selection/Review are implemented. Owned-Pass confirmation and purchase completion remain unfinished. These changes are for the development store; the production theme has not been updated.
 - See [preview and testing](../docs/booking-system/preview-testing.md) for the current entry points and test boundary.
 
 Do not add Booking as another app block inside `skyra-home`: that section's existing `@app` position is reserved for Instafeed. Follow [../docs/booking-system/implementation-backlog.md](../docs/booking-system/implementation-backlog.md) for the file-level migration and acceptance checks.
