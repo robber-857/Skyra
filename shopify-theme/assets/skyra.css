@@ -1034,7 +1034,9 @@ body.is-menu-open .menu-toggle {
 }
 
 .membership-intro h2 {
-  max-width: 8ch;
+  max-width: 13ch;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .membership-paths {
@@ -1051,7 +1053,7 @@ body.is-menu-open .menu-toggle {
 }
 
 .membership-path--membership {
-  grid-template-columns: minmax(260px, 0.56fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(380px, 0.74fr) minmax(0, 1.1fr);
   margin-left: 0;
 }
 
@@ -1099,6 +1101,8 @@ body.is-menu-open .menu-toggle {
 .membership-path__copy h3 {
   margin: 0;
   font-size: clamp(3rem, 5vw, 5.2rem);
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .membership-path__copy p {
@@ -1948,6 +1952,10 @@ body.is-menu-open .menu-toggle {
   .story-copy h2,
   .schedule-intro h2 {
     max-width: 8ch;
+  }
+
+  .programs-copy h2 {
+    max-width: 100%;
   }
 
   .story-copy {
