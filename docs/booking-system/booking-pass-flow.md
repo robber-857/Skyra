@@ -28,9 +28,9 @@ sequenceDiagram
   Proxy->>API: Signed request + logged_in_customer_id
   alt Customer not signed in
     API-->>Theme: requires_login + safe return URL
-    Theme-->>Customer: LOGIN_REQUIRED: Skyra login popup over original section
+    Theme-->>Customer: LOGIN_REQUIRED: Skyra login modal over original section
     Customer->>Theme: Continue to Shopify sign-in
-    Note over Customer,Theme: Shopify sign-in window (same-tab fallback), verify identity and restore original attempt
+    Note over Customer,Theme: Same-tab Shopify hosted sign-in, verify identity and restore original attempt
   else Customer signed in
     API->>DB: Load session + eligible entitlements
     API-->>Theme: PASS_SELECTION in current section
@@ -65,7 +65,7 @@ The URL stays on Home or Programs while the Booking App changes only the content
 | --- | --- | --- |
 | BROWSE | Skyra Programs-style Find a Class, month label, seven-day rail, Class type/Instructor filters, Full calendar, live rows and Book actions | Expand details or select a Session |
 | DETAILS | Inline or replacement-panel class detail with class, coach, location, level, policy and remaining seats | Back or continue |
-| LOGIN_REQUIRED | Accessible Skyra login popup above the original section; Shopify sign-in action and same-tab fallback | Verify the Shopify session again, then restore the selected class / attempt |
+| LOGIN_REQUIRED | Accessible Skyra login modal above the original section; same-tab Shopify sign-in action | Verify the Shopify session again, then restore the selected class / attempt |
 | PASS_SELECTION | Transaction heading, selected Booking Details, eligible owned Passes first and purchasable Shopify variants second | Select a Pass and continue |
 | REVIEW | In-section order summary with customer identity, class/date/time/coach/location, selected Pass or drop-in price and edit action | Confirm with existing Pass or continue to Shopify Checkout |
 | CONFIRMING | Server-verified processing state after an existing-Pass call or Checkout return | Poll/refresh attempt status |
@@ -126,20 +126,21 @@ Home and Programs use the same component, state machine and API client. `data-su
 - use a full-width Continue action, sticky within the component only when it does not cover content, and account for safe-area inset;
 - preserve at least 44 px touch targets, visible keyboard focus, ARIA live loading/error/status text and zero horizontal overflow.
 
-## 2. Login popup behaviour
+## 2. Login hand-off behaviour
 
 **Confirmed on 2026-09-09:** Book must check the customer's current Shopify login before proceeding. Booking uses the same Shopify Customer Account as the storefront and Checkout, not a separate account or password. This applies to Home / Programs only.
 
 1. Browsing and Show details remain public. Both the row Book button and the Details Continue button use one login gate.
 2. On activation, check identity through a fresh, non-cacheable App Proxy request. The backend must validate Shopify's proxy signature before using `logged_in_customer_id`; never trust a browser flag, customer ID, storage record or popup-close event.
 3. An authenticated customer continues to PASS_SELECTION. An anonymous customer sees a Skyra modal above the unchanged course list/details, with the selected class, close control and Shopify sign-in button.
-4. Desktop sign-in opens Shopify's `/customer_authentication/login?return_to=...` in a browser popup from an explicit user gesture. Credentials and verification codes are entered only on Shopify's hosted page. Do not iframe authentication or copy the reference's Mindbody/social-login form.
-5. On mobile, the modal has one column, full-width actions, 44px targets and safe-area spacing. The primary sign-in action uses the same tab; desktop also exposes this fallback if popup opening is blocked or window communication is unavailable.
-6. Return to the originating Home / Programs path and Booking anchor. Recheck the Shopify session before advancing; popup polling/focus/manual retry are only triggers for that server check. If Shopify severs the opener relationship, the return tab restores the selection itself.
-7. Escape, close and backdrop dismissal retain the original date, filters and class, restore focus and stop polling. A delayed response must not reopen a cancelled flow. Network errors fail closed and offer retry.
-8. Login never reserves capacity, consumes a Pass or creates a Checkout. Every subsequent protected API must independently authenticate and authorize the Shopify customer.
+4. Every viewport uses a normal top-level link to Shopify's `/customer_authentication/login?return_to=...` in the current tab. Credentials and verification codes are entered only on Shopify's hosted page. Do not iframe authentication, nest it in a popup or copy the reference's Mindbody/social-login form.
+5. On mobile, the modal has one column, full-width actions, 44px targets and safe-area spacing. Desktop uses the same navigation contract so browser popup policy, opener loss and nested Shop authentication cannot strand the user.
+6. Local theme preview builds the login URL against the canonical `*.myshopify.com` development-store domain instead of `127.0.0.1`, and carries the active `preview_theme_id` in the relative `return_to`. Production returns to the current storefront origin without adding a preview parameter.
+7. Return to the originating Home / Programs path and Booking anchor. Recheck the Shopify session through the signed App Proxy before advancing; the restored selection or opaque attempt token is never proof of authentication.
+8. Escape, close and backdrop dismissal retain the original date, filters and class and restore focus. A delayed response must not reopen a cancelled flow. Network errors fail closed and offer retry.
+9. Login never reserves capacity, consumes a Pass or creates a Checkout. Every subsequent protected API must independently authenticate and authorize the Shopify customer.
 
-### Current implementation and remaining work (2026-09-11)
+### Current implementation and remaining work (updated 2026-09-12)
 
 - `POST /apps/skyra-booking/start` creates a server BookingAttempt without holding a seat. `POST /apps/skyra-booking/attempt` resumes it and atomically binds an authenticated Shopify customer. Both validate App Proxy identity, accept JSON with `X-Skyra-Booking: 1`, reject cross-site/simple-form writes and return private/no-store JSON.
 - The random 32-byte token is stored only as SHA-256 in PostgreSQL. HOME maps to `/?skyra_attempt=...#skyra-booking-home`; PROGRAMS maps to `/pages/programs?skyra_attempt=...#skyra-booking-programs`. Arbitrary return URLs and client customer IDs are rejected.
@@ -148,7 +149,8 @@ Home and Programs use the same component, state machine and API client. `data-su
 - `/sessions` is now non-cacheable and reports capacity less confirmed Bookings and unexpired active Holds, plus the 14-day / two-hour booking-window state. The signed mutation remains authoritative when another customer takes the last place.
 - Internal Hold creation/release/expiry and database capacity constraints are implemented and tested. There is no public Hold/Checkout endpoint yet; the development shop's online booking switch remains false. New-Pass selection/Review UI is implemented; owned-Pass entitlements, confirmation and payment processing are still pending.
 - Current DB attempt states: LOGIN_REQUIRED / STARTED / HOLD_ACTIVE / RECOVERY / EXPIRED. The final Checkout/PROCESSING/CONFIRMED states in the target design are not implemented yet.
-- PostgreSQL concurrency tests, built-app HTTP tests with the real Shopify signature validator, and responsive browser fixtures pass. Real Shopify hosted customer login/logout and cross-domain cookie/return behavior still need development-store integration; production is not deployed.
+- On 2026-09-12 the user reached Shopify's hosted sign-in screen but reported that the purple **Continue with Shop** action appeared to do nothing. The desktop popup layer was removed as a reliability mitigation. Local preview previously reproduced a separate 401 because the relative login URL targeted `127.0.0.1`; the canonical development-store URL now reaches Shopify's hosted sign-in page in the same tab and preserves the preview-theme return.
+- PostgreSQL concurrency tests, built-app HTTP tests with the real Shopify signature validator, and responsive browser fixtures pass. Completing **Continue with Shop**, logout and signed return still require one real customer-account retest by the user; the current automated result proves the hand-off reaches Shopify, not that Shopify accepted a personal account. Production is not deployed.
 
 Shopify references: [Customer sign-in links and redirects](https://shopify.dev/docs/storefronts/themes/sign-in), [App Proxy authentication](https://shopify.dev/docs/apps/build/online-store/app-proxies/authenticate-app-proxies).
 

@@ -25,7 +25,7 @@ const server = http.createServer((req, res) => {
   const template = fs.readFileSync(path.resolve(app, "../shopify-theme/sections/skyra-" + surface + ".liquid"), "utf8");
   const prefix = template.slice(0, template.indexOf('id="skyra-booking-' + surface + '"'));
   const wrapper = [...prefix.matchAll(/<section[^>]*class="([^"]+)"/g)].at(-1)[1];
-  res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/theme.css"><link rel="stylesheet" href="/booking.css"><style>body{margin:0;padding:24px;background:#f3f2ef;font-family:Arial,sans-serif}.qa-label{font:12px Arial;color:#666;margin:0 0 24px}.qa-panel{max-width:1400px;margin:auto;padding:clamp(16px,4vw,60px);background:white;border-radius:20px}h2,h3,p{overflow-wrap:break-word}@media(max-width:720px){body{padding:12px}}</style></head><body><p class="qa-label">LOCAL UI TEST · Sample schedule · No live booking or payment</p><main class="${wrapper}"><div id="skyra-booking-${surface}" data-skyra-booking-root data-surface="${surface}"></div></main><script src="/calendar.js" defer></script><script src="/transaction.js" defer></script><script src="/booking.js" defer></script><script src="/login.js" defer></script><script src="/attempt.js" defer></script></body></html>`);
+  res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/theme.css"><link rel="stylesheet" href="/booking.css"><style>body{margin:0;padding:24px;background:#f3f2ef;font-family:Arial,sans-serif}.qa-label{font:12px Arial;color:#666;margin:0 0 24px}.qa-panel{max-width:1400px;margin:auto;padding:clamp(16px,4vw,60px);background:white;border-radius:20px}h2,h3,p{overflow-wrap:break-word}@media(max-width:720px){body{padding:12px}}</style><script type="application/json" data-skyra-booking-config>{"shopDomain":"skyra-booking-dev.myshopify.com"}</script></head><body><p class="qa-label">LOCAL UI TEST · Sample schedule · No live booking or payment</p><main class="${wrapper}"><div id="skyra-booking-${surface}" data-skyra-booking-root data-surface="${surface}"></div></main><script src="/calendar.js" defer></script><script src="/transaction.js" defer></script><script src="/booking.js" defer></script><script src="/login.js" defer></script><script src="/attempt.js" defer></script></body></html>`);
 });
 (async () => {
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
@@ -117,14 +117,9 @@ const server = http.createServer((req, res) => {
         authError = false;
         await dialog.getByRole("button", { name: "Check sign-in status" }).click();
         await dialog.locator("[data-login-open]").waitFor({ state: "visible" });
-        if (width === 1440) {
-          await page.evaluate(() => { window.open = () => null; });
-          await dialog.locator("[data-login-open]").click();
-          await page.getByText("Your browser blocked", { exact: false }).waitFor();
-          const href = await dialog.locator("[data-login-same-tab]").getAttribute("href");
-          assert.equal(new URL(href, base).pathname, "/customer_authentication/login");
-          assert.equal(new URL(href, base).searchParams.get("return_to"), new URL(url).pathname + "?skyra_attempt=" + fixtureToken + "#skyra-booking-" + surface);
-        }
+        const href = await dialog.locator("[data-login-open]").getAttribute("href");
+        assert.equal(new URL(href, base).pathname, "/customer_authentication/login");
+        assert.equal(new URL(href, base).searchParams.get("return_to"), new URL(url).pathname + "?skyra_attempt=" + fixtureToken + "#skyra-booking-" + surface);
         // Identity changes while the page is open are detected on retry.
         signedIn = true;
         await dialog.getByRole("button", { name: "Check sign-in status" }).click();
@@ -242,7 +237,8 @@ const server = http.createServer((req, res) => {
       await context.route("**/customer_authentication/login?*", route => {
         signedIn = true;
         const destination = new URL(route.request().url()).searchParams.get("return_to");
-        return route.fulfill({ status: 302, headers: { location: destination } });
+        // Shopify returns to the canonical storefront; map that path back to this local fixture host.
+        return route.fulfill({ status: 302, headers: { location: base + destination } });
       });
       await context.route("**/apps/skyra-booking/pass-options", route => route.fulfill({json:{passes:[],selected:null,checkoutAvailable:false}}));
       const page = await context.newPage();
@@ -251,11 +247,38 @@ const server = http.createServer((req, res) => {
       await page.getByRole("dialog").locator("[data-login-open]").click();
       await page.getByRole("heading", { name: "Select a Pass" }).waitFor();
       assert.equal(new URL(page.url()).pathname, "/pages/programs");
-      if (width === 1440) {
-        await page.waitForTimeout(200);
-        assert.equal(context.pages().length, 1);
-      }
-      results.push({ width, navigation: width === 1440 ? "popup-return" : "same-tab-return", verified: true, fixture: true, blockedStorage });
+      assert.equal(context.pages().length, 1);
+      results.push({ width, navigation: "same-tab-return", verified: true, fixture: true, blockedStorage });
+      await context.close();
+    }
+    // Local theme preview must open Shopify on the canonical shop domain and return to the same development theme.
+    {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const page = await context.newPage();
+      await context.route("**/apps/skyra-booking/start", route => route.fulfill({ json: {
+        token: "c".repeat(43), surface: "PROGRAMS", status: "LOGIN_REQUIRED", requiresLogin: true,
+        session: { ...session, timezone: "Australia/Sydney", bookingStatus: "OPEN" }, returnPath: "/pages/programs?skyra_attempt=" + "c".repeat(43) + "#skyra-booking-programs"
+      } }));
+      await page.goto(base + "/pages/programs");
+      const login = await page.evaluate(async sessionId => {
+        const config = document.querySelector("[data-skyra-booking-config]");
+        config.textContent = JSON.stringify({ shopDomain: "skyra-booking-dev.myshopify.com", themeId: "192227082532" });
+        const root = document.createElement("div");
+        root.dataset.surface = "programs";
+        root.dataset.proxyBase = "/apps/skyra-booking";
+        const attempt = window.SkyraBookingAttempt(root);
+        attempt.select(sessionId);
+        await attempt.check();
+        return attempt.loginUrl();
+      }, session.id);
+      const loginUrl = new URL(login);
+      assert.equal(loginUrl.origin, "https://skyra-booking-dev.myshopify.com");
+      assert.equal(loginUrl.pathname, "/customer_authentication/login");
+      const returnTo = new URL(loginUrl.searchParams.get("return_to"), loginUrl.origin);
+      assert.equal(returnTo.pathname, "/pages/programs");
+      assert.equal(returnTo.searchParams.get("preview_theme_id"), "192227082532");
+      assert.equal(returnTo.searchParams.get("skyra_attempt"), "c".repeat(43));
+      results.push({ width: 1440, navigation: "canonical-shop-login", previewThemeReturn: true, verified: true, fixture: true });
       await context.close();
     }
     fs.writeFileSync(path.join(output, "results.json"), JSON.stringify(results, null, 2));

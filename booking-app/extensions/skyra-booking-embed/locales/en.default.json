@@ -26,9 +26,6 @@
     "book": "Book",
     "login_close": "Close sign in",
     "login_checking": "Checking your sign-in status…",
-    "login_waiting": "Complete sign in in the window that opened, then return here. Your class is saved.",
-    "login_blocked": "Your browser blocked the sign-in window. Continue in this tab to sign in.",
-    "login_same_tab": "Continue in this tab",
     "login_check_again": "Check sign-in status",
     "login_error": "We could not verify your sign-in status. Please check your connection and try again."
   }

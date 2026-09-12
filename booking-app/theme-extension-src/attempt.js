@@ -2,6 +2,15 @@
 window.SkyraBookingAttempt = function (root) {
   const surface = (root.dataset.surface || "programs").toUpperCase();
   const storageKey = "skyra-booking:" + surface.toLowerCase() + ":attempt";
+  const storefront = (() => {
+    const node = document.querySelector("[data-skyra-booking-config]");
+    try {
+      const config = JSON.parse(node?.textContent || "{}");
+      const shopDomain = typeof config.shopDomain === "string" && /^[a-z0-9][a-z0-9.-]*\.myshopify\.com$/i.test(config.shopDomain) ? config.shopDomain : "";
+      const themeId = /^\d+$/.test(String(config.themeId || "")) ? String(config.themeId) : "";
+      return { shopDomain, themeId };
+    } catch { return { shopDomain: "", themeId: "" }; }
+  })();
   let current, sessionId, generation = 0;
   const terminal = data => ["EXPIRED", "RECOVERY"].includes(data.status);
   async function request(path, body) {
@@ -56,10 +65,21 @@ window.SkyraBookingAttempt = function (root) {
     },
     loginUrl() {
       if (!current) return "";
-      const destination = new URL(current.returnPath, window.location.origin);
+      const safeBase = "https://booking.invalid";
+      const requested = new URL(current.returnPath, safeBase);
       const expectedPath = surface === "HOME" ? "/" : "/pages/programs";
-      if (destination.origin !== window.location.origin || destination.pathname !== expectedPath) throw new Error("Invalid booking return path");
-      return "/customer_authentication/login?return_to=" + encodeURIComponent(destination.pathname + destination.search + destination.hash);
+      if (requested.origin !== safeBase || requested.pathname !== expectedPath) throw new Error("Invalid booking return path");
+      const localPreview = ["127.0.0.1", "localhost"].includes(window.location.hostname);
+      if (localPreview && !storefront.shopDomain) throw new Error("Missing Shopify shop domain");
+      const loginOrigin = localPreview && storefront.shopDomain ? "https://" + storefront.shopDomain : window.location.origin;
+      const destination = new URL(requested.pathname + requested.search + requested.hash, loginOrigin);
+      const activePreview = new URL(window.location.href).searchParams.get("preview_theme_id");
+      const runtimeThemeId = /^\d+$/.test(String(window.Shopify?.theme?.id || "")) ? String(window.Shopify.theme.id) : "";
+      const themeId = storefront.themeId || runtimeThemeId;
+      if (themeId && (localPreview || activePreview === themeId)) {
+        destination.searchParams.set("preview_theme_id", themeId);
+      }
+      return loginOrigin + "/customer_authentication/login?return_to=" + encodeURIComponent(destination.pathname + destination.search + destination.hash);
     },
     remember() {
       if (!current) return;

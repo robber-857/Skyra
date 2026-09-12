@@ -7,13 +7,10 @@ function loginGate(root, copy, { save, cancel, proceed, url, check, recover }) {
 
     loginClose: "Close sign in",
     loginChecking: "Checking your sign-in status…",
-    loginWaiting: "Complete sign in in the window that opened, then return here. Your class is saved.",
-    loginBlocked: "Your browser blocked the sign-in window. Continue in this tab to sign in.",
-    loginSameTab: "Continue in this tab",
     loginCheckAgain: "Check sign-in status",
     loginError: "We could not verify your sign-in status. Please check your connection and try again.",
   }, copy);
-  let dialog, popup, timer, trigger, previousOverflow;
+  let dialog, trigger, previousOverflow;
   let checking = false;
   let generation = 0;
   function node(tag, className, text) {
@@ -35,10 +32,6 @@ function loginGate(root, copy, { save, cancel, proceed, url, check, recover }) {
   }
   function stop() {
     generation++;
-    clearInterval(timer);
-    window.removeEventListener("focus", refresh);
-    if (popup && !popup.closed) popup.close();
-    popup = null;
     if (dialog) {
       dialog.close();
       dialog.remove();
@@ -54,10 +47,9 @@ function loginGate(root, copy, { save, cancel, proceed, url, check, recover }) {
   function showStatus(message, canSignIn = false) {
     if (!dialog) return;
     dialog.querySelector("[data-login-status]").textContent = message;
-    dialog.querySelector("[data-login-open]").hidden = !canSignIn;
-    const fallback = dialog.querySelector("[data-login-same-tab]");
-    if (canSignIn) fallback.href = url();
-    fallback.hidden = !canSignIn;
+    const signIn = dialog.querySelector("[data-login-open]");
+    if (canSignIn) signIn.href = url();
+    signIn.hidden = !canSignIn;
   }
   async function refresh() {
     if (!dialog || checking) return;
@@ -67,7 +59,7 @@ function loginGate(root, copy, { save, cancel, proceed, url, check, recover }) {
       const signedIn = await authenticated();
       if (current !== generation || !root.isConnected) return;
       if (signedIn) return finish();
-      showStatus(popup && !popup.closed ? copy.loginWaiting : copy.signInBody, true);
+      showStatus(copy.signInBody, true);
     } catch (error) {
       if (current === generation) {
         if (error.restartRequired && recover) { stop(); recover(error); }
@@ -76,29 +68,6 @@ function loginGate(root, copy, { save, cancel, proceed, url, check, recover }) {
     } finally {
       if (current === generation) checking = false;
     }
-  }
-  function openPopup() {
-    save(true);
-    if (window.matchMedia("(max-width: 720px)").matches) {
-      window.location.assign(url());
-      return;
-    }
-    // Synchronous user gesture; Shopify owns credential entry in a top-level window.
-    const width = Math.min(520, window.screen.availWidth);
-    const height = Math.min(760, window.screen.availHeight);
-    popup = window.open(url(), "skyra-booking-login", "popup=yes,width=" + width + ",height=" + height +
-      ",left=" + Math.max(0, window.screenX + (window.outerWidth - width) / 2) +
-      ",top=" + Math.max(0, window.screenY + (window.outerHeight - height) / 2));
-    showStatus(popup ? copy.loginWaiting : copy.loginBlocked, true);
-    window.addEventListener("focus", refresh);
-    clearInterval(timer);
-    const started = Date.now();
-    timer = setInterval(() => {
-      if (!root.isConnected) return dismiss();
-      // COOP may sever the handle: closing a window is never proof of login.
-      if (!popup || popup.closed || Date.now() - started > 120000) clearInterval(timer);
-      void refresh();
-    }, 1500);
   }
   function show(session, origin) {
     if (dialog) return;
@@ -119,20 +88,15 @@ function loginGate(root, copy, { save, cancel, proceed, url, check, recover }) {
     status.id = root.id + "-login-status";
     status.dataset.loginStatus = "";
     status.setAttribute("role", "status");
-    const signIn = node("button", "skyra-booking__primary", copy.signIn);
-    signIn.type = "button";
+    const signIn = node("a", "skyra-booking__primary", copy.signIn);
+    signIn.href = url();
     signIn.dataset.loginOpen = "";
     signIn.hidden = true;
-    signIn.addEventListener("click", openPopup);
-    const sameTab = node("a", "skyra-booking__login-link", copy.loginSameTab);
-    sameTab.href = url();
-    sameTab.dataset.loginSameTab = "";
-    sameTab.hidden = true;
-    sameTab.addEventListener("click", () => save(true));
+    signIn.addEventListener("click", () => save(true));
     const retry = node("button", "skyra-booking__login-link", copy.loginCheckAgain);
     retry.type = "button";
     retry.addEventListener("click", refresh);
-    dialog.append(close, brand, title, summary, status, signIn, sameTab, retry);
+    dialog.append(close, brand, title, summary, status, signIn, retry);
     dialog.addEventListener("cancel", (event) => { event.preventDefault(); dismiss(); });
     dialog.addEventListener("click", (event) => {
       if (event.target !== dialog) return;

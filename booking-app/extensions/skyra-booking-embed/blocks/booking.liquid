@@ -4,13 +4,11 @@
 <script src="{{ 'login.js' | asset_url }}" defer></script>
 <script type="application/json" data-skyra-booking-config>
 {
+  "shopDomain": {{ shop.permanent_domain | json }},
   "copy": {
     "book": {{ 'booking.book' | t | json }},
     "loginClose": {{ 'booking.login_close' | t | json }},
     "loginChecking": {{ 'booking.login_checking' | t | json }},
-    "loginWaiting": {{ 'booking.login_waiting' | t | json }},
-    "loginBlocked": {{ 'booking.login_blocked' | t | json }},
-    "loginSameTab": {{ 'booking.login_same_tab' | t | json }},
     "loginCheckAgain": {{ 'booking.login_check_again' | t | json }},
     "loginError": {{ 'booking.login_error' | t | json }},
     "title": {{ 'booking.title' | t | json }},

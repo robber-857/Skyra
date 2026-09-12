@@ -2,7 +2,7 @@
 
 更新：2026-09-12。此页记录实际代码、开发店联调与验证证据；完整范围仍以 `implementation-backlog.md` 为准。
 
-最新状态：Programs Page 与 Drop-in 选择/Review 已实现；Entitlement 追加式台账、有效 Pass 内部选择和 Drop-in Hold 数据约束已完成，71 项测试通过。公开 Checkout、Booking 确认和真实顾客登录验收仍未完成；详见文末 2026-09-12 记录。
+最新状态：Programs Page、Drop-in 选择/Review、Entitlement 追加式台账、有效 Pass 内部选择和 Drop-in Hold 数据约束已完成。Shopify 登录已改为全端同页顶层跳转并真实到达托管登录页；用户反馈的 **Continue with Shop** 仍待真实账户复测。公开 Checkout 与 Booking 确认仍未完成；详见文末 2026-09-12 记录。
 
 ## 已创建与已绑定
 
@@ -40,7 +40,7 @@
 - 20 个客户同时抢最后 1 个名额：仅 1 个 Hold 成功。20 个直接数据库 Booking 写入：同样仅 1 个成功。20 次相同请求：返回同一个 Hold，15 分钟到期时间一致。
 - 跨店/跨客户、两个客户抢同一匿名 Attempt、重复请求、过期未清理、过期重试、手动释放、关闭窗口、DST、无效 Pass、未开启预约和不可变绑定均有覆盖。
 - 生产构建后的 HTTP 冒烟通过真实 Shopify SDK 验签：错误签名 400、匿名 start、签名身份绑定、跨客户 403、禁止伪造输入、真实 Hold 对 availability 的影响和 Hold 恢复。使用的是本地测试签名及测试店铺，不是开发店托管登录联调。
-- Home / Programs × 320/390/430/1440px：8 组真实浏览器 fixture 检查；另覆盖桌面 popup 返回、手机同页返回、手机禁用 storage 后返回。证据位于 `output/playwright/booking-login/results.json`。
+- Home / Programs × 320/390/430/1440px：8 组真实浏览器 fixture 检查；登录 hand-off 更新后另覆盖桌面同页返回、手机同页返回、禁用 storage 后返回及本地预览 canonical shop/preview-theme return，共 12 个场景。证据位于 `output/playwright/booking-login/results.json`。
 - TypeScript、ESLint、生产构建及 Shopify 官方 Theme App Extension 6 文件校验通过；booking.js、login.js、attempt.js 均低于 10,000 B。
 - 本地开发店预约开关仍关闭，未创建开发店活动 Hold；未部署 Shopify 新版本或正式主题，未 commit/push，现有 `shopify-theme/assets/skyra.css` 校验和保持不变。
 
@@ -98,17 +98,17 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 
 - 新增 `GET /apps/skyra-booking/auth`：先验证 Shopify App Proxy 签名，再读取 `logged_in_customer_id`；只返回 authenticated boolean，private/no-store，拒绝重复身份参数和不可用店铺。
 - 修正此前前端从公开 Session 响应读取不存在的 authenticated 字段的问题；每次 Book / Details Continue 都独立校验最新 Shopify 登录。
-- Home / Programs 共用 Skyra 登录弹窗。桌面通过用户点击打开 Shopify 官方登录窗口；手机采用同页 Shopify 登录，桌面保留拦截时的同页备选。
+- Home / Programs 共用 Skyra 登录 modal。此历史实现原为桌面弹窗、手机同页；2026-09-12 已被文末记录的全端同页顶层 Shopify hand-off 取代。
 - 实现关闭/Escape/背景点击、焦点圈定与归还、重复点击保护、延迟响应取消、失败重试，以及返回后的 Shopify 身份复核。
 - 保留原课程、日期和筛选；暂用 30 分钟 sessionStorage UI selection，不能作为登录凭据、Booking Attempt 或 Seat Hold。登录成功只进入现有 Select a Pass 占位状态。
 - 修复长课程名使手机筛选框撑出屏幕的问题；改动只在 Booking extension CSS，未改 `shopify-theme/assets/skyra.css`。
-- 本轮本地验证：13 个登录接口测试；Home / Programs × 320/390/430/1440px 的浏览器 fixture 检查（弹窗、键盘、取消、延迟响应、重试、返回恢复、无横向溢出），另含桌面 popup / 手机同页登录的模拟跳转返回；TypeScript、ESLint、生产构建；Shopify 官方 extension 5 文件校验。
+- 本阶段原始验证包含 13 个登录接口测试和桌面弹窗/手机同页 fixture；当前导航合同及最新验证以文末 2026-09-12 登录顶层跳转记录为准。
 - 浏览器证据位于 `output/playwright/booking-login/`，这些是带测试数据的本地 UI 检查，不能当作真实 Shopify 登录成功或下单成功的证据。
 - 当前没有运行中的 9292 本地主题预览；本轮尚未重启开发店登录联调、部署正式店、Git commit 或 push。
 
 ## 下一阶段执行顺序（2026-09-12 更新）
 
-1. 网络恢复后验收 Home / Programs 的真实桌面、手机和 Shopify 登录/退出/返回；Programs Page 已创建，不再重复创建。最终网络稳定性仍待验证。
+1. 由用户在当前 Shopify 托管登录页复测 **Continue with Shop**，再验收 Home / Programs 的登录完成、退出和签名返回；Programs Page 已创建，不再重复创建。
 2. 推送本轮本地提交至 bookingdev 并核对远程 SHA / CI；之前 743e242 的 CI 通过不代表本轮 CI 已运行。
 3. M4 + M5-10：最终商品渠道可售验证、Review 后公开创建 Hold 与 Shopify Cart / Checkout。
 4. orders/paid 幂等处理、权益生成、Booking 确认和过期付款恢复；M5-09 已有 Pass 原子确认，不走 A$0 Checkout。
@@ -184,3 +184,11 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 - BookingHold 现在用 purchaseKind 区分 NEW_PASS 与 DROP_IN；Drop-in 不保存客户端 Service/Variant/价格，仍从 Attempt 的 Session → Service 映射验证。原 15 分钟、Session → Attempt 锁顺序、幂等和防超售保持不变。
 - `npm.cmd run test:db` 为 71/71，通过权益最后 1 次的 10 路并发、Ledger 不可变/非负、资格/到期排序、Intro、Drop-in Hold 幂等与非法目标；`npm.cmd run check` 的类型、lint、生产构建通过。
 - 这些仍是内部后端基础：没有公开 Hold endpoint、Cart/Checkout、orders/paid、Booking 确认、已有 Pass UI/确认或付款后 Recovery；`onlineBookingsEnabled=false`、`checkoutAvailable=false`、`ownedPassesAvailable=false` 保持不变。
+
+## 最新交付：Shopify 登录顶层跳转修复（2026-09-12）
+
+- 用户截图确认已进入 Shopify 托管 Sign in 页面，但反馈紫色 **Continue with Shop** 点击后疑似无响应。该问题已加入流程、Backlog、状态和交接文档；当前状态为“已规避嵌套弹窗风险，待真实账户复测”，不标记为 Shopify 登录已完整验收。
+- 移除桌面 `window.open`、窗口关闭轮询和 popup-blocked fallback；Home / Programs、桌面/手机统一由当前标签页打开 Shopify 官方 customer authentication 地址。跳转前继续保存服务器 opaque Attempt，返回后只接受签名 App Proxy 重新验证的身份。
+- 修复本地主题预览中相对登录地址落到 `http://127.0.0.1:9292/customer_authentication/login` 并返回 401 的问题。前端现在校验 Liquid 提供的 canonical `*.myshopify.com` 域名，读取 Shopify 运行时 theme id，并把 `preview_theme_id` 安全加入相对 `return_to`。
+- 浏览器 fixture 12/12 通过：Home / Programs × 320/390/430/1440、桌面/手机同页返回、禁用 storage 恢复、canonical shop + preview-theme return。真实浏览器已在同一标签页到达 `shopify.com/authentication/.../login`，页面标题为 `Sign in - Skyra Booking Dev`。
+- 仍未用用户个人账号完成 **Continue with Shop**、验证码/账户授权、退出和返回后的 `logged_in_customer_id` 验收；这一步需要用户在 Shopify 托管页操作。此次未收款、未创建 Booking，也未打开交易能力开关。

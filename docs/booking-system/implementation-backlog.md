@@ -228,7 +228,7 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 - [x] M5-03 Programs：用 `data-surface="programs"` 占位节点替换硬编码 Find a Class 和所有 Mindbody Book/filter/date links。
 - [ ] M5-04 完成共享 BROWSE：按 Programs Find a Class 视觉实现月标题、七日日期条、前后周、Class type/Instructor filters、实时容量、loading/empty/error 和区块内 Full calendar。七日条、筛选和实时 Session 已联调；本轮补充独立 Book 与 Show details，2026-09-11 已完成 Programs 共享宽面板、31 天 Full Calendar 和跨月选择；本轮已补齐月份标题、独立前后周与未开放文案；剩余真实 Programs 入口及完整 E2E。
 - [ ] M5-05 完成 DETAILS：Show details 在 Session 行内展开或在同一 surface 替换内容，显示课程、老师、地点、level、policy、剩余名额；Back 恢复日期、筛选、滚动和焦点。
-- [ ] M5-06 完成 LOGIN_REQUIRED：Shopify 登录 modal/popup/手机同页登录已实现，并已接服务器 opaque Attempt 与固定返回路径；签名身份绑定、无 storage 恢复通过本地验证。真实开发店客户登录/退出、跨域 cookie 与返回联调尚未完成，保持部分完成。
+- [ ] M5-06 完成 LOGIN_REQUIRED：Shopify 登录 modal 与全端同页顶层跳转已实现，并已接服务器 opaque Attempt 与固定返回路径；签名身份绑定、无 storage 恢复通过本地验证。2026-09-12 用户反馈 Shopify 托管页 **Continue with Shop** 点击后疑似无响应；已移除桌面弹窗层，并修复本地预览误把登录请求发到 `127.0.0.1` 的 401。当前已验证开发店域名能在同一标签页打开 Shopify 托管登录并保留 `preview_theme_id`，但真实账户完成登录、退出、跨域 cookie 与签名返回仍待用户复测，保持部分完成。
 - [ ] M5-07 完成 PASS_SELECTION：采用参考图的主栏 Pass cards + 右栏 Booking Details；已有适用 Pass 优先显示余额、到期与 `A$0 due today`，购买选项显示已同步 Shopify Variant 实时价格，未选择时 Continue 禁用。2026-09-11 已完成新 Pass cards、资格/同步价格检查和响应式 Booking Details；2026-09-12 已补充 Drop-in 卡片与价格复核；已有 Pass/最终 Shopify 可售校验待接。
 - [ ] M5-08 新增 REVIEW：采用参考图的交易摘要结构，显示 Customer、Class、日期时间、Coach、Location、选中 Pass/Drop-in、价格与 Edit；这是当前 Booking section 的状态，不是 Customer Account 或独立 Cart 页面。2026-09-11 已完成新 Pass 摘要、服务端价格/名额复核及 Edit；2026-09-12 已补充 Drop-in 摘要；Customer/已有 Pass 与支付交接未完成。
 - [ ] M5-09 已有 Pass 从 REVIEW 走原子确认并显示 CONFIRMING → CONFIRMED，不创建 A$0 Checkout。
@@ -248,8 +248,8 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 ### 验收
 
 - 新客可以完成“选课 → 登录 → 买 Drop-in → 付款 → 查看 Booking”。
-- Book 每次重新验证 Shopify 登录；登录成功可被网站/Account 共用，退出后再次 Book 不能复用旧状态。未登录弹窗、关闭、重复点击、校验失败、popup 被拦截、手机同页返回及延迟响应取消均需覆盖。
-- 只把 signed App Proxy 重新验证成功视为登录完成；储存的 selection、popup 关闭或浏览器传入 authenticated 不得放行。
+- Book 每次重新验证 Shopify 登录；登录成功可被网站/Account 共用，退出后再次 Book 不能复用旧状态。未登录 modal、关闭、重复点击、校验失败、全端同页返回、无 storage 恢复及延迟响应取消均需覆盖；真实账户还需复测 Shopify 托管页 **Continue with Shop**。
+- 只把 signed App Proxy 重新验证成功视为登录完成；储存的 selection、页面返回或浏览器传入 authenticated 不得放行。
 - 老客可以使用有效 10 次卡预约而不重复付款。
 - Home 和 Programs 的 Booking 步骤不会导航到自建详情/Pass/确认页面；只有 Shopify 登录和 Checkout 会离开，返回后恢复到正确状态。
 - Home 和 Programs 显示同一组实时 Session、余额和容量结果，且代码中只有一份 Booking 状态机。
@@ -403,7 +403,7 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 
 ### 2026-09-12 新会话执行入口
 
-具体交接见 [开发交接](handoff-2026-09-12.md)。先完成真实双入口登录验收和本轮 Git 推送；后续按权益台账/Drop-in Hold → 商品可售验证/Cart → orders/paid/确认 → 已有 Pass/付款后恢复推进。Programs Page 创建、新 Pass/Drop-in Review 已完成，不再列为待创建 UI；完整交易链路仍未完成。
+具体交接见 [开发交接](handoff-2026-09-12.md)。登录已改为全端同页顶层 Shopify hand-off，并完成到托管登录页的真实跳转；下一步由用户复测 **Continue with Shop**、退出和签名返回。后续按商品可售验证/Cart → orders/paid/确认 → 已有 Pass/付款后恢复推进。Programs Page 创建、权益台账/Drop-in Hold、新 Pass/Drop-in Review 已完成，不再列为待创建 UI；完整交易链路仍未完成。
 
 ### 2026-09-12 权益与 Hold 基础续开发
 
