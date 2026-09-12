@@ -4,13 +4,7 @@ import { DomainError } from "../lib/errors.server";
 
 type Tx = Prisma.TransactionClient;
 type LedgerKind =
-  | "GRANT"
-  | "RESERVE"
-  | "CONSUME"
-  | "RELEASE"
-  | "ADJUST"
-  | "EXPIRE"
-  | "REVOKE";
+  "GRANT" | "RESERVE" | "CONSUME" | "RELEASE" | "ADJUST" | "EXPIRE" | "REVOKE";
 
 export type EntitlementBalance = {
   availableUnits: number;
@@ -117,7 +111,8 @@ async function appendLedgerEntry(tx: Tx, input: LedgerInput) {
 export type GrantEntitlementInput = {
   shopId: string;
   customerId: string;
-  passPlanId: string;
+  passPlanId: string | null;
+  serviceId?: string | null;
   productMappingId: string;
   sourceOrderGid: string;
   sourceLineItemGid: string;
@@ -128,13 +123,20 @@ export type GrantEntitlementInput = {
 };
 
 export async function grantEntitlement(input: GrantEntitlementInput) {
+  return db.$transaction((tx) => grantEntitlementInTransaction(tx, input));
+}
+
+export async function grantEntitlementInTransaction(
+  tx: Tx,
+  input: GrantEntitlementInput,
+) {
   if (
     !Number.isInteger(input.grantedUnits) ||
     input.grantedUnits <= 0 ||
     input.expiresAt <= input.startsAt
   )
     fail("INVALID_ENTITLEMENT", "Invalid Pass entitlement grant.", 400);
-  return db.$transaction(async (tx) => {
+  {
     const mapping = await tx.productMapping.findUnique({
       where: {
         shopId_id: {
@@ -145,8 +147,12 @@ export async function grantEntitlement(input: GrantEntitlementInput) {
     });
     if (
       !mapping ||
-      mapping.ownerType !== "PASS_PLAN" ||
-      mapping.ownerId !== input.passPlanId
+      (input.passPlanId
+        ? mapping.ownerType !== "PASS_PLAN" ||
+          mapping.ownerId !== input.passPlanId ||
+          !!input.serviceId
+        : mapping.ownerType !== "SERVICE" ||
+          mapping.ownerId !== input.serviceId)
     )
       fail("INVALID_ENTITLEMENT", "Pass product mapping does not match.", 400);
     const entitlement = await tx.entitlement.upsert({
@@ -161,6 +167,7 @@ export async function grantEntitlement(input: GrantEntitlementInput) {
         shopId: input.shopId,
         customerId: input.customerId,
         passPlanId: input.passPlanId,
+        serviceId: input.serviceId || null,
         productMappingId: input.productMappingId,
         sourceOrderGid: input.sourceOrderGid,
         sourceLineItemGid: input.sourceLineItemGid,
@@ -173,6 +180,7 @@ export async function grantEntitlement(input: GrantEntitlementInput) {
     if (
       entitlement.customerId !== input.customerId ||
       entitlement.passPlanId !== input.passPlanId ||
+      entitlement.serviceId !== (input.serviceId || null) ||
       entitlement.productMappingId !== input.productMappingId ||
       entitlement.startsAt.getTime() !== input.startsAt.getTime() ||
       entitlement.expiresAt.getTime() !== input.expiresAt.getTime() ||
@@ -197,7 +205,7 @@ export async function grantEntitlement(input: GrantEntitlementInput) {
       entitlement,
       balance: await entitlementBalance(tx, input.shopId, entitlement.id),
     };
-  });
+  }
 }
 
 export async function eligibleEntitlements(
@@ -244,7 +252,7 @@ export async function eligibleEntitlements(
           {
             id: entitlement.id,
             passPlanId: entitlement.passPlanId,
-            name: entitlement.passPlan.name,
+            name: entitlement.passPlan!.name,
             grantedUnits: entitlement.grantedUnits,
             expiresAt: entitlement.expiresAt,
             ...balance,
@@ -321,15 +329,17 @@ export async function reserveEntitlementCredit(
     entitlement.expiresAt <= input.sessionStartsAt
   )
     fail("ENTITLEMENT_UNAVAILABLE", "This Pass is not valid for the class.");
-  const eligible = await tx.passEligibility.findUnique({
-    where: {
-      shopId_passPlanId_serviceId: {
-        shopId: input.shopId,
-        passPlanId: entitlement.passPlanId,
-        serviceId: input.serviceId,
-      },
-    },
-  });
+  const eligible = entitlement.passPlanId
+    ? await tx.passEligibility.findUnique({
+        where: {
+          shopId_passPlanId_serviceId: {
+            shopId: input.shopId,
+            passPlanId: entitlement.passPlanId,
+            serviceId: input.serviceId,
+          },
+        },
+      })
+    : entitlement.serviceId === input.serviceId;
   if (!eligible)
     fail("ENTITLEMENT_UNAVAILABLE", "This Pass cannot be used for the class.");
   const balance = await entitlementBalance(

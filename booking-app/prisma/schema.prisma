@@ -100,6 +100,7 @@ model Service {
   coaches             ServiceCoach[]
   passes              PassEligibility[]
   sessions            ClassSession[]
+  dropInEntitlements  Entitlement[]
   createdAt           DateTime          @default(now()) @db.Timestamptz
   updatedAt           DateTime          @updatedAt @db.Timestamptz
 
@@ -223,6 +224,7 @@ model WebhookReceipt {
   receivedAt  DateTime @default(now()) @db.Timestamptz
 
   @@unique([shopId, webhookId])
+  @@index([status, receivedAt])
 }
 
 model AuditLog {
@@ -308,6 +310,7 @@ model BookingCheckout {
   variantGid         String
   priceCents         Int
   catalogFingerprint String
+  purchaseTerms      Json?
   status             String         @default("CREATING")
   cartId             String?
   createdAt          DateTime       @default(now()) @db.Timestamptz
@@ -320,12 +323,15 @@ model BookingCheckout {
   @@index([shopId, status, createdAt])
 }
 
-// Capacity projection only. Entitlement confirmation / cancellation APIs are M3/M4 follow-ups.
+// Confirmed occupancy, linked to its immutable checkout and order source.
 model Booking {
   id                       String                   @id @default(uuid()) @db.Uuid
   shopId                   String                   @db.Uuid
   sessionId                String                   @db.Uuid
   customerId               String                   @db.Uuid
+  checkoutId               String?                  @unique @db.Uuid
+  sourceOrderGid           String?
+  sourceLineItemGid        String?
   status                   String                   @default("CONFIRMED")
   createdAt                DateTime                 @default(now()) @db.Timestamptz
   session                  ClassSession             @relation(fields: [shopId, sessionId], references: [shopId, id])
@@ -333,6 +339,7 @@ model Booking {
   entitlementLedgerEntries EntitlementLedgerEntry[]
 
   @@unique([shopId, id])
+  @@unique([shopId, sourceOrderGid, sourceLineItemGid])
   @@index([shopId, sessionId, status])
 }
 
@@ -340,7 +347,8 @@ model Entitlement {
   id                String                   @id @default(uuid()) @db.Uuid
   shopId            String                   @db.Uuid
   customerId        String                   @db.Uuid
-  passPlanId        String                   @db.Uuid
+  passPlanId        String?                  @db.Uuid
+  serviceId         String?                  @db.Uuid
   productMappingId  String                   @db.Uuid
   sourceOrderGid    String
   sourceLineItemGid String
@@ -350,7 +358,8 @@ model Entitlement {
   status            String                   @default("ACTIVE")
   createdAt         DateTime                 @default(now()) @db.Timestamptz
   customer          CustomerProfile          @relation(fields: [shopId, customerId], references: [shopId, id])
-  passPlan          PassPlan                 @relation(fields: [shopId, passPlanId], references: [shopId, id])
+  passPlan          PassPlan?                @relation(fields: [shopId, passPlanId], references: [shopId, id])
+  service           Service?                 @relation(fields: [shopId, serviceId], references: [shopId, id])
   productMapping    ProductMapping           @relation(fields: [shopId, productMappingId], references: [shopId, id])
   ledgerEntries     EntitlementLedgerEntry[]
 
@@ -379,4 +388,54 @@ model EntitlementLedgerEntry {
   @@unique([shopId, idempotencyKey])
   @@index([shopId, entitlementId, createdAt])
   @@index([shopId, reservationKey])
+}
+
+// Recipient IDs reference internal records only; addresses and rendered email are resolved at send time.
+model BookingNotification {
+  id                String    @id @default(uuid()) @db.Uuid
+  shopId            String    @db.Uuid
+  bookingId         String    @db.Uuid
+  recipientKind     String
+  recipientId       String    @db.Uuid
+  template          String    @default("BOOKING_CONFIRMED_V1")
+  status            String    @default("PENDING")
+  attempts          Int       @default(0)
+  availableAt       DateTime  @default(now()) @db.Timestamptz
+  claimedAt         DateTime? @db.Timestamptz
+  acceptedAt        DateTime? @db.Timestamptz
+  providerMessageId String?
+  lastError         String?
+  createdAt         DateTime  @default(now()) @db.Timestamptz
+
+  @@unique([shopId, bookingId, recipientKind, recipientId, template])
+  @@index([status, availableAt])
+}
+
+model PaidBookingResult {
+  id                String   @id @default(uuid()) @db.Uuid
+  shopId            String   @db.Uuid
+  checkoutId        String   @unique @db.Uuid
+  sourceOrderGid    String
+  sourceLineItemGid String
+  entitlementId     String?  @db.Uuid
+  bookingId         String?  @db.Uuid
+  status            String
+  reason            String?
+  createdAt         DateTime @default(now()) @db.Timestamptz
+
+  @@unique([shopId, sourceOrderGid, sourceLineItemGid])
+  @@index([shopId, status, createdAt])
+}
+
+model CoachAccessToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  shopId    String   @db.Uuid
+  coachId   String   @db.Uuid
+  tokenHash String   @unique
+  kind      String
+  status    String   @default("ACTIVE")
+  expiresAt DateTime @db.Timestamptz
+  createdAt DateTime @default(now()) @db.Timestamptz
+
+  @@index([shopId, coachId, status])
 }

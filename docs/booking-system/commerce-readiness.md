@@ -1,5 +1,14 @@
 # 开发店 Commerce 配置与归属恢复
 
+## 最新续开发：付款确认、邮件与 Coach（2026-09-12）
+
+已在本地接通 ORDER_PAID_RECEIVED Worker：冻结购买条款、NEW_PASS/Drop-in 权益、原子 GRANT/RESERVE/CONFIRMED、PaidBookingResult 的 Checkout/Order-Line 去重、可恢复过期 Hold 的容量重查与 Needs Attention。预约确认同时生成 Customer + 对应 Coach 两条幂等通知；含邮件模板、预览、投递 adapter 接口和重试/UNKNOWN 状态，**尚未配置或发送真实邮件**。
+
+新增独立受保护的 Coach 只读个人中心 /coach，按上课日期筛选未来 7 天、30 天和自定义区间，显示报名人次/容量及出席、取消、No-show。单次链接/会话/退出服务和页面已实现；真实 Coach 邮箱绑定、邀请发信和真实账号验收仍未完成。Admin Bookings 现可只读查看 Needs Attention、近期预约和邮件预览，不能执行退款/人工重新确认。
+
+当前实现和边界详见 [Booking 邮件与 Coach](notifications-and-coach.md)。下方早期记录属于历史快照，最新代码/测试以本节及本轮验证记录为准。三个公开交易开关仍关闭；没有真实付款、Booking、发信、正式部署或 Git commit/push。
+
+
 更新：2026-09-12 15:35 Australia/Sydney。本页记录真实配置和安全恢复顺序，不是上线许可。
 
 ## 当前结果：开发店商品准备已通过
@@ -62,5 +71,11 @@ npm.cmd run preview:purchasability -- -RestoreOwnership -MappingId bb60d549-8727
 - **Continue with Shop** 完成、退出和签名身份返回仍需真实账号复测；此前同页顶层跳转修复不等于真实登录闭环验收。
 - M4-01 / M5-10 的内部 Review → Hold → 单 Cart 编排已完成并测试，公开路由/前端仍关闭。下一开发项是 orders/paid 收件、幂等处理、订单与 booking reference 校验、权益发放/Booking 确认及过期付款恢复；具备该闭环后才开放真实 Checkout。
 - 本轮没有收款、扣课、创建预约或部署正式店；未再次 commit/push。检查通过仅代表当时商品可售，不是支付或预约授权。
+
+### 2026-09-12 orders/paid 基础更新
+
+- Hold → Cart 批次已推送 `b67694271cbe5ddee75d3a6484c59e23c04eab39`。后续本地已完成 HMAC 验签后的 orders/paid 收件、Webhook ID 并发去重、Booking reference 与 Customer/Product/Variant/数量/AUD 金额/paid 状态核对，并按结果写入 `ORDER_PAID_RECEIVED` 或 `ORDER_PAID_REVIEW` Outbox。
+- 官方 Admin GraphQL schema 已验证未来订单 reconciliation 查询；验证器显示需要订单以及所选客户/商品字段的读取权限。本轮没有扩大运行 App scopes，也没有把 orders/paid 写入 `shopify.app.toml`，避免在 Worker/恢复闭环完成前改变开发店授权或接收真实付款事件。
+- 下一步是实现 Outbox Worker 的 Entitlement grant → reserve → Booking Confirmed、过期 Hold 付款的 Needs Attention/可恢复路径和乱序/重试测试；完成后再单独申请权限、注册并用 Shopify CLI trigger/真实测试支付验收。
 
 官方依据：[Storefront 认证](https://shopify.dev/docs/api/storefront/2026-07)、[Product publishedAt](https://shopify.dev/docs/api/admin-graphql/2026-07/objects/Product#field-Product.fields.publishedAt)、[商品渠道发布](https://shopify.dev/docs/apps/build/sales-channels/product-publishing)、[字段定义](https://shopify.dev/docs/apps/build/metafields/definitions)、[metafieldsSet 比较写入](https://shopify.dev/docs/api/admin-graphql/2026-07/mutations/metafieldsSet)。

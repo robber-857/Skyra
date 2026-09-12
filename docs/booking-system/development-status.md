@@ -1,8 +1,27 @@
 # Booking V3 — 开发状态
 
+## 最新续开发：付款确认、邮件与 Coach（2026-09-12）
+
+已在本地接通 ORDER_PAID_RECEIVED Worker：冻结购买条款、NEW_PASS/Drop-in 权益、原子 GRANT/RESERVE/CONFIRMED、PaidBookingResult 的 Checkout/Order-Line 去重、可恢复过期 Hold 的容量重查与 Needs Attention。预约确认同时生成 Customer + 对应 Coach 两条幂等通知；含邮件模板、预览、投递 adapter 接口和重试/UNKNOWN 状态，**尚未配置或发送真实邮件**。
+
+新增独立受保护的 Coach 只读个人中心 /coach，按上课日期筛选未来 7 天、30 天和自定义区间，显示报名人次/容量及出席、取消、No-show。单次链接/会话/退出服务和页面已实现；真实 Coach 邮箱绑定、邀请发信和真实账号验收仍未完成。Admin Bookings 现可只读查看 Needs Attention、近期预约和邮件预览，不能执行退款/人工重新确认。
+
+当前实现和边界详见 [Booking 邮件与 Coach](notifications-and-coach.md)。下方早期记录属于历史快照，最新代码/测试以本节及本轮验证记录为准。三个公开交易开关仍关闭；没有真实付款、Booking、发信、正式部署或 Git commit/push。
+
+
 更新：2026-09-12。此页记录实际代码、开发店联调与验证证据；完整范围仍以 `implementation-backlog.md` 为准。
 
-最新状态：commerce readiness 已以 `eb1fd6a` 推送且 CI 成功。下一轮已完成 Review → Hold → Cart 的内部安全编排和 BookingCheckout 数据约束；200 项测试、类型/lint/构建通过。公开 Checkout 路由仍由能力开关关闭，开发店未创建真实 Cart/订单、未收款。下一步先实现 orders/paid 幂等处理、Booking 确认与付款后恢复，再开放前端 Checkout。Continue with Shop 真实账户复测仍未完成。
+最新状态：Hold → Cart 已以 `b67694271cbe5ddee75d3a6484c59e23c04eab39` 推送 `bookingdev`，远程 SHA 一致，GitHub CI run 34679489160 已触发。其后已完成 `orders/paid` 的验签路由、Webhook ID 幂等收件、订单归属/商品/数量/AUD 金额/付款状态校验和 Outbox 分类；212 项测试、类型/lint/构建通过。真实订阅、`read_orders` 权限、Worker 权益发放、Booking 确认、付款后恢复和公开 Checkout 仍关闭。Continue with Shop 真实账户复测仍未完成。
+
+### 本轮最终验证（2026-09-12 23:03 Australia/Sydney）
+
+- 全套 14 个测试文件、240 项测试通过（上一轮 212 + 本轮 28），包括重复 delivery/worker、两笔过期付款争抢最后名额、全事务回滚、权益冻结、通知重试/UNKNOWN，以及 Coach 跨店/跨教练隔离、一次链接并发消费、退出/停用、DST 和日期边界。
+- TypeScript、ESLint、生产构建与 Prisma validate 通过；测试库和本地开发库全部 8 条迁移已应用。
+- 生产构建 + 专用测试库的 Playwright：390/1440px，登录、月度筛选、自定义空状态、退出通过；两视口均 noHorizontalOverflow=true、pageErrors=[]。已检查截图。
+- 证据：output/playwright/coach-booking/{results.json,coach-390.png,coach-1440.png,customer-email.html,coach-email.html}；重跑使用 booking-app/scripts/coach-booking-smoke.mjs，需测试 DATABASE_URL 和已安装的 PLAYWRIGHT_MODULE，通过 tsx 运行。测试过程没有真实发信或 Shopify 支付。
+- 已恢复 App/Worker，原 Theme dev 继续运行；preview:check 的 Home、Programs、App host、Booking API、Shopify upstream 均通过 HTTP 200 检查。这不代表真实客户登录/支付 E2E。
+- 本地开发店 holds=0、bookings=0、notifications=0；onlineBookingsEnabled=false、checkoutAvailable=false、ownedPassesAvailable=false。
+- 保留上一轮未提交 Webhook 批次；本轮没有 commit/push、真实收款/发信或正式店发布。
 
 ## 已创建与已绑定
 
@@ -231,4 +250,13 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 - Cart line 只写服务器随机 `_skyra_booking_ref`，不含 Customer GID/PII，也不复用浏览器 Attempt token；完整 Cart ID 含 secret，仅服务器保存，API/审计不返回。创建结果未知时禁止自动二次创建。
 - 新增签名 `/apps/skyra-booking/checkout` 路由，但 `checkoutAvailable=false` 在调用编排前拒绝；`onlineBookingsEnabled=false` 和 `ownedPassesAvailable=false` 不变。因此本轮没有真实 Cart、Checkout、Hold、订单、扣课或 Booking。
 - 专用测试库 200 项串行通过（原 154 + 新增 46）；新覆盖 NEW_PASS/DROP_IN、10 路并发、两客户最后一席、跨店/跨账号、恶意输入、响应变更、超时和数据库不可变。`npm.cmd run check`、Prisma validate、两项 Storefront GraphQL 官方校验通过。迁移已应用测试库和本地开发库。
-- App/Worker 和 9292 Theme 预览已恢复；本轮无主题前端改动、无 App deploy 或正式店变更。本轮 Cart 修改及文档尚未 commit/push。
+- App/Worker 和 9292 Theme 预览已恢复；本轮无主题前端改动、无 App deploy 或正式店变更。此批已提交并推送 `b67694271cbe5ddee75d3a6484c59e23c04eab39`，远程 ref 已核对。
+
+## 最新交付：orders/paid 收件箱与严格订单分类（2026-09-12）
+
+- 新增 `/webhooks/orders/paid`：先由 Shopify React Router SDK 验证 HMAC，再读取原始字节计算 SHA-256；只接受 orders/paid 主题。认证失败不确认，认证成功的业务异常被持久化后快速返回 200，避免在五秒 Webhook 窗口内直接发权益或确认预约。
+- `webhook_receipts` 以 `(shopId, webhookId)` 唯一约束去重；10 路并发重试只生成一条 Receipt 和一条 Outbox。相同 delivery ID 但不同 payload/topic 记为冲突且不重新处理。新增状态/哈希数据库约束和 `status + receivedAt` 运维索引。
+- 仅从订单载荷提取最小必要字段，不保存原始订单、邮箱、地址或 Customer GID 到 Outbox。无 `_skyra_booking_ref` 的普通订单标记已处理并忽略；畸形或多 Booking line 进入 `ORDER_PAID_REVIEW`。
+- 对命中的 Checkout 严格验证同店 reference、READY 状态、Customer、Product、Variant、单行 quantity=1、AUD、line/subtotal/final amount、paid 状态及未取消。全部通过才投递 `ORDER_PAID_RECEIVED`；任一不匹配进入 Needs Attention，不发 Pass、不写 Booking。
+- 专用测试库迁移成功，12 个测试文件共 212 项通过；`npm.cmd run check` 的类型、lint、生产构建通过，本地开发库 6 条迁移 up to date。官方 schema 验证了后续 Order 对账查询，但它需要订单/客户/商品读取权限，因此本轮未扩大 App scopes、未注册真实订阅。
+- 尚未完成：Outbox Worker 的 grant → reserve → Booking Confirmed、过期 Hold 付款恢复、乱序/重复业务处理、真实 webhook 注册/触发、退款/取消与 reconciliation。三个能力开关保持 false，本轮没有真实订单、付款、权益或预约。

@@ -159,6 +159,18 @@ async function readContext(
     productGid: mapping!.productGid!,
     variantGid: mapping!.variantGid!,
     priceCents: owner.requestedPriceCents,
+    purchaseTerms: {
+      version: 1,
+      credits: plan?.credits ?? 1,
+      validityDays: plan?.validityDays ?? 1,
+      timezone: session.timezone,
+      sessionStartsAt: session.startsAt.toISOString(),
+      sessionEndsAt: session.endsAt.toISOString(),
+      coachId: session.coachId,
+      locationId: session.locationId,
+      serviceId: session.serviceId,
+      introOnly: plan?.introOnly ?? false,
+    },
   };
 }
 type Context = Awaited<ReturnType<typeof readContext>>;
@@ -303,6 +315,7 @@ export async function prepareBookingCheckout(
         variantGid: context.variantGid,
         priceCents: context.priceCents,
         catalogFingerprint: context.fingerprint,
+        purchaseTerms: context.purchaseTerms,
       },
     });
     await tx.auditLog.create({

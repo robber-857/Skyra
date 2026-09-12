@@ -202,12 +202,12 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 - [ ] M4-01 根据适用 Pass / Session-owned Drop-in Variant 创建/更新 Shopify Cart。内部服务、单 Hold 单 Cart 创建 claim、实时复核、Cart 回读及安全重试已完成并测试；公开路由仍由 checkoutAvailable=false 关闭，等待 paid webhook/预约恢复闭环后才能联调真实 Checkout。
 - [x] M4-02 将服务器随机生成、无 PII 且与公开 Attempt/Hold ID 分离的 opaque booking reference 写入 Cart line attribute `_skyra_booking_ref`；完整 Cart ID/secret 仅服务器保存。
 - [ ] M4-03 确认预约摘要进入 Order 但不包含敏感数据。
-- [ ] M4-04 订阅并验证订单、付款、取消、退款 Webhooks。
-- [ ] M4-05 建立 `webhook_receipts` 去重和异步处理。
-- [ ] M4-06 `orders/paid` 后发放 Entitlement 并 Confirm Booking。
-- [ ] M4-07 重复 Webhook/Worker retry 不重复发 Pass 或 Booking。
+- [ ] M4-04 已实现 Shopify SDK HMAC 验证后的 `orders/paid` 路由和主题拒绝；真实订阅、所需订单权限、CLI trigger 联调，以及取消/退款 topics 尚未完成。
+- [ ] M4-05 已建立 `webhook_receipts` 的 payload hash、`(shopId, webhookId)` 并发去重、状态约束和最小化 Outbox 分类；`ORDER_PAID_RECEIVED` Worker 消费、失败重试/告警和运维重放尚未完成。
+- [x] M4-06 内部 orders/paid Worker 完成 NEW_PASS/Drop-in GRANT → RESERVE → CONFIRMED；事务包括两条预约通知。真实订阅/支付验收仍属于 M4-04/M8-11。
+- [x] M4-07 同事件重试、不同 delivery ID、同订单并发由 Checkout/Order-Line 唯一记录和事务锁去重，不重复发权益、确认或通知。
 - [ ] M4-08 退款后执行 Entitlement reversal 与 Booking projection 更新。
-- [ ] M4-09 实现付款已完成但 Hold 异常的 Needs Attention 队列。
+- [ ] M4-09 订单引用/客户/Product/Variant/数量/币种/金额/付款状态异常已进入 `ORDER_PAID_REVIEW` 与 Receipt NEEDS_ATTENTION；Admin 队列、过期 Hold 付款决策和人工恢复尚未完成。
 - [ ] M4-10 实现订单 reconciliation job 与 Admin 手工 Reconcile。
 - [ ] M4-11 内部服务已严格核对并仅返回允许店铺/Shopify host 的 HTTPS checkoutUrl，以及固定 Home/Programs returnPath；前端跳转、Thank-you/支付后返回与真实店联调尚未实现。
 
@@ -268,14 +268,14 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 ### 任务
 
 - [ ] M6-01 Coach Today dashboard。
-- [ ] M6-02 Day/Week schedule。
+- [ ] M6-02 Day/Week schedule。已实现 /coach 的未来 7 天/30 天/自定义日期只读课程列表；日历视图及真实邀请登录验收待完成。
 - [ ] M6-03 Class Session roster。
 - [ ] M6-04 Check-in、Attended、No-show。
 - [ ] M6-05 Appointment detail 与有限客户信息。
 - [ ] M6-06 Availability recurring hours。
 - [ ] M6-07 Time off / exception。
 - [ ] M6-08 Schedule change notifications。
-- [ ] M6-09 Coach 数据访问审计。
+- [ ] M6-09 Coach 数据访问审计。当前 /coach 课程报名查询已有审计；其他 Coach 操作待实现。
 - [ ] M6-10 Coach 创建 PRE_CLASS/POST_CLASS 留言，并明确选择 Customer-visible 或 Internal。
 
 ### 验收
@@ -317,11 +317,11 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 
 ### 通知
 
-- [ ] M8-01 Booking confirmation。
+- [ ] M8-01 Booking confirmation。Customer/Coach 模板、事务通知、Admin 预览与 adapter 接口已完成；真实邮件 provider/收件人解析/投递未接。
 - [ ] M8-02 Reminder。
 - [ ] M8-03 Reschedule/cancellation。
 - [ ] M8-04 Appointment request accepted/rejected。
-- [ ] M8-05 发送失败重试与通知日志。
+- [ ] M8-05 已实现通知状态、并发 claim、最多 5 次明确失败重试和 UNKNOWN 防盲重发；真实发送与 provider 回执/对账未完成。
 
 ### 测试
 
@@ -445,4 +445,21 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 - Shopify Cart 只含 quantity=1、服务器随机 `_skyra_booking_ref`、AU buyer country；回读严格拒绝额外行/属性、商品/价格/币种/订阅/host 变化。`cartCreate` 禁止 SDK 自动重试，6 秒截止覆盖响应体读取。
 - 新增签名 App Proxy Checkout route，但 checkoutAvailable=false，匿名/跨站/GET 均拒绝。没有真实 Cart、Checkout、收款、扣课或 Booking。
 - 全套测试 200 项通过（新增 46），含 10 路重复请求、两客户抢最后一席、未知结果、警告、跨店/跨账号、商品变化、Hold 过期与数据库不可变性；类型/lint/构建、Prisma schema 和两项 Storefront GraphQL 官方校验通过。
-- 上一轮 commerce readiness 已提交并推送 `eb1fd6a`，远程 SHA 一致，GitHub CI run 34676536279 成功。本轮 Cart 代码和文档尚未提交；下一步是 orders/paid inbox/幂等处理与付款后确认/Needs Attention，再开放前端 Checkout。
+- Hold → Cart 已提交并推送 `b67694271cbe5ddee75d3a6484c59e23c04eab39`，远程 SHA 一致，GitHub CI run 34679489160 已触发。其后本地完成 orders/paid inbox、Webhook ID 并发去重、严格订单归属/金额校验和 Outbox/Needs Attention 分类，212 项测试及 check 通过；本批尚未 commit/push。下一步消费 `ORDER_PAID_RECEIVED`，原子 grant/reserve/Booking 确认并处理过期 Hold，再申请权限、注册真实订阅和开放 Checkout。
+
+## 2026-09-12 本轮新增范围
+
+## 最新续开发：付款确认、邮件与 Coach（2026-09-12）
+
+已在本地接通 ORDER_PAID_RECEIVED Worker：冻结购买条款、NEW_PASS/Drop-in 权益、原子 GRANT/RESERVE/CONFIRMED、PaidBookingResult 的 Checkout/Order-Line 去重、可恢复过期 Hold 的容量重查与 Needs Attention。预约确认同时生成 Customer + 对应 Coach 两条幂等通知；含邮件模板、预览、投递 adapter 接口和重试/UNKNOWN 状态，**尚未配置或发送真实邮件**。
+
+新增独立受保护的 Coach 只读个人中心 /coach，按上课日期筛选未来 7 天、30 天和自定义区间，显示报名人次/容量及出席、取消、No-show。单次链接/会话/退出服务和页面已实现；真实 Coach 邮箱绑定、邀请发信和真实账号验收仍未完成。Admin Bookings 现可只读查看 Needs Attention、近期预约和邮件预览，不能执行退款/人工重新确认。
+
+当前实现和边界详见 [Booking 邮件与 Coach](notifications-and-coach.md)。下方早期记录属于历史快照，最新代码/测试以本节及本轮验证记录为准。三个公开交易开关仍关闭；没有真实付款、Booking、发信、正式部署或 Git commit/push。
+
+
+- [x] Coach 课程报名统计：按 Session 日期、未来 7/30 天、自定义首尾日；报名/取消/出席/No-show 分开，隔离其他 Coach 与店铺。
+- [x] 内部 Coach 一次性登录/8 小时会话/退出与停用检查；公开未授权访问被拒绝。
+- [ ] Coach 真实邮箱维护、邀请发信、自助重发和真实身份登录验收。
+- [ ] 事务邮件 provider、Customer/Coach verified recipient 解析、域名配置、投递回执和真实收信验收。
+- [ ] 退款/取消/争议乱序、订单 reconciliation、异常队列可审计人工恢复；完成前不开放 Checkout。

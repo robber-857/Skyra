@@ -594,6 +594,7 @@ test("checkout binding, price and Cart secret cannot be reassigned, including ac
     db.bookingCheckout.create({
       data: {
         ...intent,
+        purchaseTerms: intent.purchaseTerms ?? undefined,
         id: randomUUID(),
         holdId: otherHold.id,
         reference: "b".repeat(43),
@@ -606,6 +607,7 @@ test("checkout binding, price and Cart secret cannot be reassigned, including ac
     db.bookingCheckout.create({
       data: {
         ...intent,
+        purchaseTerms: intent.purchaseTerms ?? undefined,
         id: randomUUID(),
         shopId: other.shop.id,
         holdId: otherHold.id,

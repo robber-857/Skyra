@@ -306,7 +306,7 @@ export async function resumeAttempt(actor: BookingActor, token: string) {
     attempt = await tx.bookingAttempt.findUniqueOrThrow({
       where: { id: attempt.id },
     });
-    if (attempt.expiresAt <= now) {
+    if (attempt.expiresAt <= now && attempt.status !== "CONFIRMED") {
       attempt = await tx.bookingAttempt.update({
         where: { id: attempt.id },
         data: { status: "EXPIRED" },
@@ -321,7 +321,7 @@ export async function resumeAttempt(actor: BookingActor, token: string) {
         customerId: profile.id,
       });
     }
-    if (!["EXPIRED", "RECOVERY"].includes(attempt.status)) {
+    if (!["EXPIRED", "RECOVERY", "CONFIRMED"].includes(attempt.status)) {
       try {
         await classForBooking(tx, shop, attempt.sessionId, now);
       } catch (error) {
@@ -552,7 +552,7 @@ export async function expireBookingWork(batchSize = 100) {
     orderBy: { expiresAt: "asc" },
   });
   const attempts = await db.bookingAttempt.findMany({
-    where: { status: { not: "EXPIRED" }, expiresAt: { lte: now } },
+    where: { status: { notIn: ["EXPIRED", "CONFIRMED"] }, expiresAt: { lte: now } },
     take: batchSize,
     orderBy: { expiresAt: "asc" },
   });
@@ -575,7 +575,7 @@ export async function expireBookingWork(batchSize = 100) {
             shopId,
             sessionId,
             expiresAt: { lte: clock },
-            status: { not: "EXPIRED" },
+            status: { notIn: ["EXPIRED", "CONFIRMED"] },
           },
           data: { status: "EXPIRED" },
         })

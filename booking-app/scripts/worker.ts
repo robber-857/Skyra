@@ -1,4 +1,9 @@
 import "dotenv/config";
+import { markStaleNotificationsUnknown } from "../app/services/booking-notifications.server";
+import {
+  processPaidBookingEvent,
+  recordPaidBookingFailure,
+} from "../app/services/paid-booking.server";
 import { Queue, Worker } from "bullmq";
 import db from "../app/db.server";
 import { unauthenticated } from "../app/shopify.server";
@@ -19,6 +24,15 @@ const worker = new Worker(
     const event = await db.outboxEvent.findUniqueOrThrow({
       where: { id: job.data.id },
     });
+    if (event.kind === "ORDER_PAID_RECEIVED") {
+      try {
+        await processPaidBookingEvent(event.id);
+      } catch {
+        await recordPaidBookingFailure(event.id);
+        log.warn({ eventId: event.id }, "Paid booking processing failed");
+      }
+      return;
+    }
     const shop = await db.shop.findUniqueOrThrow({
       where: { id: event.shopId },
     });
@@ -42,7 +56,7 @@ async function dispatch() {
   try {
     const events = await db.outboxEvent.findMany({
       where: {
-        kind: "CATALOG_SYNC",
+        kind: { in: ["CATALOG_SYNC", "ORDER_PAID_RECEIVED"] },
         status: "PENDING",
         availableAt: { lte: new Date() },
       },
@@ -70,9 +84,14 @@ let sweeping = false;
 async function sweepBookings() {
   if (sweeping) return;
   sweeping = true;
-  try { await expireBookingWork(); }
-  catch { log.error("Booking expiry sweep failed"); }
-  finally { sweeping = false; }
+  try {
+    await expireBookingWork();
+    await markStaleNotificationsUnknown();
+  } catch {
+    log.error("Booking expiry sweep failed");
+  } finally {
+    sweeping = false;
+  }
 }
 const bookingTimer = setInterval(() => void sweepBookings(), 30000);
 await sweepBookings();

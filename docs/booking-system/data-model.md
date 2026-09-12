@@ -196,7 +196,7 @@ Appointment 在客户成功 Hold 时创建临时 Session，或在确认后持久
 - EntitlementLedgerEntry：只追加、不更新/删除。每条同时记录 available/reserved/consumed delta：GRANT 增加 available；RESERVE 从 available 移到 reserved；CONSUME 从 reserved 移到 consumed；RELEASE 从 reserved 退回 available；ADJUST、EXPIRE、REVOKE 保留原因和幂等键。数据库锁行并阻止任一余额为负。
 - SQL 触发器统一锁定 ClassSession 行，检查 Hold + confirmed Booking 总数和同客户占用；阻止直接 SQL 超卖及把 capacity 下调到已占数量以下。
 - 过期 Hold 无须等待 Worker 就从 availability 排除；Worker/创建 Hold/恢复 Attempt 时可把它标为 EXPIRED。创建/绑定/释放/到期使用既有不可变 AuditLog；目标 `booking_events` 独立表仍待后续阶段。
-- 新迁移：`202609120002_entitlement_ledger_drop_in_hold`、`202609120003_entitlement_hold_immutability` 与 `202609120004_booking_checkout`，已应用到专用测试库和 `127.0.0.1:55432/skyra_booking` 本地开发库。
+- 新迁移：`202609120002_entitlement_ledger_drop_in_hold`、`202609120003_entitlement_hold_immutability`、`202609120004_booking_checkout` 与 `202609120005_order_paid_inbox`，已应用到专用测试库和 `127.0.0.1:55432/skyra_booking` 本地开发库。
 
 ### `booking_attempts`
 
@@ -360,10 +360,11 @@ Booking 当前状态是投影，事件记录用于追溯谁在何时执行了改
 
 ### `webhook_receipts`
 
-- `shop_id`, `shopify_webhook_id`, `topic`, `triggered_at`, `payload_hash`。
-- `status`: RECEIVED / PROCESSING / PROCESSED / FAILED / IGNORED。
-- `attempt_count`, `last_error`。
-- 唯一约束：`(shop_id, shopify_webhook_id)`，保证重复 Webhook 不重复确认 Booking 或发放 Pass。
+- 当前已落库字段为 `shop_id`, `webhook_id`, `topic`, `payload_hash`, `status`, `received_at`；不保存原始订单、邮箱、地址或银行卡数据。
+- 当前状态约束：RECEIVED / QUEUED / PROCESSED / NEEDS_ATTENTION / FAILED；`status + received_at` 有运维索引。
+- 唯一约束 `(shop_id, webhook_id)` 在并发事务下去重；相同 ID 只有 topic 与原始 payload SHA-256 都一致才作为安全重放。
+- `orders/paid` 无 Booking reference 时标记 PROCESSED；合法关联进入 `ORDER_PAID_RECEIVED` Outbox，畸形、跨店或 Customer/Product/Variant/数量/AUD 金额/付款状态不匹配进入 `ORDER_PAID_REVIEW`。
+- 当前 Outbox 只保存 Receipt/Order/Line/Checkout opaque ID 和错误代码，不保存 Customer GID。Worker 成功后的 Receipt 状态推进、attempt_count/last_error、Admin 重放与 reconciliation 仍是后续字段/功能。
 
 ## 4. 并发和防超卖规则
 
@@ -467,3 +468,15 @@ DISPUTED
 - 健康信息、Waiver 和内部备注需单独授权、加密并记录访问审计。
 - 客户删除与数据请求必须传播到 Booking 数据保留流程。
 - PostgreSQL 开启自动备份和 point-in-time recovery；Webhook 失败队列需可重放。
+
+## 2026-09-12 实际模型增量
+
+- BookingCheckout.purchaseTerms：不可变 JSON v1，冻结 credits/validityDays/timezone/Session 时间/Coach/Location/Service。历史 null 进入人工检查。
+- Entitlement.passPlanId 改为 nullable，新增 serviceId；Pass 与 Service Drop-in 目标必须二选一，Drop-in grantedUnits=1；归属和来源不可变。
+- Booking 增加 checkoutId/sourceOrderGid/sourceLineItemGid，单 Checkout 和同店 Order-Line 唯一；跨店 FK 和来源不可变。Attempt 增加 CONFIRMED，过期 sweep/resume 不再降级已确认状态。
+- PaidBookingResult：checkoutId 唯一、同店 Order-Line 唯一；记录 Entitlement/Booking 引用和 CONFIRMED/NEEDS_ATTENTION、原因；确保恢复失败后重试也不重复发权益。
+- BookingNotification：同店 Booking + 收件角色/内部 ID + template 唯一，PENDING/SENDING/ACCEPTED/FAILED/UNKNOWN/SUPPRESSED；attempts、availableAt、claimedAt、acceptedAt、providerMessageId、lastError。没有邮箱、原始订单、Customer GID 或正文。
+- CoachAccessToken：同店 Coach 关联，tokenHash 唯一；LOGIN/SESSION、ACTIVE/CONSUMED/REVOKED、expiresAt；原始 token 只作为登录/会话凭证，不落日志或数据库。
+- Coach 查询按当前身份与 Session.startsAt 过滤，跨店/其他 Coach 不可查询；Shop timezone 定义日期区间，Session timezone 定义显示。
+
+当前通知合同与状态语义见 [Booking 邮件与 Coach](notifications-and-coach.md)。

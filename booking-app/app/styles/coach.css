@@ -1,0 +1,60 @@
+.coach-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.coach-summary > div {
+  padding: 20px 0;
+  border-bottom: 1px solid #cad2cc;
+}
+.coach-summary strong {
+  display: block;
+  font-size: 32px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.coach-summary span {
+  font-size: 14px;
+  color: #606a66;
+}
+.coach-count {
+  min-width: 110px;
+  text-align: right;
+}
+.coach-count strong {
+  display: block;
+  font-size: 24px;
+}
+.coach-count span {
+  color: #606a66;
+  font-size: 14px;
+}
+.coach-workspace .record {
+  overflow-wrap: anywhere;
+}
+.coach-workspace button,
+.coach-workspace input,
+.coach-workspace select {
+  min-height: 44px;
+}
+@media (max-width: 600px) {
+  .coach-workspace {
+    padding: 20px 16px 40px;
+  }
+  .coach-workspace .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .coach-summary {
+    gap: 12px;
+  }
+  .coach-summary strong {
+    font-size: 26px;
+  }
+  .coach-record {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .coach-count {
+    text-align: left;
+  }
+}
