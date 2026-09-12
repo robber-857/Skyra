@@ -22,7 +22,7 @@
 5. 测试临时断线重试、attempt 过期重新选课、商品变更重新选择，以及登录失效后重新认证。上述异常流程已用本地 fixture 验证。
 6. Admin 可编辑 Classes & Passes、People、Settings、Weekly Schedule；在 Classes & Passes 点击 Check availability 查看每个商品的可售问题和检查时间。
 
-**当前不能支付、扣课或确认预约。** onlineBookingsEnabled=false，选择/Review 不创建 Hold、Cart 或订单。内部 NEW_PASS/DROP_IN Hold、Entitlement 台账、有效 Pass 选择和保守 Intro 资格已完成；已有 Pass UI/原子确认、Customer/Coach 个人中心尚未完成。
+**当前不能支付、扣课或确认预约。** onlineBookingsEnabled=false、checkoutAvailable=false；公开 Checkout route 会在任何 Hold/Cart 写入前返回 CHECKOUT_NOT_AVAILABLE。内部 NEW_PASS/DROP_IN 的 Review → Hold → Cart 编排已完成，但没有接入前端或真实 Shopify Checkout。Entitlement 台账、有效 Pass 选择和保守 Intro 资格已完成；orders/paid、Booking 确认、付款后恢复、已有 Pass UI/原子确认及 Customer/Coach 个人中心尚未完成。
 
 ## 商品检查与已完成配置
 
@@ -64,10 +64,10 @@ npm run preview:check
 
 - Booking Admin 编辑课程名称、介绍、时长、价格、容量、地点、教练和排期；Pass 编辑价格、次数、有效期及适用课程。
 - 保存课程/Pass 后由 outbox/worker 同步 Shopify Product + Variant，通常无需手工重复上传。单次课程商品与 Pass 是购买项，某日场次保留在 PostgreSQL，不为每场课复制商品。
-- 当前 `SYNCED` 只代表商品同步成功；开发店两个测试商品现已通过实时检查，但每次交易仍须重新核验。接下来需完成 Cart/Attempt 关联、Shopify Checkout、`orders/paid` 幂等处理、权益发放/扣减、预约确认及退款/取消对账。
+- 当前 `SYNCED` 只代表商品同步成功；开发店两个测试商品现已通过实时检查，但每次交易仍须重新核验。内部 Cart/Attempt/Hold 关联已完成；接下来需实现 `orders/paid` 幂等处理、权益发放/扣减、预约确认和付款后恢复，之后再开放前端 Shopify Checkout，最后处理退款/取消对账。
 - 付款使用 Shopify Checkout；不自建支付表单。已有 Pass 应直接确认并扣课，不进入 A$0 Checkout。
 - 店铺还需 Customer Accounts、支付服务/测试支付、币种税务、订单通知与政策配置；折扣/礼品卡按业务需要启用，自动续费订阅另行接入。
 
 ## 验证边界
 
-最新数据库/接口测试 154 项通过，类型/lint/构建通过，8 个最终 Admin/Storefront 操作及 App TOML 通过官方校验。本轮 Home/Programs 有 Booking mount、课表接口返回 1 场 Session，单次 HTTP 均 200；密码页保持有效。上一轮 12 项浏览器 fixture 覆盖双 surface、320/390/430/1440px、同页登录返回、异常恢复及 Drop-in 价格变化，本轮未重跑。真实 Continue with Shop、完整交易及后台按钮人工视觉验收仍未完成；商品检查不等于真实登录或支付成功。
+最新数据库/接口测试 200 项通过，类型/lint/构建通过；新增 Cart mutation/read query 通过官方 Storefront schema 校验。BookingCheckout 迁移已应用测试库和本地开发库，App/Worker 与 Theme 预览恢复运行。上一轮 12 项浏览器 fixture 本轮未重跑，因为没有前端资源改动。真实 Continue with Shop、Cart/Checkout/支付及后台按钮人工视觉验收仍未完成；当前不要尝试付款。

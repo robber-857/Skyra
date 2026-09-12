@@ -10,6 +10,7 @@ import db from "../db.server";
 import { DomainError } from "../lib/errors.server";
 import { introOfferEligible } from "./entitlements.server";
 import { purchaseMappingReady } from "./purchase-mapping.server";
+import { checkoutAvailable, ownedPassesAvailable } from "./commerce-capabilities.server";
 
 type Tx = Prisma.TransactionClient;
 export type BookingActor = { shopId: string; customerGid: string | null };
@@ -69,7 +70,7 @@ export function bookingWindow(
     .toMillis();
   return now.getTime() < opensAt ? "NOT_YET_OPEN" : "OPEN";
 }
-async function classForBooking(
+export async function classForBooking(
   tx: Tx,
   shop: Shop,
   sessionId: string,
@@ -248,7 +249,7 @@ export async function startAttempt(actor: BookingActor, raw: unknown) {
     return snapshot(tx, attempt, token, !profile);
   }, txOptions);
 }
-async function withAttempt<T>(
+export async function withAttempt<T>(
   actor: BookingActor,
   token: string,
   fn: (tx: Tx, attempt: BookingAttempt, shop: Shop, now: Date) => Promise<T>,
@@ -700,8 +701,8 @@ export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
       passes,
       dropIn,
       selected,
-      checkoutAvailable: false,
-      ownedPassesAvailable: false,
+      checkoutAvailable,
+      ownedPassesAvailable,
     };
   });
 }

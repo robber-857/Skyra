@@ -2,7 +2,7 @@
 
 更新：2026-09-12。此页记录实际代码、开发店联调与验证证据；完整范围仍以 `implementation-backlog.md` 为准。
 
-最新状态：用户已授权开发店配置操作。Storefront 商品读取 scope 已生效，两个 [DEV] 商品的 Booking 归属字段已安全恢复并发布到 Online Store；2026-09-12 05:34:57–58 UTC 两项真实检查均 ready=true。修复离线 scope 缓存陈旧与 onlineStoreUrl 为空造成的发布误报，154 项测试、类型/lint/构建通过。密码保护及三个交易开关保持不变，未开放交易、未部署正式店。操作证据见 [Commerce 配置与恢复](commerce-readiness.md)。下一项为 Review → Hold → Cart；Continue with Shop 真实账户复测、付款/Booking 确认仍未完成。
+最新状态：commerce readiness 已以 `eb1fd6a` 推送且 CI 成功。下一轮已完成 Review → Hold → Cart 的内部安全编排和 BookingCheckout 数据约束；200 项测试、类型/lint/构建通过。公开 Checkout 路由仍由能力开关关闭，开发店未创建真实 Cart/订单、未收款。下一步先实现 orders/paid 幂等处理、Booking 确认与付款后恢复，再开放前端 Checkout。Continue with Shop 真实账户复测仍未完成。
 
 ## 已创建与已绑定
 
@@ -222,3 +222,13 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 - 154 项测试通过（139 + scope 缓存 11 + 发布回归 4），类型/lint/生产构建通过；最终 8 个 GraphQL 操作官方脚本校验通过，TOML valid=true。无迁移或前端资源改动。Home/Programs/API 单次 HTTP 200，双页面有 Booking mount；不是浏览器/真实登录 E2E。
 - 下一项 M4-01/M5-10 为 Review → 公开 Hold → Cart/Checkout，之后 paid webhook、权益与 Booking 确认、已有 Pass/付款后恢复。Continue with Shop 真实账号完成/退出/签名返回仍未验收。
 - 开发文档、流程、进度、交接和预览指南已同步更新；本轮修改未 commit/push，远程仍以已推送 fa06784 为基线。
+
+## 最新交付：Hold → Shopify Cart 内部安全编排（2026-09-12）
+
+- 上一轮 22 个 commerce readiness 文件已提交 `eb1fd6a7bf9941d27e6635d8b8923e226857b20b` 并推送 `origin/bookingdev`；远程 ref 一致，[CI 34676536279](https://github.com/robber-857/Skyra/actions/runs/34676536279) 成功。
+- 新增 BookingCheckout 表与迁移，冻结 shop/Hold/ProductMapping/Product/Variant/价格/catalog fingerprint。每个 Hold 只能有一个创建记录，状态只允许 CREATING → READY/UNKNOWN/REJECTED/INVALIDATED；上下文、已知 Cart ID 和历史删除均受数据库保护。
+- 内部 `prepareBookingCheckout` 串联实时商品检查、15 分钟 Hold、`cartCreate`、完整响应核对和已知 Cart 回读。网络请求不持锁；返回后重新检查身份、课程窗口、容量、Pass/Drop-in 资格与版本。重复请求复用原 Hold 和 Cart，不延长截止时间。
+- Cart line 只写服务器随机 `_skyra_booking_ref`，不含 Customer GID/PII，也不复用浏览器 Attempt token；完整 Cart ID 含 secret，仅服务器保存，API/审计不返回。创建结果未知时禁止自动二次创建。
+- 新增签名 `/apps/skyra-booking/checkout` 路由，但 `checkoutAvailable=false` 在调用编排前拒绝；`onlineBookingsEnabled=false` 和 `ownedPassesAvailable=false` 不变。因此本轮没有真实 Cart、Checkout、Hold、订单、扣课或 Booking。
+- 专用测试库 200 项串行通过（原 154 + 新增 46）；新覆盖 NEW_PASS/DROP_IN、10 路并发、两客户最后一席、跨店/跨账号、恶意输入、响应变更、超时和数据库不可变。`npm.cmd run check`、Prisma validate、两项 Storefront GraphQL 官方校验通过。迁移已应用测试库和本地开发库。
+- App/Worker 和 9292 Theme 预览已恢复；本轮无主题前端改动、无 App deploy 或正式店变更。本轮 Cart 修改及文档尚未 commit/push。

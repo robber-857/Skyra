@@ -2,7 +2,7 @@ import db from "../db.server";
 import { Prisma } from "@prisma/client";
 export type GraphQL = (
   query: string,
-  options: { variables: Record<string, unknown> },
+  options: { variables: Record<string, unknown>; tries?: number; signal?: AbortSignal },
 ) => Promise<Response>;
 export const PRODUCT_SET = `#graphql
 mutation BookingProductSet($identifier: ProductSetIdentifiers!, $input: ProductSetInput!) {

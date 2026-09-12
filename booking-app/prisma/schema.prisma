@@ -146,21 +146,22 @@ model PassEligibility {
 }
 
 model ProductMapping {
-  id               String        @id @default(uuid()) @db.Uuid
-  shopId           String        @db.Uuid
+  id               String            @id @default(uuid()) @db.Uuid
+  shopId           String            @db.Uuid
   ownerType        String
-  ownerId          String        @db.Uuid
+  ownerId          String            @db.Uuid
   productGid       String?
   variantGid       String?
-  syncStatus       String        @default("PENDING")
-  requestedVersion Int           @default(1)
-  shopifyVersion   Int           @default(0)
+  syncStatus       String            @default("PENDING")
+  requestedVersion Int               @default(1)
+  shopifyVersion   Int               @default(0)
   publishedPrice   String?
   publishedTitle   String?
   productStatus    String?
   lastError        String?
-  syncedAt         DateTime?     @db.Timestamptz
+  syncedAt         DateTime?         @db.Timestamptz
   entitlements     Entitlement[]
+  checkouts        BookingCheckout[]
 
   @@unique([shopId, ownerType, ownerId])
   @@unique([shopId, variantGid])
@@ -272,26 +273,51 @@ model BookingAttempt {
 }
 
 model BookingHold {
-  id             String          @id @default(uuid()) @db.Uuid
-  shopId         String          @db.Uuid
-  attemptId      String          @unique @db.Uuid
-  sessionId      String          @db.Uuid
-  customerId     String          @db.Uuid
-  purchaseKind   String          @default("NEW_PASS")
-  passPlanId     String?         @db.Uuid
-  idempotencyKey String          @db.Uuid
-  status         String          @default("ACTIVE")
-  expiresAt      DateTime        @db.Timestamptz
-  createdAt      DateTime        @default(now()) @db.Timestamptz
-  attempt        BookingAttempt  @relation(fields: [shopId, attemptId], references: [shopId, id])
-  session        ClassSession    @relation(fields: [shopId, sessionId], references: [shopId, id])
-  customer       CustomerProfile @relation(fields: [shopId, customerId], references: [shopId, id])
-  passPlan       PassPlan?       @relation(fields: [shopId, passPlanId], references: [shopId, id])
+  id             String           @id @default(uuid()) @db.Uuid
+  shopId         String           @db.Uuid
+  attemptId      String           @unique @db.Uuid
+  sessionId      String           @db.Uuid
+  customerId     String           @db.Uuid
+  purchaseKind   String           @default("NEW_PASS")
+  passPlanId     String?          @db.Uuid
+  idempotencyKey String           @db.Uuid
+  status         String           @default("ACTIVE")
+  expiresAt      DateTime         @db.Timestamptz
+  createdAt      DateTime         @default(now()) @db.Timestamptz
+  attempt        BookingAttempt   @relation(fields: [shopId, attemptId], references: [shopId, id])
+  session        ClassSession     @relation(fields: [shopId, sessionId], references: [shopId, id])
+  customer       CustomerProfile  @relation(fields: [shopId, customerId], references: [shopId, id])
+  passPlan       PassPlan?        @relation(fields: [shopId, passPlanId], references: [shopId, id])
+  checkout       BookingCheckout?
 
+  @@unique([shopId, id])
   @@unique([shopId, attemptId])
   @@unique([shopId, customerId, idempotencyKey])
   @@index([shopId, sessionId, status, expiresAt])
   @@index([status, expiresAt])
+}
+
+// Full Cart ID contains a secret key: server-only, never include in API/audit output.
+model BookingCheckout {
+  id                 String         @id @default(uuid()) @db.Uuid
+  shopId             String         @db.Uuid
+  holdId             String         @unique @db.Uuid
+  productMappingId   String         @db.Uuid
+  reference          String         @unique
+  productGid         String
+  variantGid         String
+  priceCents         Int
+  catalogFingerprint String
+  status             String         @default("CREATING")
+  cartId             String?
+  createdAt          DateTime       @default(now()) @db.Timestamptz
+  updatedAt          DateTime       @updatedAt @db.Timestamptz
+  hold               BookingHold    @relation(fields: [shopId, holdId], references: [shopId, id], map: "checkout_hold_fk")
+  productMapping     ProductMapping @relation(fields: [shopId, productMappingId], references: [shopId, id], map: "checkout_mapping_fk")
+
+  @@unique([shopId, holdId])
+  @@unique([shopId, cartId])
+  @@index([shopId, status, createdAt])
 }
 
 // Capacity projection only. Entitlement confirmation / cancellation APIs are M3/M4 follow-ups.

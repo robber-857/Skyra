@@ -199,8 +199,8 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 - [x] M4-00 实现实时商品可售检查：Admin 店铺/归属/产品/变体/Online Store 发布/价格与澳洲 Storefront 可见性/可售/价格/配送限制，接入后台 Check availability 和客户 Review；网络故障、检查期间变更均拒绝放行。发布以有效 publishedAt 而非 URL 非空判断，认证 Storefront 仍独立校验。
 - [x] M4-00a 认证与恢复代码：官方离线 SDK Storefront 精确 scope/店铺校验；ADMIN 单商品缺失字段恢复、App/定义/映射核对、CAS 防覆盖、读回和审计；权益类型复核。配置和真实写入验收不在此完成项内。
 - [x] M4-00b 开发店配置：经用户明确授权，商品 scope 与现有 TOML 定义已应用；逐商品 CAS 恢复、回读/审计和 Online Store 发布完成，两项真实 ready=true。密码保护不变。详见 commerce-readiness.md；这不代表真实登录/交易已验收。
-- [ ] M4-01 根据适用 Pass / Session-owned Drop-in Variant 创建/更新 Shopify Cart。两个测试商品的前置配置已通过；仍需在交易请求时复核身份、商品/价格、名额与 Hold，不复用旧 ready 结果作为授权。
-- [ ] M4-02 将 opaque booking hold reference 写入 Cart line attributes。
+- [ ] M4-01 根据适用 Pass / Session-owned Drop-in Variant 创建/更新 Shopify Cart。内部服务、单 Hold 单 Cart 创建 claim、实时复核、Cart 回读及安全重试已完成并测试；公开路由仍由 checkoutAvailable=false 关闭，等待 paid webhook/预约恢复闭环后才能联调真实 Checkout。
+- [x] M4-02 将服务器随机生成、无 PII 且与公开 Attempt/Hold ID 分离的 opaque booking reference 写入 Cart line attribute `_skyra_booking_ref`；完整 Cart ID/secret 仅服务器保存。
 - [ ] M4-03 确认预约摘要进入 Order 但不包含敏感数据。
 - [ ] M4-04 订阅并验证订单、付款、取消、退款 Webhooks。
 - [ ] M4-05 建立 `webhook_receipts` 去重和异步处理。
@@ -209,7 +209,7 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 - [ ] M4-08 退款后执行 Entitlement reversal 与 Booking projection 更新。
 - [ ] M4-09 实现付款已完成但 Hold 异常的 Needs Attention 队列。
 - [ ] M4-10 实现订单 reconciliation job 与 Admin 手工 Reconcile。
-- [ ] M4-11 使用 Cart checkoutUrl 进入原生 Checkout，并把 Checkout/Thank-you 后续入口返回到原 Home/Programs Booking section；返回参数只携带 opaque attempt token。
+- [ ] M4-11 内部服务已严格核对并仅返回允许店铺/Shopify host 的 HTTPS checkoutUrl，以及固定 Home/Programs returnPath；前端跳转、Thank-you/支付后返回与真实店联调尚未实现。
 
 ### 验收
 
@@ -235,7 +235,7 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 - [ ] M5-07 完成 PASS_SELECTION：采用参考图的主栏 Pass cards + 右栏 Booking Details；已有适用 Pass 优先显示余额、到期与 `A$0 due today`，购买选项显示已同步 Shopify Variant 实时价格，未选择时 Continue 禁用。2026-09-11 已完成新 Pass cards、资格/同步价格检查和响应式 Booking Details；2026-09-12 已补充 Drop-in 卡片、价格复核及 Continue 时的实时 Shopify 可售校验。开发店两个测试商品的真实检查现已通过；已有 Pass UI、真实账号 Review 仍待验收。
 - [ ] M5-08 新增 REVIEW：采用参考图的交易摘要结构，显示 Customer、Class、日期时间、Coach、Location、选中 Pass/Drop-in、价格与 Edit；这是当前 Booking section 的状态，不是 Customer Account 或独立 Cart 页面。2026-09-11 已完成新 Pass 摘要、服务端价格/名额复核及 Edit；2026-09-12 已补充 Drop-in 摘要；Customer/已有 Pass 与支付交接未完成。
 - [ ] M5-09 已有 Pass 从 REVIEW 走原子确认并显示 CONFIRMING → CONFIRMED，不创建 A$0 Checkout。
-- [ ] M5-10 新 Pass/Drop-in 从 REVIEW 创建 15 分钟 Hold、写 Cart line attribute，并通过 `checkoutUrl` 进入原生 Shopify Checkout；Booking App 不渲染支付表单。
+- [ ] M5-10 新 Pass/Drop-in 的内部 Review → 15 分钟 Hold → 单 Cart 编排及 line attribute 已完成；公开接口/前端跳转仍关闭，待 orders/paid、预约确认和付款后恢复具备后再联调 Shopify Checkout。Booking App 不渲染支付表单。
 - [ ] M5-11 Checkout 返回后恢复 attempt，显示 webhook processing、confirmed、payment complete but seat unavailable、Needs Attention 和 retry/recovery。
 - [ ] M5-12 Home 与 Programs 的 UI、状态机、API client、analytics 与错误文案只实现一次；`data-surface` 仅控制标题、介绍文案或初始筛选。
 - [ ] M5-13 完成 320–430px 与桌面验收：手机单列、日期横滑、Session 信息分组、全宽 Book/Continue、Booking Details 可折叠、44px touch target、安全区、键盘焦点、ARIA live、浏览器 Back、重复点击和零横向溢出。
@@ -437,3 +437,12 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 - 新增远端 granted scopes → 本地离线 scope 缓存的身份/CAS 保护工具；修复已发布商品 URL 为空的误报。154 项测试、类型/lint/构建和最终 8 个 GraphQL 操作校验通过。
 - 下一顺序：真实 Continue with Shop/Review 复测；M4-01 + M5-10 Review → Hold → Cart/Checkout；orders/paid/权益/确认；已有 Pass/付款后 Recovery。
 - 三个交易开关仍为 false，无收款、扣课或 Booking，未部署正式店、未 commit/push。详细操作及证据见 commerce-readiness.md。
+
+### 2026-09-12 Hold → Cart 内部编排（最新）
+
+- 已实现 NEW_PASS / DROP_IN 的内部 Checkout 编排：服务器从签名 Attempt 推导 Product/Variant/价格，在网络前后复核身份、窗口、资格、容量与 catalog fingerprint，并复用原 15 分钟 Hold。
+- 新增 BookingCheckout 迁移和不可变保护。每个 Hold 只允许一个 Cart 创建 claim；未知网络结果进入 UNKNOWN 并停止自动重建，已知 Cart 只回读。完整 Cart ID/secret 不返回 API 或审计。
+- Shopify Cart 只含 quantity=1、服务器随机 `_skyra_booking_ref`、AU buyer country；回读严格拒绝额外行/属性、商品/价格/币种/订阅/host 变化。`cartCreate` 禁止 SDK 自动重试，6 秒截止覆盖响应体读取。
+- 新增签名 App Proxy Checkout route，但 checkoutAvailable=false，匿名/跨站/GET 均拒绝。没有真实 Cart、Checkout、收款、扣课或 Booking。
+- 全套测试 200 项通过（新增 46），含 10 路重复请求、两客户抢最后一席、未知结果、警告、跨店/跨账号、商品变化、Hold 过期与数据库不可变性；类型/lint/构建、Prisma schema 和两项 Storefront GraphQL 官方校验通过。
+- 上一轮 commerce readiness 已提交并推送 `eb1fd6a`，远程 SHA 一致，GitHub CI run 34676536279 成功。本轮 Cart 代码和文档尚未提交；下一步是 orders/paid inbox/幂等处理与付款后确认/Needs Attention，再开放前端 Checkout。

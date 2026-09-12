@@ -60,7 +60,7 @@ npm.cmd run preview:purchasability -- -RestoreOwnership -MappingId bb60d549-8727
 - 本轮最终 8 个 Admin/Storefront 操作通过官方脚本校验；运行前新增查询/发布 mutation 也通过官方 AI Toolkit 校验。App TOML CLI `valid=true`。
 - Home、Programs、Booking sessions 单次 HTTP 检查均 200，双页面包含 Booking mount；这不是完整浏览器 E2E。未重跑上一轮 12 项布局/恢复 fixture。
 - **Continue with Shop** 完成、退出和签名身份返回仍需真实账号复测；此前同页顶层跳转修复不等于真实登录闭环验收。
-- 下一开发项为 M4-01 / M5-10：Review → 公开 Hold → Shopify Cart/Checkout；之后是 orders/paid、权益发放与 Booking 确认、过期付款/重复回调恢复、已有 Pass 原子确认。
+- M4-01 / M5-10 的内部 Review → Hold → 单 Cart 编排已完成并测试，公开路由/前端仍关闭。下一开发项是 orders/paid 收件、幂等处理、订单与 booking reference 校验、权益发放/Booking 确认及过期付款恢复；具备该闭环后才开放真实 Checkout。
 - 本轮没有收款、扣课、创建预约或部署正式店；未再次 commit/push。检查通过仅代表当时商品可售，不是支付或预约授权。
 
 官方依据：[Storefront 认证](https://shopify.dev/docs/api/storefront/2026-07)、[Product publishedAt](https://shopify.dev/docs/api/admin-graphql/2026-07/objects/Product#field-Product.fields.publishedAt)、[商品渠道发布](https://shopify.dev/docs/apps/build/sales-channels/product-publishing)、[字段定义](https://shopify.dev/docs/apps/build/metafields/definitions)、[metafieldsSet 比较写入](https://shopify.dev/docs/api/admin-graphql/2026-07/mutations/metafieldsSet)。

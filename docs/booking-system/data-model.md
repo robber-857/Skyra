@@ -185,17 +185,18 @@ Appointment 在客户成功 Hold 时创建临时 Session，或在确认后持久
 
 ### 2026-09-12 已落库的 Class Booking 与 Entitlement 基础
 
-当前 Prisma 已包含 `CustomerProfile`、`BookingAttempt`、`BookingHold`、`Booking`、`Entitlement` 与 `EntitlementLedgerEntry`。下面各表描述仍包含后续订单、完整 Booking 状态与 Customer/Coach 功能的目标字段；不要把这些后续字段当成已实现。
+当前 Prisma 已包含 `CustomerProfile`、`BookingAttempt`、`BookingHold`、`BookingCheckout`、`Booking`、`Entitlement` 与 `EntitlementLedgerEntry`。下面各表描述仍包含后续订单、完整 Booking 状态与 Customer/Coach 功能的目标字段；不要把这些后续字段当成已实现。
 
 - CustomerProfile：仅保存 shop + Shopify Customer GID 映射，不保存密码。`(shopId, shopifyCustomerGid)` 唯一。
 - BookingAttempt：`tokenHash` 唯一、Session、可空 Customer、HOME/PROGRAMS、状态、创建/更新/到期；默认 30 分钟。客户绑定后不可修改，shop/session/surface/tokenHash 同样不可换绑。当前状态为 LOGIN_REQUIRED / STARTED / HOLD_ACTIVE / RECOVERY / EXPIRED。
 - BookingHold：每个 Attempt 最多一条，包含 Customer/Session、purchaseKind、可空 PassPlan、idempotencyKey、15 分钟期限、ACTIVE/CONSUMED/EXPIRED/RELEASED。NEW_PASS 必须指向 PassPlan；DROP_IN 不接受 PassPlan，购买商品从 Session 对应 Service 推导。每店每客户 idempotencyKey 唯一；ACTIVE 的同客户同场次唯一。复合外键保证 Hold 与 Attempt 的店铺/课程/客户完全一致。
+- BookingCheckout：每个 Hold 最多一条。保存服务器生成的随机 reference、已核对的 Product/Variant/价格和 catalog fingerprint，以及 CREATING / READY / UNKNOWN / REJECTED / INVALIDATED 状态。完整 Cart ID（含 secret key）仅保存在服务器，不能进入 API、审计或前端；Cart 创建结果未知时停止自动重建，避免重复 Cart/付款。数据库禁止换绑上下文、改写已知 Cart ID 或删除创建历史。
 - Booking：本轮仅实现 shop/customer/session/status/createdAt 容量投影；尚未连接订单、权益和确认接口。CONFIRMED 的同客户同场次唯一。
 - Entitlement：绑定 shop/customer/PassPlan/ProductMapping 与唯一 Shopify Order + Line Item 来源，记录使用窗口、初始次数和 ACTIVE/EXPIRED/REVOKED 状态；来源、归属、期限与初始次数不可改写。
 - EntitlementLedgerEntry：只追加、不更新/删除。每条同时记录 available/reserved/consumed delta：GRANT 增加 available；RESERVE 从 available 移到 reserved；CONSUME 从 reserved 移到 consumed；RELEASE 从 reserved 退回 available；ADJUST、EXPIRE、REVOKE 保留原因和幂等键。数据库锁行并阻止任一余额为负。
 - SQL 触发器统一锁定 ClassSession 行，检查 Hold + confirmed Booking 总数和同客户占用；阻止直接 SQL 超卖及把 capacity 下调到已占数量以下。
 - 过期 Hold 无须等待 Worker 就从 availability 排除；Worker/创建 Hold/恢复 Attempt 时可把它标为 EXPIRED。创建/绑定/释放/到期使用既有不可变 AuditLog；目标 `booking_events` 独立表仍待后续阶段。
-- 新迁移：`202609120002_entitlement_ledger_drop_in_hold` 与 `202609120003_entitlement_hold_immutability`，已应用到专用测试库和 `127.0.0.1:55432/skyra_booking` 本地开发库。
+- 新迁移：`202609120002_entitlement_ledger_drop_in_hold`、`202609120003_entitlement_hold_immutability` 与 `202609120004_booking_checkout`，已应用到专用测试库和 `127.0.0.1:55432/skyra_booking` 本地开发库。
 
 ### `booking_attempts`
 
@@ -227,7 +228,7 @@ Appointment 在客户成功 Hold 时创建临时 Session，或在确认后持久
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| id | uuid | PK，也是传入 Shopify Cart 的 opaque reference |
+| id | uuid | PK，Booking 内部 Hold ID；不会直接传入 Shopify Cart |
 | attempt_id | uuid | UNIQUE nullable FK，购买新 Pass 时关联恢复流程 |
 | customer_id | uuid | FK |
 | session_id | uuid | FK |
@@ -235,6 +236,22 @@ Appointment 在客户成功 Hold 时创建临时 Session，或在确认后持久
 | expires_at | timestamptz | 15 分钟 |
 | status | enum | ACTIVE / CONSUMED / EXPIRED / RELEASED |
 | idempotency_key | uuid | 防止重复点击 |
+
+### `booking_checkouts`
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| id | uuid | PK，内部 checkout intent ID |
+| shop_id / hold_id | uuid | 复合 FK；每个 Hold 只能有一条创建记录 |
+| product_mapping_id | uuid | 复合 FK，服务器推导的商品映射 |
+| reference | text | 32 字节随机 opaque 值，Cart line attribute `_skyra_booking_ref`；不含客户 PII |
+| product_gid / variant_gid | text | 创建前核对并冻结的 Shopify 目标 |
+| price_cents | integer | 创建前核对并冻结的 AUD 价格 |
+| catalog_fingerprint | sha256 | Shop/商品/Session 关键版本快照，网络前后需一致 |
+| status | enum | CREATING / READY / UNKNOWN / REJECTED / INVALIDATED |
+| cart_id | text | nullable；含 secret key，仅服务器保存和回读，永不返回浏览器或审计 |
+
+当前公开 Checkout 路由仍由编译期能力开关关闭。内部编排在创建 Hold 前和 Cart 返回后重新检查身份、预约窗口、容量、资格及 catalog；Shopify 网络请求期间不持有 Session/Attempt 数据库锁。`cartCreate` 禁用 SDK 自动重试并有 6 秒截止；同一 Hold 的并发/重复请求只允许一次创建 claim。已知 Cart 可只读回查，未知创建结果不自动创建第二个 Cart。
 
 ### `bookings`
 
