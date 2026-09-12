@@ -1,0 +1,4 @@
+query BookingDefinitionInventory {
+ shop { myshopifyDomain }
+ metafieldDefinitions(first: 50, ownerType: PRODUCT) { nodes { id namespace key } pageInfo { hasNextPage endCursor } }
+}

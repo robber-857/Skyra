@@ -54,7 +54,11 @@ export async function bookingPurchaseReview(
   if (!checked.ready) {
     if (
       checked.issues.some((issue) =>
-        ["SHOPIFY_UNAVAILABLE", "STOREFRONT_LOCKED"].includes(issue.code),
+        [
+          "SHOPIFY_UNAVAILABLE",
+          "STOREFRONT_LOCKED",
+          "STOREFRONT_ACCESS_REQUIRED",
+        ].includes(issue.code),
       )
     )
       throw new DomainError(

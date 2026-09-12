@@ -1,0 +1,6 @@
+mutation BookingDevelopmentPublish($id: ID!, $publicationId: ID!) {
+ publishablePublish(id: $id, input: [{publicationId: $publicationId}]) {
+  publishable { ... on Product { id onlineStoreUrl publishedOnPublication(publicationId: $publicationId) } }
+  userErrors { field message }
+ }
+}

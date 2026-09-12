@@ -1,6 +1,6 @@
 # Booking 开发预览与测试
 
-更新日期：2026-09-12。Home 和 Programs 的开发主题入口均已配置；目前用户网络较慢，已停止连续联网测试，最终页面稳定性和真实顾客登录验收仍待继续。
+更新日期：2026-09-12。Home 和 Programs 开发主题已配置；本轮单次 HTTP 检查双页面及课表接口均 200，两个测试商品的真实可售检查已通过。仍避免连续刷新；完整页面稳定性与真实顾客登录/Review 尚待验收。
 
 ## 打开入口
 
@@ -8,27 +8,27 @@
 - 本机 Programs：[Find a Class](http://127.0.0.1:9292/pages/programs#skyra-booking-programs)。
 - App 自带预览：[Home 9293](http://127.0.0.1:9293/#skyra-booking-home)。两个本地入口都依赖开发进程和网络。
 - 远程开发主题：[Home](https://skyra-booking-dev.myshopify.com/?preview_theme_id=192227082532#skyra-booking-home)、[Programs](https://skyra-booking-dev.myshopify.com/pages/programs?preview_theme_id=192227082532#skyra-booking-programs)。新浏览器可能要求开发店 storefront password，Booking API 仍依赖本机 App tunnel。
-- Booking Admin：[Skyra Booking](https://admin.shopify.com/store/skyra-booking-dev/apps/skyra-booking/app)。使用开发店员工账号；顾客账号不能访问 Admin。
+- Booking Admin：[Skyra Booking](https://admin.shopify.com/store/skyra-booking-dev/apps/c9d266a38e2f11a1240139974253b3a1?dev-console=show)。使用开发店员工账号；顾客账号不能访问 Admin。
 - 开发主题 ID `192227082532`；根域名未带预览参数时仍是发布中的 Horizon。没有部署正式主题。
 - Programs Page 已通过 Shopify CLI 创建：`gid://shopify/Page/167140557092`，handle=`programs`，templateSuffix=`programs`。已验证 HTTP 200 和共享组件挂载标记；旧的 404 / 内容授权阻塞已解决。
 - `index.html`、wireframes 是静态原型，不连接当前数据库。
 
 ## 当前可测试
 
-1. 选择 **2026-09-12**：`[DEV] Aerial Foundations`，18:30，Development Coach，60 分钟。
+1. 选择 **2026-09-12**：`[DEV] Aerial Foundations`，18:30，Development Coach，60 分钟。按规则 16:30 起关闭预约；后续日期请先检查 Weekly Schedule，不要重复 seed 或绕过关闭窗口。
 2. 月份标题、前后 7 天、未来 31 天 Full Calendar、Class type / Instructor、剩余名额和 Details；未开放与已关闭文案区分。
 3. 未登录 Book 显示弹层，桌面/手机统一当前标签页进入 Shopify 托管登录，保留课程 Attempt/预览主题返回。Continue with Shop 完成登录、退出和签名返回仍待真实账户复测。
-4. 登录后选择新 Pass 或 Single class (Drop-in)，Continue 进入 Review 前执行 Shopify Admin + 澳洲 Storefront 实时检查。当前测试商品配置阻塞会触发恢复提示，尚不能完成真实 Review/Checkout；Drop-in 仅覆盖当前场次。
+4. 登录后选择新 Pass 或 Single class (Drop-in)，Continue 进入 Review 前执行 Shopify Admin + 澳洲 Storefront 实时检查。两个测试商品现已通过检查，可在有效预约窗口内复测真实账号 Review；Checkout 仍未开发/开放。Drop-in 仅覆盖当前场次。
 5. 测试临时断线重试、attempt 过期重新选课、商品变更重新选择，以及登录失效后重新认证。上述异常流程已用本地 fixture 验证。
 6. Admin 可编辑 Classes & Passes、People、Settings、Weekly Schedule；在 Classes & Passes 点击 Check availability 查看每个商品的可售问题和检查时间。
 
 **当前不能支付、扣课或确认预约。** onlineBookingsEnabled=false，选择/Review 不创建 Hold、Cart 或订单。内部 NEW_PASS/DROP_IN Hold、Entitlement 台账、有效 Pass 选择和保守 Intro 资格已完成；已有 Pass UI/原子确认、Customer/Coach 个人中心尚未完成。
 
-## 商品检查与当前阻塞
+## 商品检查与已完成配置
 
 从 D:/Skyra/booking-app 运行 npm.cmd run preview:purchasability。需要已登录且绑定 Skyra Booking 的 Shopify CLI；脚本只在子进程载入凭据，SDK 刷新离线会话，不改 .env。诊断模式：npm.cmd run preview:purchasability -- -Diagnostics。
 
-2026-09-12 真实结果：Class/Pass 的 Admin 价格分别 A$49/A$220、均 ACTIVE，但未发布 Online Store，当前 App 的 Booking 归属字段未读到；tokenless Storefront 因渠道锁定返回 400。命令非零表示存在阻塞。下一步核对商品归属/发布、配置锁定开发店可用的 Storefront 接入；不要为通过测试而移除保护或开放付款。
+2026-09-12 05:34:57–58 UTC 最新真实结果：Class A$49 / Pass A$220 均 ready=true、issues=[]。用户授权后已应用商品读取 scope、恢复两个 App Booking 字段并发布到开发店 Online Store。修复 scope 缓存陈旧与 onlineStoreUrl=null 误报；现在使用有效发布时间并独立验证认证 AU Storefront。缺权限、未发布或市场不可售仍拒绝。未认证店铺访问依然返回 /password，未移除保护。操作证据、维护命令及前置条件见 [Commerce 配置与恢复](commerce-readiness.md)；不要重复发布或提前开放付款。
 
 ## 启动或恢复开发预览
 
@@ -64,10 +64,10 @@ npm run preview:check
 
 - Booking Admin 编辑课程名称、介绍、时长、价格、容量、地点、教练和排期；Pass 编辑价格、次数、有效期及适用课程。
 - 保存课程/Pass 后由 outbox/worker 同步 Shopify Product + Variant，通常无需手工重复上传。单次课程商品与 Pass 是购买项，某日场次保留在 PostgreSQL，不为每场课复制商品。
-- 当前 `SYNCED` 只代表商品同步成功；实时商品渠道可售检查已接入但开发店未通过。仍需解决检查报告中的配置阻塞，再完成 Cart/Attempt 关联、Shopify Checkout、`orders/paid` 幂等处理、权益发放/扣减、预约确认及退款/取消对账。
+- 当前 `SYNCED` 只代表商品同步成功；开发店两个测试商品现已通过实时检查，但每次交易仍须重新核验。接下来需完成 Cart/Attempt 关联、Shopify Checkout、`orders/paid` 幂等处理、权益发放/扣减、预约确认及退款/取消对账。
 - 付款使用 Shopify Checkout；不自建支付表单。已有 Pass 应直接确认并扣课，不进入 A$0 Checkout。
 - 店铺还需 Customer Accounts、支付服务/测试支付、币种税务、订单通知与政策配置；折扣/礼品卡按业务需要启用，自动续费订阅另行接入。
 
 ## 验证边界
 
-最新数据库/接口测试 104 项通过，类型/lint/构建通过，新增 Admin/Storefront 查询通过官方校验。上一轮 12 项浏览器 fixture 覆盖双 surface、320/390/430/1440px、同页登录返回、异常恢复及 Drop-in 价格变化。真实 Continue with Shop、完整交易及后台按钮人工视觉验收仍未完成；商品检查不等于真实登录或支付成功。
+最新数据库/接口测试 154 项通过，类型/lint/构建通过，8 个最终 Admin/Storefront 操作及 App TOML 通过官方校验。本轮 Home/Programs 有 Booking mount、课表接口返回 1 场 Session，单次 HTTP 均 200；密码页保持有效。上一轮 12 项浏览器 fixture 覆盖双 surface、320/390/430/1440px、同页登录返回、异常恢复及 Drop-in 价格变化，本轮未重跑。真实 Continue with Shop、完整交易及后台按钮人工视觉验收仍未完成；商品检查不等于真实登录或支付成功。

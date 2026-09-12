@@ -18,10 +18,9 @@ import {
 import { publicError } from "../lib/errors.server";
 import { Feedback, Field, Status } from "../components/admin-ui";
 import { CatalogAvailability } from "../components/catalog-availability";
-import {
-  checkCatalogPurchase,
-  storefrontReadClient,
-} from "../services/shopify-purchasability.server";
+import { unauthenticated } from "../shopify.server";
+import { authenticatedStorefrontClient } from "../services/storefront-access.server";
+import { checkCatalogPurchase } from "../services/shopify-purchasability.server";
 export async function loader({ request }: LoaderFunctionArgs) {
   const { actor, shop } = await adminContext(request);
   return { ...(await catalogData(actor.shopId)), domain: shop.domain };
@@ -38,7 +37,10 @@ export async function action({ request }: ActionFunctionArgs) {
           String(form.get("id")),
           {
             admin: admin.graphql,
-            storefront: storefrontReadClient(shop.domain),
+            storefront: authenticatedStorefrontClient(
+              shop.domain,
+              unauthenticated.storefront,
+            ),
           },
         ),
       };

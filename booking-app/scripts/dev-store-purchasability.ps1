@@ -1,5 +1,9 @@
-param([switch]$Diagnostics)
+param([switch]$Diagnostics, [switch]$RestoreOwnership, [string]$MappingId, [switch]$RefreshSessionScopes)
 $ErrorActionPreference = 'Stop'
+if ($RestoreOwnership -and $MappingId -notmatch '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$') {
+  throw 'Ownership restoration requires one explicit MappingId UUID.'
+}
+if ($MappingId -and -not $RestoreOwnership) { throw 'MappingId requires RestoreOwnership.' }
 $appPath = Split-Path -Parent $PSScriptRoot
 $keys = @('SHOPIFY_API_KEY', 'SHOPIFY_API_SECRET', 'SCOPES')
 $previous = @{}
@@ -19,6 +23,8 @@ try {
   }
   $arguments = @('tsx', '--env-file=.env', 'scripts/dev-store-purchasability.ts', 'skyra-booking-dev.myshopify.com')
   if ($Diagnostics) { $arguments += '--diagnostics' }
+  if ($RefreshSessionScopes) { $arguments += '--refresh-session-scopes' }
+  if ($RestoreOwnership) { $arguments += "--restore-ownership=$MappingId" }
   & npx.cmd @arguments
   $result = $LASTEXITCODE
 } finally {

@@ -1,0 +1,6 @@
+query BookingDevelopmentPublications {
+ shop { myshopifyDomain }
+ publications(first: 20) { nodes { id catalog { title ... on AppCatalog { apps(first: 3) { nodes { title } } } } } pageInfo { hasNextPage endCursor } }
+ classProduct: product(id: "gid://shopify/Product/10798362362148") { id title handle onlineStoreUrl publishedAt }
+ passProduct: product(id: "gid://shopify/Product/10798362427684") { id title handle onlineStoreUrl publishedAt }
+}

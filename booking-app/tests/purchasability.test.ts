@@ -7,6 +7,7 @@ import {
   type CommerceClients,
 } from "../app/services/shopify-purchasability.server";
 import { bookingPurchaseReview } from "../app/services/booking-purchase-review.server";
+import { DomainError } from "../app/lib/errors.server";
 import { startAttempt } from "../app/services/booking.server";
 import type { Actor } from "../app/services/authorization";
 
@@ -101,8 +102,12 @@ async function fixture(ownerType: "SERVICE" | "PASS_PLAN" = "PASS_PLAN") {
       status: "ACTIVE",
       onlineStoreUrl: ("https://" + shop.domain + "/products/test") as
         string | null,
+      publishedAt: new Date(Date.now() - 60000).toISOString() as string | null,
       requiresSellingPlan: false,
       bookingOwner: { jsonValue: owner.id },
+      entitlementKind: {
+        jsonValue: ownerType === "SERVICE" ? "DROP_IN" : "PACK",
+      },
       variants: {
         nodes: [
           {
@@ -217,7 +222,7 @@ const failures: [string, (f: Fixture) => void][] = [
   [
     "ONLINE_STORE_UNPUBLISHED",
     (f) => {
-      f.adminData.product.onlineStoreUrl = null;
+      f.adminData.product.publishedAt = null;
     },
   ],
   [
@@ -423,7 +428,7 @@ test("listing choices makes no remote requests; unauthorized Review stops before
 test("unpublished product returns existing customer recovery error", async () => {
   const f = await fixture();
   const attempt = await f.begin();
-  f.adminData.product.onlineStoreUrl = null;
+  f.adminData.product.publishedAt = null;
   await expect(
     bookingPurchaseReview(
       f.customer,
@@ -474,7 +479,7 @@ test("class cancellation during a successful remote check is revalidated before 
 test("a locked storefront preserves actionable Admin findings and blocks Review", async () => {
   const f = await fixture();
   const attempt = await f.begin();
-  f.adminData.product.onlineStoreUrl = null;
+  f.adminData.product.publishedAt = null;
   f.storefront.mockImplementation(async () =>
     Response.json(
       {
@@ -502,6 +507,39 @@ test("a locked storefront preserves actionable Admin findings and blocks Review"
   ).rejects.toMatchObject({ code: "UNAVAILABLE", status: 503 });
 });
 
+test.each(["SERVICE", "PASS_PLAN"] as const)(
+  "a published %s can pass without an Online Store URL",
+  async (kind) => {
+    const f = await fixture(kind);
+    f.adminData.product.onlineStoreUrl = null;
+    expect(await f.check()).toMatchObject({ ready: true, issues: [] });
+    // Publication alone still cannot replace the authenticated market check.
+    f.storefrontData.product.availableForSale = false;
+    expect(await f.check()).toMatchObject({
+      ready: false,
+      issues: [{ code: "STOREFRONT_UNAVAILABLE" }],
+    });
+  },
+);
+
+test("future Online Store publication is not ready even with a URL", async () => {
+  const f = await fixture();
+  f.adminData.product.publishedAt = new Date(Date.now() + 86400000).toISOString();
+  expect(await f.check()).toMatchObject({
+    ready: false,
+    issues: [{ code: "ONLINE_STORE_UNPUBLISHED" }],
+  });
+});
+
+test("malformed publication dates fail closed", async () => {
+  const f = await fixture();
+  f.adminData.product.publishedAt = "invalid-date";
+  expect(await f.check()).toMatchObject({
+    ready: false,
+    issues: [{ code: "SHOPIFY_UNAVAILABLE" }],
+  });
+});
+
 test("Storefront reads never send Admin credentials and reject untrusted domains", async () => {
   const fetch = vi
     .spyOn(globalThis, "fetch")
@@ -524,4 +562,35 @@ test("Storefront reads never send Admin credentials and reject untrusted domains
   } finally {
     fetch.mockRestore();
   }
+});
+
+test("mismatched entitlement kind blocks the purchase", async () => {
+  const f = await fixture();
+  f.adminData.product.entitlementKind.jsonValue = "DROP_IN";
+  const result = await f.check();
+  expect(result.ready).toBe(false);
+  expect(result.issues.map((issue) => issue.code)).toContain(
+    "ENTITLEMENT_KIND_MISMATCH",
+  );
+});
+
+test("missing Storefront access is actionable in Admin and recoverable in Review", async () => {
+  const f = await fixture();
+  const attempt = await f.begin();
+  f.storefront.mockRejectedValue(
+    new DomainError("STOREFRONT_ACCESS_REQUIRED", "private details", 503),
+  );
+  const result = await f.check();
+  expect(result.ready).toBe(false);
+  expect(result.issues.map((issue) => issue.code)).toContain(
+    "STOREFRONT_ACCESS_REQUIRED",
+  );
+  expect(JSON.stringify(result)).not.toContain("private details");
+  await expect(
+    bookingPurchaseReview(
+      f.customer,
+      { token: attempt.token, ...f.selection },
+      async () => f.clients,
+    ),
+  ).rejects.toMatchObject({ code: "UNAVAILABLE", status: 503 });
 });

@@ -2,7 +2,7 @@
 
 更新：2026-09-12。此页记录实际代码、开发店联调与验证证据；完整范围仍以 `implementation-backlog.md` 为准。
 
-最新状态：商品可售检查已接入 Admin 与客户 Review，按澳洲/AUD 复核 Shopify Admin 和 Storefront；104 项测试通过。真实开发店存在商品未发布、Booking 归属字段未读到、渠道锁定阻止 Storefront 查询三个阻塞。登录修复已推送 GitHub；Continue with Shop 真实账户复测、Checkout/付款/Booking 确认尚未完成。
+最新状态：用户已授权开发店配置操作。Storefront 商品读取 scope 已生效，两个 [DEV] 商品的 Booking 归属字段已安全恢复并发布到 Online Store；2026-09-12 05:34:57–58 UTC 两项真实检查均 ready=true。修复离线 scope 缓存陈旧与 onlineStoreUrl 为空造成的发布误报，154 项测试、类型/lint/构建通过。密码保护及三个交易开关保持不变，未开放交易、未部署正式店。操作证据见 [Commerce 配置与恢复](commerce-readiness.md)。下一项为 Review → Hold → Cart；Continue with Shop 真实账户复测、付款/Booking 确认仍未完成。
 
 ## 已创建与已绑定
 
@@ -110,7 +110,7 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 
 1. 由用户在当前 Shopify 托管登录页复测 **Continue with Shop**，再验收 Home / Programs 的登录完成、退出和签名返回；Programs Page 已创建，不再重复创建。
 2. 登录修复已推送 e8d0b2b，CI 34672286983 通过。可售检查提交/CI 以当前 bookingdev HEAD 为准。
-3. M4 + M5-10：先修复测试商品归属/发布和锁定开发店的 Storefront 接入，再接公开 Hold 与 Shopify Cart / Checkout；实时校验代码已就绪。
+3. M4 + M5-10：开发店商品读取权限、归属恢复及两个测试商品的 Online Store 发布已完成，真实可售检查已通过。继续公开 Review → Hold → Cart/Checkout；交易时仍须重新检查，不能将本次 ready 结果作为持久授权。
 4. orders/paid 幂等处理、权益生成、Booking 确认和过期付款恢复；M5-09 已有 Pass 原子确认，不走 A$0 Checkout。
 5. Confirmation、付款后 Recovery / Needs Attention；完整链路验收后再开启 onlineBookingsEnabled。
 
@@ -202,3 +202,23 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 - 真实开发店：两个测试商品 Admin 为 ACTIVE、变体可售、价格 A$49/A$220，但 onlineStoreUrl=null；当前 App 未读到 booking_owner_id/entitlement_kind。Storefront HTTP 400 返回 “Online Store channel is locked.”。后台分别报告 ONLINE_STORE_UNPUBLISHED、OWNER_MISMATCH、STOREFRONT_LOCKED，公开 Review 返回恢复提示。未解除店铺保护、发布商品或重写归属。
 - 验证：专用测试库 vitest run 104/104（新增 33 项），覆盖权限隔离、数据库/远端价格变化、上下架、锁定渠道、配送/订阅/Bundle、接口故障、检查期间编辑与课程取消；类型/lint/生产构建通过。Admin 与 Storefront 查询通过官方 schema 校验。12 项浏览器 fixture 是上一轮布局/恢复证据，本轮未宣称真实支付或后台人工视觉验收。
 - 无新迁移。公开 Hold/Cart/Checkout、orders/paid、权益发放/预约确认、已有 Pass UI/确认、付款后 Recovery 尚未交付；三个能力开关保持 false。下一轮先解决上述商品/Storefront 阻塞，再继续 Cart。
+
+## 上一轮交付：认证 Storefront 与安全归属恢复（2026-09-12，授权前快照）
+
+- 后台、Review 和开发店诊断改用官方 SDK 的离线认证 Storefront；验证同店铺、离线会话、精确商品读取 scope，缺权限返回 STOREFRONT_ACCESS_REQUIRED，不退回 tokenless。SDK 负责 token 刷新和私有传输，不新增明文凭据配置。
+- 新增仅 ADMIN 可用的单商品恢复服务和显式 -RestoreOwnership / -MappingId 脚本参数。先核对 App、店铺、TOML 定义、同步映射、稳定 handle、唯一 Variant 与价格；只补不存在的字段，以 compareDigest:null 防止并发覆盖，回读后写审计；已存在正确值时幂等，无冲突覆盖。
+- 真实诊断确认 App Client ID 正确；当前两个 Product Booking 字段定义/值仍未读到，缺 unauthenticated_read_product_listings，两个测试商品未发布 Online Store。只确认 API 当前状态，未断言历史删除原因。新增权益类型检查分别要求 DROP_IN/PACK。
+- 验证：139 项测试通过（新增 35），类型/lint/构建通过，4 个最终 GraphQL 操作官方校验通过，现有 TOML CLI 校验 valid=true。无迁移、无主题/浏览器 UI 改动，未重新运行历史浏览器 fixture。
+- 待用户确认仅开发店权限和测试商品可见性变更，随后按 [Commerce 配置与恢复](commerce-readiness.md) 操作。本轮未改 scopes、未恢复真实字段、未发布商品、未移除密码，三个交易能力开关保持 false；Cart/Checkout 和真实登录验收仍未完成。
+- 上一轮 fa06784 已推送且 CI 34673814637 成功；本轮改动已保存在工作区，未再次 commit/push，不把本地测试当作新的 GitHub CI 结果。
+
+## 最新交付：开发店授权配置与真实可售通过（2026-09-12）
+
+- 用户明确授权仅开发店加商品读取 scope、恢复归属和发布两个测试商品；App dev 配置已应用，未执行全局 App deploy 或正式店部署。原有两个 TOML Product 定义现已读回。
+- 新增显式 -RefreshSessionScopes：读取 Shopify 已授予 scopes，核对 App、店铺和离线 Session，只在 accessToken 快照仍一致时更新本地 scope 缓存，不授予权限、不替换/输出 token。
+- 两个商品均已恢复 booking_owner_id / entitlement_kind，CAS 防覆盖、回读和 2 条审计通过。只发布到已核对的 Online Store publication 324415521060，未发布到 Shop/POS，未改价格或变体。
+- 修复 onlineStoreUrl=null 的发布误报：实际 publishedOnPublication=true 且 publishedAt 有效；运行校验改用 Online Store 发布时间并独立验证认证 AU Storefront。缺失/未来/无效日期或市场不可售仍拒绝；URL 为空的原因未确认。
+- 最终检查时间为 05:34:57–58 UTC：Class A$49、Pass A$220 均 ready=true、issues=[]。密码页依旧有效；开发店 onlineBookingsEnabled=false，Hold/Booking 均为 0，Checkout/已有 Pass UI 能力仍关闭。
+- 154 项测试通过（139 + scope 缓存 11 + 发布回归 4），类型/lint/生产构建通过；最终 8 个 GraphQL 操作官方脚本校验通过，TOML valid=true。无迁移或前端资源改动。Home/Programs/API 单次 HTTP 200，双页面有 Booking mount；不是浏览器/真实登录 E2E。
+- 下一项 M4-01/M5-10 为 Review → 公开 Hold → Cart/Checkout，之后 paid webhook、权益与 Booking 确认、已有 Pass/付款后恢复。Continue with Shop 真实账号完成/退出/签名返回仍未验收。
+- 开发文档、流程、进度、交接和预览指南已同步更新；本轮修改未 commit/push，远程仍以已推送 fa06784 为基线。

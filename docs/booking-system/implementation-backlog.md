@@ -196,8 +196,10 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 
 ### 任务
 
-- [x] M4-00 实现实时商品可售检查：Admin 店铺/归属/产品/变体/Online Store 发布/价格与澳洲 Storefront 可见性/可售/价格/配送限制，接入后台 Check availability 和客户 Review；网络故障、检查期间变更均拒绝放行。这里只完成检查代码，真实开发店配置仍有阻塞。
-- [ ] M4-01 根据适用 Pass Variant 创建/更新 Shopify Cart。前置待处理：两个测试商品的 Online Store 发布、App Booking 归属字段和锁定店铺的 Storefront 接入；本地 SYNCED 不等于可购买。
+- [x] M4-00 实现实时商品可售检查：Admin 店铺/归属/产品/变体/Online Store 发布/价格与澳洲 Storefront 可见性/可售/价格/配送限制，接入后台 Check availability 和客户 Review；网络故障、检查期间变更均拒绝放行。发布以有效 publishedAt 而非 URL 非空判断，认证 Storefront 仍独立校验。
+- [x] M4-00a 认证与恢复代码：官方离线 SDK Storefront 精确 scope/店铺校验；ADMIN 单商品缺失字段恢复、App/定义/映射核对、CAS 防覆盖、读回和审计；权益类型复核。配置和真实写入验收不在此完成项内。
+- [x] M4-00b 开发店配置：经用户明确授权，商品 scope 与现有 TOML 定义已应用；逐商品 CAS 恢复、回读/审计和 Online Store 发布完成，两项真实 ready=true。密码保护不变。详见 commerce-readiness.md；这不代表真实登录/交易已验收。
+- [ ] M4-01 根据适用 Pass / Session-owned Drop-in Variant 创建/更新 Shopify Cart。两个测试商品的前置配置已通过；仍需在交易请求时复核身份、商品/价格、名额与 Hold，不复用旧 ready 结果作为授权。
 - [ ] M4-02 将 opaque booking hold reference 写入 Cart line attributes。
 - [ ] M4-03 确认预约摘要进入 Order 但不包含敏感数据。
 - [ ] M4-04 订阅并验证订单、付款、取消、退款 Webhooks。
@@ -230,7 +232,7 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 - [ ] M5-04 完成共享 BROWSE：按 Programs Find a Class 视觉实现月标题、七日日期条、前后周、Class type/Instructor filters、实时容量、loading/empty/error 和区块内 Full calendar。七日条、筛选和实时 Session 已联调；本轮补充独立 Book 与 Show details，2026-09-11 已完成 Programs 共享宽面板、31 天 Full Calendar 和跨月选择；本轮已补齐月份标题、独立前后周与未开放文案；剩余真实 Programs 入口及完整 E2E。
 - [ ] M5-05 完成 DETAILS：Show details 在 Session 行内展开或在同一 surface 替换内容，显示课程、老师、地点、level、policy、剩余名额；Back 恢复日期、筛选、滚动和焦点。
 - [ ] M5-06 完成 LOGIN_REQUIRED：Shopify 登录 modal 与全端同页顶层跳转已实现，并已接服务器 opaque Attempt 与固定返回路径；签名身份绑定、无 storage 恢复通过本地验证。2026-09-12 用户反馈 Shopify 托管页 **Continue with Shop** 点击后疑似无响应；已移除桌面弹窗层，并修复本地预览误把登录请求发到 `127.0.0.1` 的 401。当前已验证开发店域名能在同一标签页打开 Shopify 托管登录并保留 `preview_theme_id`，但真实账户完成登录、退出、跨域 cookie 与签名返回仍待用户复测，保持部分完成。
-- [ ] M5-07 完成 PASS_SELECTION：采用参考图的主栏 Pass cards + 右栏 Booking Details；已有适用 Pass 优先显示余额、到期与 `A$0 due today`，购买选项显示已同步 Shopify Variant 实时价格，未选择时 Continue 禁用。2026-09-11 已完成新 Pass cards、资格/同步价格检查和响应式 Booking Details；2026-09-12 已补充 Drop-in 卡片、价格复核及 Continue 时的实时 Shopify 可售校验。已有 Pass UI 待接；开发店实际可售检查尚未通过，具体阻塞见 M4-00 最新进度。
+- [ ] M5-07 完成 PASS_SELECTION：采用参考图的主栏 Pass cards + 右栏 Booking Details；已有适用 Pass 优先显示余额、到期与 `A$0 due today`，购买选项显示已同步 Shopify Variant 实时价格，未选择时 Continue 禁用。2026-09-11 已完成新 Pass cards、资格/同步价格检查和响应式 Booking Details；2026-09-12 已补充 Drop-in 卡片、价格复核及 Continue 时的实时 Shopify 可售校验。开发店两个测试商品的真实检查现已通过；已有 Pass UI、真实账号 Review 仍待验收。
 - [ ] M5-08 新增 REVIEW：采用参考图的交易摘要结构，显示 Customer、Class、日期时间、Coach、Location、选中 Pass/Drop-in、价格与 Edit；这是当前 Booking section 的状态，不是 Customer Account 或独立 Cart 页面。2026-09-11 已完成新 Pass 摘要、服务端价格/名额复核及 Edit；2026-09-12 已补充 Drop-in 摘要；Customer/已有 Pass 与支付交接未完成。
 - [ ] M5-09 已有 Pass 从 REVIEW 走原子确认并显示 CONFIRMING → CONFIRMED，不创建 A$0 Checkout。
 - [ ] M5-10 新 Pass/Drop-in 从 REVIEW 创建 15 分钟 Hold、写 Cart line attribute，并通过 `checkoutUrl` 进入原生 Shopify Checkout；Booking App 不渲染支付表单。
@@ -421,3 +423,17 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 - 真实检查发现测试 Class/Pass 未发布 Online Store、当前 App 的归属字段未读到、开发店渠道锁定使 Storefront 查询返回 400。问题已定位并有明确提示，配置修复及真实 Review/Checkout 验收仍未完成。
 - 登录修复已推送 e8d0b2b，CI 34672286983 通过；Continue with Shop 真实账户复测仍待办。
 - 下一顺序：商品归属核对/恢复 → 开发店 Storefront 认证与发布 → Cart/Hold → orders/paid/权益/确认 → 已有 Pass/付款后恢复。检查通过不是付款或预约成功。
+
+### 2026-09-12 认证与安全恢复续开发（授权前历史快照）
+
+- M4-00a 已完成，139 项测试和类型/lint/构建通过；Storefront 生产调用不再使用 tokenless，旧段落中的 tokenless 描述仅为历史。
+- 实际 App 身份正确；字段定义/值未读到、商品 scope 缺失和商品未发布仍阻塞。M4-00b 等用户明确同意开发店权限/可见性变更，不自动解除密码保护。
+- 恢复命令默认只读，必须显式指定 RestoreOwnership 和单个 MappingId 才写缺失字段；不改变商品、交易开关或现有错误归属。定义缺失时拒绝操作，须先通过现有 TOML 应用定义。
+- 本轮未执行真实恢复/发布/权限更新，也未实现 Cart/Checkout、orders/paid/确认、已有 Pass UI/原子确认、付款后 Recovery；Continue with Shop 仍需用户账户复测。本轮未 commit/push。
+
+### 2026-09-12 开发店配置落地（最新）
+
+- M4-00b 完成：用户已授权；仅开发店新增 Storefront 商品读取 scope，应用两个现有 TOML 定义，恢复两个商品的缺失归属字段并发布到核对后的 Online Store publication。最终两项 ready=true，密码保护不变。
+- 新增远端 granted scopes → 本地离线 scope 缓存的身份/CAS 保护工具；修复已发布商品 URL 为空的误报。154 项测试、类型/lint/构建和最终 8 个 GraphQL 操作校验通过。
+- 下一顺序：真实 Continue with Shop/Review 复测；M4-01 + M5-10 Review → Hold → Cart/Checkout；orders/paid/权益/确认；已有 Pass/付款后 Recovery。
+- 三个交易开关仍为 false，无收款、扣课或 Booking，未部署正式店、未 commit/push。详细操作及证据见 commerce-readiness.md。

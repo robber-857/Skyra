@@ -9,8 +9,9 @@ export const PURCHASABILITY_QUERY = `#graphql
 query BookingPurchasability($id: ID!) {
   shop { myshopifyDomain currencyCode }
   product(id: $id) {
-    id status onlineStoreUrl requiresSellingPlan
+    id status onlineStoreUrl publishedAt requiresSellingPlan
     bookingOwner: metafield(namespace: "$app", key: "booking_owner_id") { jsonValue }
+    entitlementKind: metafield(namespace: "$app", key: "entitlement_kind") { jsonValue }
     variants(first: 2) { nodes { id price availableForSale requiresComponents } }
   }
 }
@@ -47,8 +48,10 @@ const adminData = z.object({
       id: z.string(),
       status: z.string(),
       onlineStoreUrl: z.string().url().nullable(),
+      publishedAt: z.string().datetime({ offset: true }).nullable(),
       requiresSellingPlan: z.boolean(),
       bookingOwner: z.object({ jsonValue: z.unknown() }).nullable(),
+      entitlementKind: z.object({ jsonValue: z.unknown() }).nullable(),
       variants: z.object({
         nodes: z.array(variant.extend({ price: z.string() })),
       }),
@@ -220,14 +223,23 @@ export async function inspectCatalogPurchase(
     );
   }
   if (storefrontResult.status === "rejected") {
+    const accessRequired =
+      storefrontResult.reason instanceof DomainError &&
+      storefrontResult.reason.code === "STOREFRONT_ACCESS_REQUIRED";
     const locked =
       storefrontResult.reason instanceof DomainError &&
       storefrontResult.reason.code === "STOREFRONT_LOCKED";
     add(
-      locked ? "STOREFRONT_LOCKED" : "SHOPIFY_UNAVAILABLE",
-      locked
-        ? "The Online Store is locked and blocks tokenless product checks. Authenticated Storefront access must be configured before checkout."
-        : "Could not verify Australian storefront availability. Please try again.",
+      accessRequired
+        ? "STOREFRONT_ACCESS_REQUIRED"
+        : locked
+          ? "STOREFRONT_LOCKED"
+          : "SHOPIFY_UNAVAILABLE",
+      accessRequired
+        ? "Approve Storefront product access for Skyra Booking, then reconnect the app and check again."
+        : locked
+          ? "The Online Store is locked. Check authenticated Storefront access; do not remove store protection to bypass this check."
+          : "Could not verify Australian storefront availability. Please try again.",
     );
   }
   if (adminResult.status === "fulfilled") {
@@ -248,9 +260,23 @@ export async function inspectCatalogPurchase(
           "OWNER_MISMATCH",
           "The Shopify product is no longer linked to this class or Pass.",
         );
+      if (
+        product.entitlementKind?.jsonValue !==
+        (mapping.ownerType === "SERVICE" ? "DROP_IN" : "PACK")
+      )
+        add(
+          "ENTITLEMENT_KIND_MISMATCH",
+          "The Shopify entitlement type differs from this class or Pass.",
+        );
       if (product.status !== "ACTIVE")
         add("PRODUCT_INACTIVE", "Activate the product in Shopify.");
-      if (!product.onlineStoreUrl)
+      // A protected dev store can return a null URL for an already-published
+      // product. Use the Online Store publication timestamp, then independently
+      // require the live AU Storefront product/variant/price checks below.
+      if (
+        !product.publishedAt ||
+        Date.parse(product.publishedAt) > Date.now()
+      )
         add(
           "ONLINE_STORE_UNPUBLISHED",
           "Publish this product to the Online Store sales channel in Shopify.",

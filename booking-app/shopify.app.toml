@@ -5,7 +5,7 @@ embedded = true
 [build]
 automatically_update_urls_on_dev = true
 [access_scopes]
-scopes = "write_products,write_metaobjects,read_metaobjects,write_metaobject_definitions,read_metaobject_definitions,write_app_proxy"
+scopes = "write_products,write_metaobjects,read_metaobjects,write_metaobject_definitions,read_metaobject_definitions,write_app_proxy,unauthenticated_read_product_listings"
 [auth]
 redirect_urls = ["https://shopify.dev/apps/default-app-home/auth/callback"]
 [app_proxy]
@@ -23,11 +23,11 @@ topics = ["app/scopes_update"]
 uri = "/webhooks/app/scopes_update"
 [product.metafields.app.booking_owner_id]
 name = "Booking owner ID"
+description = "Stable Booking Service or PassPlan UUID; managed by Skyra Booking."
 type = "single_line_text_field"
 access.admin = "merchant_read"
 [product.metafields.app.entitlement_kind]
 name = "Booking entitlement kind"
+description = "Booking purchase type: DROP_IN for a Class or PACK for a Pass."
 type = "single_line_text_field"
 access.admin = "merchant_read"
-
-
