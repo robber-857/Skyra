@@ -48,7 +48,7 @@ New Class/Pass/Coach creation forms have no automatic network retry. An uncertai
 
 ## Tests and validation
 
-- `npm.cmd run test:db`: creates/uses only `skyra_booking_test` and runs 61 tests, including PostgreSQL integration and proxy/auth unit tests. Tests refuse any other database name.
+- `npm.cmd run test:db`: creates/uses only `skyra_booking_test` and runs 64 tests, including PostgreSQL integration and proxy/auth unit tests. Tests refuse any other database name.
 - `npm.cmd run build:theme-extension`: builds `theme-extension-src/booking.js`, `login.js`, `attempt.js`, `calendar.js` and `transaction.js` into five minified Theme App Extension assets, each under Shopify's 10 KB limit.
 - npm.cmd run check: typecheck, ESLint, production build.
 - `shopify app config validate --json`: official app and extension config validation.
@@ -87,6 +87,6 @@ The local Home/Programs templates now use the shared mounts and no longer contai
 
 ### Development preview diagnostics (2026-09-11)
 
-Run `npm run preview:check` to sample the local theme, app host, Booking sessions and Shopify upstream separately. Programs 404 is reported as `NOT_READY`. `npm run preview:app` and `npm run preview:theme` pin the development theme 192227082532; stop the existing process before restarting. These commands do not publish Horizon.
+Run `npm run preview:check` to sample the local theme, app host, Booking sessions and Shopify upstream separately. Programs is now a required check; its Page resource has been created. `npm run preview:app` and `npm run preview:theme` pin the development theme 192227082532; stop the existing process before restarting. These commands do not publish Horizon.
 
-The shared frontend now has month/week navigation and pre-payment recovery for transient failures, expired attempts, changed Passes and sign-in expiry. Eleven browser fixture scenarios cover both mounts and mobile/desktop; they are not real Shopify login or payment acceptance. Programs Page creation is pending store content OAuth authorization. Checkout, paid webhooks, entitlements and post-payment recovery remain incomplete.
+The shared frontend now has month/week navigation and pre-payment recovery for transient failures, expired attempts, changed Passes and sign-in expiry. Eleven browser fixture scenarios cover both mounts and mobile/desktop; they are not real Shopify login or payment acceptance. Programs Page 167140557092 is configured. Drop-in selection/Review is implemented; Drop-in Hold is not. Checkout, paid webhooks, entitlements and post-payment recovery remain incomplete. Development scripts use IPv4-first with Node network family autoselection disabled for this Windows network; they do not change system networking or TLS. Final live-page/customer-login verification and this batch's push are deferred while the user's connection is slow.

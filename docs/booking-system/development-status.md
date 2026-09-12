@@ -1,6 +1,8 @@
 # Booking V3 — 开发状态
 
-更新：2026-09-11。此页记录实际代码、开发店联调与验证证据；完整范围仍以 `implementation-backlog.md` 为准。
+更新：2026-09-12。此页记录实际代码、开发店联调与验证证据；完整范围仍以 `implementation-backlog.md` 为准。
+
+最新状态：Programs Page 已创建，Drop-in 选择/Review 已实现，64 项测试通过。当前网络慢，最终页面稳定性/真实顾客登录验收和本轮 GitHub 推送暂缓；详见文末 2026-09-12 记录。
 
 ## 已创建与已绑定
 
@@ -18,7 +20,7 @@
 | M2 Classes & Passes | Class/Pass 创建与编辑、跨店校验、Coach/Location、Coach 与 Pass eligibility、乐观版本检查 | Category/Resource、Appointment/Course 完整表单未完成；Admin iframe 尚未做完整人工视觉验收 |
 | M2 商品同步 | 事务 Outbox、`productSet`、稳定 Product/Variant 映射、`metafieldsSet`、app-owned Service content definition 自愈、Metaobject upsert/read-back、重试和状态刷新 | Coach public Metaobject 与 `products/update` 对账尚未实现 |
 | M2 Weekly Schedule | 按周日期/时间/教练、草稿、发布、删除草稿、4/8/13 周生成、复制上周、时区/DST 校验 | 持久化 Series 编辑、资源分配、Appointment slots、教练可用时间例外未完成 |
-| M5 Storefront 首个 slice | Theme App Extension app embed、Home/Programs 共享 mount、公开 Session App Proxy、七日 Browse、Class/Coach 筛选、Details、登录提示、loading/empty/error、移动端布局 | 开发店已授权 App Proxy 并启用 app embed；Home 的真实 Browse/Details/Login UI 已联调，后续交易 UI 规范已冻结；本轮已接服务器 Attempt 与真实占位计算，本轮已交付 31 天 Full Calendar、新 Pass selection/Review；已有 Pass、真实客户登录完成/返回验收及 Checkout 仍未完成 |
+| M5 Storefront 首个 slice | Theme App Extension app embed、Home/Programs 共享 mount、公开 Session App Proxy、七日 Browse、Class/Coach 筛选、Details、登录提示、loading/empty/error、移动端布局 | 开发店已授权 App Proxy 并启用 app embed；Home 的真实 Browse/Details/Login UI 已联调，后续交易 UI 规范已冻结；本轮已接服务器 Attempt 与真实占位计算，本轮已交付 31 天 Full Calendar、新 Pass / Drop-in selection/Review；已有 Pass、真实客户登录完成/返回验收及 Checkout 仍未完成 |
 
 ## 本轮交付：M3 Class Booking 基础（2026-09-10）
 
@@ -104,14 +106,16 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 - 浏览器证据位于 `output/playwright/booking-login/`，这些是带测试数据的本地 UI 检查，不能当作真实 Shopify 登录成功或下单成功的证据。
 - 当前没有运行中的 9292 本地主题预览；本轮尚未重启开发店登录联调、部署正式店、Git commit 或 push。
 
-## 下一阶段执行顺序
+## 下一阶段执行顺序（2026-09-12 更新）
 
-1. M3-09 / M3-10：实现 Entitlement grant/reserve/consume/release ledger、余额/有效期/服务匹配与 Intro 资格。当前基础 Hold 不能代替已有 Pass 确认。
-2. M5-04 / M5-05：Full Calendar 与 Programs 共享视觉已完成；补直接前后周导航、完整 policy、关闭/未开放文案及 Details 返回位置验收。
-3. M5-07 / M5-08：新 Pass 实时本地同步价格与 Review 双栏/单栏 UI 已完成；接已有 Pass 余额/有效期、Drop-in、Customer 摘要及最终 Shopify 可售资格校验。
-4. M5-09：已有 Pass 原子确认、credit reserve、Booking 事件与 CONFIRMED；不走 A$0 Checkout。
-5. M4 + M5-10 / M5-11：Review 后创建 Hold + Shopify Cart，接入 `orders/paid`、Entitlement、确认/过期付款恢复与 Needs Attention。
-6. M5-06 / M5-13：启动开发店 App/Theme 联调，实测真实客户登录/退出、跨域 cookie/弹窗返回，创建 Programs 页面资源并完成两入口 E2E。当前 HTTP 和浏览器 fixture 不能替代这一验收。
+1. 网络恢复后验收 Home / Programs 的真实桌面、手机和 Shopify 登录/退出/返回；Programs Page 已创建，不再重复创建。最终网络稳定性仍待验证。
+2. 推送本轮本地提交至 bookingdev 并核对远程 SHA / CI；之前 743e242 的 CI 通过不代表本轮 CI 已运行。
+3. M3-09 / M3-10：权益台账、已有 Pass 余额/有效期/服务匹配和 Intro 资格；补 Drop-in Hold 模型，现有 PassPlan 外键不能直接支持单次课。
+4. M4 + M5-10：最终商品渠道可售验证、Review 后创建 Hold 与 Shopify Cart / Checkout。
+5. orders/paid 幂等处理、权益生成、Booking 确认和过期付款恢复；M5-09 已有 Pass 原子确认，不走 A$0 Checkout。
+6. Confirmation、付款后 Recovery / Needs Attention；完整链路验收后再开启 onlineBookingsEnabled。
+
+详细交接、证据和启动命令见 [2026-09-12 交接文档](handoff-2026-09-12.md)。
 
 ## 后续独立范围
 
@@ -156,3 +160,19 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 - Programs 真实入口仍未完成：Shopify Page 资源缺失，CLI `store auth` 的内容权限 OAuth 回调等待超时，未获得页面写入权限、未创建页面；不是代码模板缺失，也不是自动审批拒绝。Page 查询/创建 GraphQL 已通过官方 schema 校验，但没有执行 mutation。
 
 下一阶段：完成开发店 Programs 页面内容授权与 Page 创建 → 两个入口的真实 Shopify 顾客登录/退出/返回验收 → 商品渠道可售校验、Cart/Checkout 交接与 Hold → `orders/paid` 幂等处理和权益台账 → 已有 Pass 原子确认、Confirmation、付款后 Recovery / Needs Attention。保持 `onlineBookingsEnabled=false`，直到完整交易链路验收。
+
+## 最新交付：Programs 入口、Drop-in 与开发网络兼容（2026-09-12）
+
+- Shopify 内容 OAuth 已成功，使用官方 CLI 创建 Page `167140557092`，handle/templateSuffix 均为 `programs`；页面 HTTP 200 且包含共享组件 mount。9 月 11 日记录的 404/授权超时为历史问题，当前已解除；Booking App 正式 scopes 未扩大。
+- `/pass-options` 新增 `purchaseKind=DROP_IN` 与 `dropIn` 选项。Service 从 attempt 的 Session 推导，拒绝客户端 Service/Variant/price 字段及 Drop-in 与 passPlanId 混用。只显示 ACTIVE/SYNCED 且价格与版本一致的课程商品。
+- UI 将单次课与新 Pass 放在同一选择区，选择键包含 kind 和 id；Review 分别展示单次课说明或次数/有效期，并重新校验服务端价格和可用性。Drop-in 商品变更提供重新选择出口。
+- 仍不创建 Hold/Cart/订单。当前内部 Hold 外键仍为 PassPlan；Drop-in Hold、最终渠道可售验证、支付与权益闭环还未接入。
+- Docker / PostgreSQL / Redis 曾停止，现已恢复。App CLI 曾因 Shopify 开发 GraphQL 连接失败退出，清理了本项目残留 worker 后重启。
+- 复现并捕获 `AggregateError ETIMEDOUT`：IPv4 250ms 超时后 IPv6 `ENETUNREACH`。2 秒窗口仍出现失败；IPv4 优先且禁用地址竞速的 10 次独立连接通过。已将官方 Node 兼容参数放入本项目开发脚本和诊断脚本，不修改系统网络/TLS；上游 503 及网络拥塞仍可能影响预览。
+- 验证：64 项测试通过（增加 3 个 Drop-in 数据库用例），类型/lint/构建通过；官方 8 文件扩展校验通过，公共 schema 刷新失败时使用官方缓存。11 项浏览器 fixture 场景覆盖双 surface 的 Drop-in repricing/Edit/unavailable 和原有恢复流程。
+- 最终 Home/Programs 真实完整页面验证中出现网络加载超时/502；用户反馈网络很卡后，停止连续网络测试、页面刷新并暂缓本轮 GitHub 推送。之前 `743e242` 已推送且 GitHub CI 通过。不能声称本轮真实客户登录、付款或最终网络稳定性已经验收。
+- 下一步：网络恢复后验证双入口与真实 Shopify 登录/退出/返回，推送本轮提交；随后接商品渠道可售校验、Drop-in Hold 模型、Cart/Checkout、orders/paid 与权益台账、已有 Pass 确认、付款后 Recovery / Needs Attention。
+
+## 交接完成（2026-09-12）
+
+已整理 [新会话交接文档](handoff-2026-09-12.md)，包含实际完成项、未完成交易链路、测试证据、服务/主题入口、下一步顺序及 Git 保护项。最后启动日志确认 App / Worker 就绪且无待执行迁移。此为启动状态，不代表最终 Shopify 登录或网络稳定性验收；本轮本地提交后暂缓推送。

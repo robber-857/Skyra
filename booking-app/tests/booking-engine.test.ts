@@ -597,3 +597,111 @@ test("Review revalidates price and mapping version without trusting a browser am
     bookingPassOptions(f.actor(), { token, passPlanId: foreign.pass.id }),
   ).rejects.toMatchObject({ code: "PASS_UNAVAILABLE" });
 });
+
+async function selectableDropIn(f: Awaited<ReturnType<typeof fixture>>) {
+  return db.productMapping.create({
+    data: {
+      shopId: f.shopId,
+      ownerType: "SERVICE",
+      ownerId: f.session.serviceId,
+      variantGid: "gid://shopify/ProductVariant/456",
+      productGid: "gid://shopify/Product/456",
+      syncStatus: "SYNCED",
+      productStatus: "ACTIVE",
+      requestedVersion: 1,
+      shopifyVersion: 1,
+      publishedPrice: "49.00",
+    },
+  });
+}
+test("Drop-in uses the attempt's class product and does not reserve or issue credits", async () => {
+  const f = await fixture();
+  await selectableDropIn(f);
+  await db.passEligibility.deleteMany({ where: { shopId: f.shopId } });
+  const { token } = await f.start();
+  const options = await bookingPassOptions(f.actor(), { token });
+  expect(options.passes).toEqual([]);
+  expect(options.dropIn).toMatchObject({
+    id: f.session.serviceId,
+    kind: "DROP_IN",
+    priceCents: 4900,
+  });
+  const review = await bookingPassOptions(f.actor(), {
+    token,
+    purchaseKind: "DROP_IN",
+  });
+  expect(review.selected).toEqual(options.dropIn);
+  expect(review.checkoutAvailable).toBe(false);
+  expect(await db.bookingHold.count({ where: { shopId: f.shopId } })).toBe(0);
+  expect(await db.booking.count({ where: { shopId: f.shopId } })).toBe(0);
+});
+test("Drop-in hides unsynchronized or inactive mappings and revalidates the class price", async () => {
+  const f = await fixture();
+  const mapping = await selectableDropIn(f);
+  const { token } = await f.start();
+  for (const data of [
+    { syncStatus: "PENDING" },
+    { productStatus: "ARCHIVED" },
+    { variantGid: null },
+    { publishedPrice: "1.00" },
+    { shopifyVersion: 0 },
+  ]) {
+    await db.productMapping.update({ where: { id: mapping.id }, data });
+    expect((await bookingPassOptions(f.actor(), { token })).dropIn).toBeNull();
+    await expect(
+      bookingPassOptions(f.actor(), { token, purchaseKind: "DROP_IN" }),
+    ).rejects.toMatchObject({ code: "DROP_IN_UNAVAILABLE" });
+    await db.productMapping.update({
+      where: { id: mapping.id },
+      data: {
+        syncStatus: "SYNCED",
+        productStatus: "ACTIVE",
+        variantGid: mapping.variantGid,
+        publishedPrice: "49.00",
+        shopifyVersion: 1,
+      },
+    });
+  }
+  await db.service.update({
+    where: { id: f.session.serviceId },
+    data: { version: 2, requestedPriceCents: 5100 },
+  });
+  expect((await bookingPassOptions(f.actor(), { token })).dropIn).toBeNull();
+  await db.productMapping.update({
+    where: { id: mapping.id },
+    data: { shopifyVersion: 2, requestedVersion: 2, publishedPrice: "51.00" },
+  });
+  expect(
+    (await bookingPassOptions(f.actor(), { token, purchaseKind: "DROP_IN" }))
+      .selected?.priceCents,
+  ).toBe(5100);
+});
+test("Drop-in rejects browser prices, foreign service selection and ambiguous purchase types", async () => {
+  const f = await fixture(),
+    other = await fixture();
+  await selectableDropIn(f);
+  const { token } = await f.start();
+  for (const extra of [
+    { passPlanId: f.pass.id },
+    { serviceId: other.session.serviceId },
+    { variantId: "456" },
+    { priceCents: 1 },
+  ]) {
+    await expect(
+      bookingPassOptions(f.actor(), {
+        token,
+        purchaseKind: "DROP_IN",
+        ...extra,
+      }),
+    ).rejects.toThrow();
+  }
+  await expect(
+    bookingPassOptions(f.actor(), { token, purchaseKind: "NEW_PASS" }),
+  ).rejects.toThrow();
+  await expect(
+    bookingPassOptions(f.actor(null), { token, purchaseKind: "DROP_IN" }),
+  ).rejects.toMatchObject({ code: "LOGIN_REQUIRED" });
+  await expect(
+    bookingPassOptions(other.actor(), { token, purchaseKind: "DROP_IN" }),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
+});

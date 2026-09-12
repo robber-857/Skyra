@@ -49,11 +49,16 @@ const server = http.createServer((req, res) => {
           if (delay) await new Promise(resolve => setTimeout(resolve, delay));
           await route.fulfill({ status: authError ? 503 : 200, json: authError ? { error: "We could not verify your sign-in status. Please try again." } : snapshot() });
         });
-        let passPrice = 22000, passError = null;
+        let passPrice = 22000, passError = null, dropInEnabled = false, dropPrice = 4900;
         await context.route("**/apps/skyra-booking/pass-options", route => {
           if (passError) return route.fulfill({status:passError.status, json:{code:passError.code,error:passError.message}});
           const pass = {id:"test-pass",name:"5 Aerial Classes",credits:5,validityDays:90,priceCents:passPrice,currency:"AUD"};
-          return route.fulfill({json:{passes:[pass],selected:route.request().postDataJSON().passPlanId ? pass : null,checkoutAvailable:false}});
+          // Intentionally reuse an ID across kinds: UI selection must include the purchase kind.
+          const dropIn = dropInEnabled ? {id:"test-pass",kind:"DROP_IN",name:"Single class (Drop-in)",priceCents:dropPrice,currency:"AUD"} : null;
+          const input = route.request().postDataJSON();
+          if(input.purchaseKind === "DROP_IN" && !dropIn) return route.fulfill({status:409,json:{code:"DROP_IN_UNAVAILABLE",error:"Single-class booking is not available right now. Choose another option."}});
+          if(input.purchaseKind === "DROP_IN") assert.equal(input.passPlanId,undefined);
+          return route.fulfill({json:{passes:[pass],dropIn,selected:input.purchaseKind === "DROP_IN" ? dropIn : input.passPlanId ? pass : null,checkoutAvailable:false}});
         });
         const url = base + (surface === "home" ? "/" : "/pages/programs");
         const key = "skyra-booking:" + surface + ":selection";
@@ -196,9 +201,29 @@ const server = http.createServer((req, res) => {
         attemptEnded = false;
         await page.getByRole("button",{name:"Choose a class",exact:true}).click();
         await book.waitFor();
+        // Single-class purchase is separate from a credit Pass, including Review and repricing.
+        passError = null; dropInEnabled = true;
+        await book.click();
+        const single = page.getByRole("radio",{name:/Single class/});
+        await single.check();
+        dropPrice = 5100;
+        await page.locator("[data-pass-continue]").click();
+        await page.getByText("Class price",{exact:true}).waitFor();
+        await page.getByText("$51.00",{exact:true}).waitFor();
+        await page.getByText("One booking · This class only",{exact:true}).waitFor();
+        assert.equal(await page.getByRole("button",{name:"Continue to Shopify Checkout"}).isDisabled(),true);
+        await page.screenshot({path:path.join(output,`${surface}-${width}-dropin.png`),fullPage:true});
+        await page.getByRole("button",{name:"Edit selection",exact:true}).click();
+        assert.equal(await single.isChecked(),true);
+        dropInEnabled = false;
+        await page.locator("[data-pass-continue]").click();
+        await page.getByRole("button",{name:"Choose another option",exact:true}).click();
+        await page.getByRole("radio").waitFor();
+        assert.equal(await page.locator("[data-pass-continue]").isDisabled(),true);
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
         assert(calls >= 6);
         assert.deepEqual(errors, []);
-        results.push({ surface, width, overflow: false, dialog: true, keyboard: true, cancellation: true, retry: true, returnRecovery: true, weekBoundaries:true, recoveryRetry:true, expiredAttempt:true, passChanged:true, passReauth:true });
+        results.push({ surface, width, overflow: false, dialog: true, keyboard: true, cancellation: true, retry: true, returnRecovery: true, weekBoundaries:true, recoveryRetry:true, expiredAttempt:true, passChanged:true, passReauth:true, dropIn:true });
         await context.close();
       }
     }

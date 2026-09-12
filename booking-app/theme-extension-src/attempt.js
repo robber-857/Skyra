@@ -118,7 +118,7 @@ window.SkyraBookingRecovery = function ({host, error, retry, restart, signIn}) {
     button.addEventListener("click", callback);
     return button;
   }
-  host.replaceChildren(title, message, action(login ? "Sign in again" : terminal ? "Choose a class" : code === "PASS_UNAVAILABLE" ? "Choose another Pass" : "Try again", login || (terminal ? restart : retry)));
+  host.replaceChildren(title, message, action(login ? "Sign in again" : terminal ? "Choose a class" : code === "PASS_UNAVAILABLE" ? "Choose another Pass" : code === "DROP_IN_UNAVAILABLE" ? "Choose another option" : "Try again", login || (terminal ? restart : retry)));
   if (!terminal) host.append(action("Return to schedule", restart));
   title.focus({preventScroll:true});
 };

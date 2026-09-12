@@ -152,11 +152,11 @@ Home and Programs use the same component, state machine and API client. `data-su
 
 Shopify references: [Customer sign-in links and redirects](https://shopify.dev/docs/storefronts/themes/sign-in), [App Proxy authentication](https://shopify.dev/docs/apps/build/online-store/app-proxies/authenticate-app-proxies).
 
-### Delivered selection / Review slice (2026-09-11)
+### Delivered selection / Review slice (2026-09-12)
 
-Home and Programs use the same responsive Programs-style component and a 31-day in-section Full Calendar. `POST /apps/skyra-booking/pass-options` requires the verified, bound Shopify customer and opaque Attempt. It validates current session availability and returns eligible active, synchronized non-Intro new Passes with matching price/version and adequate validity. An optional `passPlanId` revalidates the selection for Review; arbitrary client fields/prices are rejected.
+Home and Programs use the same responsive Programs-style component and a 31-day in-section Full Calendar. `POST /apps/skyra-booking/pass-options` requires the verified, bound Shopify customer and opaque Attempt. It validates current session availability and returns eligible active, synchronized non-Intro new Passes with matching price/version and adequate validity. An optional `passPlanId` revalidates a new Pass for Review. `purchaseKind=DROP_IN` selects the synchronized product of the attempt's Service, without accepting a client Service/Variant/price. A Drop-in cannot also submit passPlanId; arbitrary client fields/prices are rejected.
 
-The new-Pass cards and Review summary are implemented for desktop and mobile. Checkout is explicitly unavailable: selection/review create no Hold, Cart, payment or booking. Owned Passes, Intro history, Drop-in, customer identity summary, final Shopify channel availability and checkout recovery remain pending. This is a partial implementation of the full target contract below.
+The new-Pass cards and Review summary are implemented for desktop and mobile. Checkout is explicitly unavailable: selection/review create no Hold, Cart, payment or booking. Drop-in cards and Review are now implemented. Owned Passes, Intro history, customer identity summary, final Shopify channel availability and checkout recovery remain pending. The internal Hold currently requires a PassPlan and still needs a Drop-in model before exposing checkout. This is a partial implementation of the full target contract below.
 
 ## 3. PASS_SELECTION state inside the Booking section
 

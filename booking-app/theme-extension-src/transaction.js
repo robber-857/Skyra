@@ -26,6 +26,19 @@ window.SkyraBookingTransaction = function ({
       style: "currency",
       currency: pass.currency,
     }).format(pass.priceCents / 100);
+  const kind = (option) => option.kind || "NEW_PASS";
+  const key = (option) => kind(option) + ":" + option.id;
+  const options = (data) => [
+    ...(data.dropIn ? [data.dropIn] : []),
+    ...data.passes,
+  ];
+  const terms = (option) =>
+    kind(option) === "DROP_IN"
+      ? "One booking · This class only"
+      : option.credits +
+        " classes · Valid for " +
+        option.validityDays +
+        " days";
   const format = (value, options) =>
     new Intl.DateTimeFormat("en-AU", { timeZone: timezone, ...options }).format(
       new Date(value),
@@ -89,10 +102,19 @@ window.SkyraBookingTransaction = function ({
   }
   function errorView(error, retry) {
     const main = frame("Choose a Pass");
-    window.SkyraBookingRecovery({host:main, error, retry, restart:()=>{revision++;restart();}, signIn});
+    window.SkyraBookingRecovery({
+      host: main,
+      error,
+      retry,
+      restart: () => {
+        revision++;
+        restart();
+      },
+      signIn,
+    });
   }
 
-  async function request(passPlanId) {
+  async function request(option) {
     const response = await fetch(
       (root.dataset.proxyBase || "/apps/skyra-booking") + "/pass-options",
       {
@@ -107,14 +129,20 @@ window.SkyraBookingTransaction = function ({
         },
         body: JSON.stringify({
           token: attempt.token(),
-          ...(passPlanId ? { passPlanId } : {}),
+          ...(option
+            ? kind(option) === "DROP_IN"
+              ? { purchaseKind: "DROP_IN" }
+              : { purchaseKind: "NEW_PASS", passPlanId: option.id }
+            : {}),
         }),
         signal: AbortSignal.timeout(10000),
       },
     );
     const data = await response.json();
     if (!response.ok) {
-      const error = new Error(data.error || "We could not load Passes. Please try again.");
+      const error = new Error(
+        data.error || "We could not load Passes. Please try again.",
+      );
       error.code = data.code;
       error.status = response.status;
       error.bookingError = true;
@@ -130,43 +158,39 @@ window.SkyraBookingTransaction = function ({
       el(
         "p",
         "skyra-booking__notice",
-        "Choose a class Pass for this booking. Your place is not reserved yet.",
+        "Choose a single class or a Pass for this booking. Your place is not reserved yet.",
       ),
     );
-    if (!payload.passes.length) {
+    if (!options(payload).length) {
       main.append(
         el(
           "p",
           "skyra-booking__message",
-          "No eligible Passes are available for this class. Please contact Skyra Studio.",
+          "No booking options are available for this class. Please contact Skyra Studio.",
         ),
       );
       return;
     }
     const group = el("fieldset", "skyra-booking__passes");
-    group.append(el("legend", "skyra-booking__live", "Available class Passes"));
-    payload.passes.forEach((pass) => {
+    group.append(
+      el("legend", "skyra-booking__live", "Available booking options"),
+    );
+    options(payload).forEach((pass) => {
       const label = el("label", "skyra-booking__pass"),
         input = el("input");
       input.type = "radio";
       input.name = root.id + "-pass";
-      input.value = pass.id;
-      input.checked = pass.id === selectedId;
+      input.value = key(pass);
+      input.dataset.purchaseKind = kind(pass);
+      input.checked = key(pass) === selectedId;
       const content = el("span", "skyra-booking__pass-copy"),
         top = el("span", "skyra-booking__pass-top");
       top.append(el("strong", "", pass.name), el("span", "", money(pass)));
-      content.append(
-        top,
-        el(
-          "span",
-          "skyra-booking__pass-meta",
-          pass.credits + " classes · Valid for " + pass.validityDays + " days",
-        ),
-      );
+      content.append(top, el("span", "skyra-booking__pass-meta", terms(pass)));
       label.append(input, content);
       group.append(label);
       input.addEventListener("change", () => {
-        selectedId = pass.id;
+        selectedId = key(pass);
         next.disabled = false;
       });
     });
@@ -184,7 +208,7 @@ window.SkyraBookingTransaction = function ({
       const data = await request();
       if (version !== revision || !root.contains(host)) return;
       payload = data;
-      if (!data.passes.some((p) => p.id === selectedId)) selectedId = null;
+      if (!options(data).some((p) => key(p) === selectedId)) selectedId = null;
       choices();
     } catch (error) {
       if (version === revision && root.contains(host)) errorView(error, load);
@@ -199,33 +223,46 @@ window.SkyraBookingTransaction = function ({
       next.textContent = "Checking availability…";
     }
     try {
-      const data = await request(selectedId);
+      const option = options(payload).find((p) => key(p) === selectedId);
+      if (!option) return load();
+      const data = await request(option);
       if (version !== revision || !root.contains(host)) return;
       payload = data;
       const pass = data.selected;
-      if (!pass || pass.id !== selectedId)
-        throw new Error("This Pass has changed. Please choose again.");
+      if (!pass || key(pass) !== selectedId)
+        throw new Error(
+          "This booking option has changed. Please choose again.",
+        );
       const main = frame("Review your booking");
       const summary = el("div", "skyra-booking__review");
       summary.append(
         el("h4", "", "Summary"),
         el("p", "", session.service.name),
-        el("p", "", "New Pass: " + pass.name),
         el(
           "p",
-          "skyra-booking__pass-meta",
-          pass.credits + " classes · Valid for " + pass.validityDays + " days",
+          "",
+          (kind(pass) === "DROP_IN" ? "Single class: " : "New Pass: ") +
+            pass.name,
         ),
+        el("p", "skyra-booking__pass-meta", terms(pass)),
       );
       const total = el("div", "skyra-booking__review-total");
       total.append(
-        el("strong", "", "Pass price"),
+        el(
+          "strong",
+          "",
+          kind(pass) === "DROP_IN" ? "Class price" : "Pass price",
+        ),
         el("strong", "", money(pass)),
       );
       summary.append(total);
       main.append(
         summary,
-        button("Edit Pass", "skyra-booking__back", choices),
+        button(
+          kind(pass) === "DROP_IN" ? "Edit selection" : "Edit Pass",
+          "skyra-booking__back",
+          choices,
+        ),
         el(
           "p",
           "skyra-booking__notice",

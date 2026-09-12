@@ -8,7 +8,7 @@
 
 ## 当前开发进度
 
-已创建并绑定 **Skyra Booking** App；工程和第一轮 Admin Catalog/Schedule 代码位于 [booking-app](../../booking-app/README.md)。实际验证、待确认规则和未完成项见 [开发状态](./development-status.md)。2026-09-10 已完成 Class Booking 基础：服务器 Attempt、真实容量、15 分钟 Hold、幂等/过期和防超售数据库锁。尚未完成 Pass/Review、权益账本、付款与确认闭环，也未部署正式主题。
+已创建并绑定 **Skyra Booking** App；工程和第一轮 Admin Catalog/Schedule 代码位于 [booking-app](../../booking-app/README.md)。实际验证、待确认规则和未完成项见 [开发状态](./development-status.md)。2026-09-10 已完成 Class Booking 基础：服务器 Attempt、真实容量、15 分钟 Hold、幂等/过期和防超售数据库锁。2026-09-12 已完成新 Pass / Drop-in 选择与 Review、付款前 Recovery，并创建 Programs 开发店页面；权益账本、付款与确认闭环仍未完成，也未部署正式主题。
 
 ## 推荐阅读顺序
 
@@ -52,10 +52,14 @@
 - `shopify-theme/sections/skyra-home.liquid` 和 `shopify-theme/sections/skyra-programs.liquid` 已替换为共享挂载节点；根目录静态 HTML 原型不作为后端实现依据。
 
 
-## 当前测试入口（2026-09-11）
+## 当前测试入口（2026-09-12）
 
 参见 [开发预览与测试指南](preview-testing.md)：Home/Booking Admin 入口、当前可测试范围、启动命令及 Shopify 商品和支付分工。先体验当前阶段，再继续未完成交易功能。
 
-当前交付包含共享 Programs 样式、Full Calendar、新 Pass 选择和 Review；支付及已有 Pass 确认未开放。详见 [开发状态](development-status.md)。
+当前交付包含共享 Programs 样式、Full Calendar、新 Pass / Drop-in 选择和 Review；支付及已有 Pass 确认未开放。详见 [开发状态](development-status.md)。
 
-- 2026-09-11 续开发：共享月份/翻周、付款前失效恢复与预览健康检查已实现；9292 本轮连续检查正常，502 根因未确认。Programs Page 内容授权超时，真实入口仍待创建。入口及重启命令见 [开发预览与测试](preview-testing.md)，完整剩余任务见 [当前进度](development-status.md)。
+- 2026-09-11 续开发：共享月份/翻周、付款前失效恢复与预览健康检查已实现；2026-09-12 已捕获 Node IPv4 超时/IPv6 无路由并加入开发进程兼容设置，Programs Page 已创建。当前网络慢，最终真实页面验收暂缓。入口及重启命令见 [开发预览与测试](preview-testing.md)，完整剩余任务见 [当前进度](development-status.md)。
+
+## 新会话交接
+
+先读 [2026-09-12 开发交接](handoff-2026-09-12.md)，再按 [当前进度](development-status.md) 与 [开发任务](implementation-backlog.md) 继续。交接明确区分本地测试、真实 Shopify 验收与尚未实现的支付/权益流程。

@@ -1,5 +1,10 @@
 import { createHash, randomBytes } from "node:crypto";
-import { Prisma, type BookingAttempt, type Shop } from "@prisma/client";
+import {
+  Prisma,
+  type BookingAttempt,
+  type Shop,
+  type ProductMapping,
+} from "@prisma/client";
 import { DateTime } from "luxon";
 import { z } from "zod";
 import db from "../db.server";
@@ -544,8 +549,34 @@ export const passOptionsInput = z
   .object({
     token: tokenSchema,
     passPlanId: z.string().uuid().optional(),
+    purchaseKind: z.enum(["NEW_PASS", "DROP_IN"]).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (input) => input.purchaseKind !== "DROP_IN" || !input.passPlanId,
+    "A drop-in cannot select a Pass",
+  )
+  .refine(
+    (input) => input.purchaseKind !== "NEW_PASS" || Boolean(input.passPlanId),
+    "Select a Pass for review",
+  );
+
+function purchaseMappingReady(
+  mapping: ProductMapping | null | undefined,
+  owner: { version: number; requestedPriceCents: number },
+) {
+  return Boolean(
+    mapping?.variantGid &&
+    mapping.productGid &&
+    mapping.syncStatus === "SYNCED" &&
+    mapping.productStatus === "ACTIVE" &&
+    mapping.shopifyVersion === owner.version &&
+    mapping.requestedVersion === owner.version &&
+    /^\d+(\.\d{1,2})?$/.test(mapping.publishedPrice || "") &&
+    Math.round(Number(mapping.publishedPrice) * 100) ===
+      owner.requestedPriceCents,
+  );
+}
 export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
   const input = passOptionsInput.parse(raw);
   return withAttempt(actor, input.token, async (tx, attempt, shop, now) => {
@@ -581,13 +612,7 @@ export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
     const passes = plans.flatMap((plan) => {
       const mapping = mappings.find((m) => m.ownerId === plan.id);
       if (
-        !mapping?.variantGid ||
-        !mapping.productGid ||
-        mapping.shopifyVersion !== plan.version ||
-        mapping.requestedVersion !== plan.version ||
-        !/^\d+(\.\d{1,2})?$/.test(mapping.publishedPrice || "") ||
-        Math.round(Number(mapping.publishedPrice) * 100) !==
-          plan.requestedPriceCents ||
+        !purchaseMappingReady(mapping, plan) ||
         DateTime.fromJSDate(now, { zone: session.timezone })
           .plus({ days: plan.validityDays })
           .toJSDate() < session.startsAt
@@ -605,9 +630,36 @@ export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
         },
       ];
     });
-    const selected = input.passPlanId
-      ? passes.find((p) => p.id === input.passPlanId)
+    // The dated Session supplies the Service. Never accept a client Service or Variant ID.
+    const serviceMapping = await tx.productMapping.findUnique({
+      where: {
+        shopId_ownerType_ownerId: {
+          shopId: shop.id,
+          ownerType: "SERVICE",
+          ownerId: session.serviceId,
+        },
+      },
+    });
+    const dropIn = purchaseMappingReady(serviceMapping, session.service)
+      ? {
+          id: session.serviceId,
+          kind: "DROP_IN" as const,
+          name: "Single class (Drop-in)",
+          priceCents: session.service.requestedPriceCents,
+          currency: "AUD",
+        }
       : null;
+    const selected =
+      input.purchaseKind === "DROP_IN"
+        ? dropIn
+        : input.passPlanId
+          ? passes.find((p) => p.id === input.passPlanId)
+          : null;
+    if (input.purchaseKind === "DROP_IN" && !dropIn)
+      fail(
+        "DROP_IN_UNAVAILABLE",
+        "Single-class booking is not available right now. Choose another option.",
+      );
     if (input.passPlanId && !selected)
       fail(
         "PASS_UNAVAILABLE",
@@ -617,6 +669,7 @@ export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
       attemptExpiresAt: attempt.expiresAt.toISOString(),
       spotsRemaining: spots,
       passes,
+      dropIn,
       selected,
       checkoutAvailable: false,
       ownedPassesAvailable: false,
