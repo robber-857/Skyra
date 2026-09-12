@@ -183,17 +183,19 @@ erDiagram
 
 Appointment 在客户成功 Hold 时创建临时 Session，或在确认后持久化；Class/Course Session 由 Series 提前生成。
 
-### 2026-09-10 已落库的 Class Booking 基础
+### 2026-09-12 已落库的 Class Booking 与 Entitlement 基础
 
-当前 Prisma 新增 `CustomerProfile`、`BookingAttempt`、`BookingHold`、`Booking`。下面各表描述仍包含目标模型；不要把目标字段当成已实现。
+当前 Prisma 已包含 `CustomerProfile`、`BookingAttempt`、`BookingHold`、`Booking`、`Entitlement` 与 `EntitlementLedgerEntry`。下面各表描述仍包含后续订单、完整 Booking 状态与 Customer/Coach 功能的目标字段；不要把这些后续字段当成已实现。
 
 - CustomerProfile：仅保存 shop + Shopify Customer GID 映射，不保存密码。`(shopId, shopifyCustomerGid)` 唯一。
 - BookingAttempt：`tokenHash` 唯一、Session、可空 Customer、HOME/PROGRAMS、状态、创建/更新/到期；默认 30 分钟。客户绑定后不可修改，shop/session/surface/tokenHash 同样不可换绑。当前状态为 LOGIN_REQUIRED / STARTED / HOLD_ACTIVE / RECOVERY / EXPIRED。
-- BookingHold：每个 Attempt 最多一条，包含 Customer/Session/PassPlan、idempotencyKey、15 分钟期限、ACTIVE/CONSUMED/EXPIRED/RELEASED。每店每客户 idempotencyKey 唯一；ACTIVE 的同客户同场次唯一。复合外键保证 Hold 与 Attempt 的店铺/课程/客户完全一致。
+- BookingHold：每个 Attempt 最多一条，包含 Customer/Session、purchaseKind、可空 PassPlan、idempotencyKey、15 分钟期限、ACTIVE/CONSUMED/EXPIRED/RELEASED。NEW_PASS 必须指向 PassPlan；DROP_IN 不接受 PassPlan，购买商品从 Session 对应 Service 推导。每店每客户 idempotencyKey 唯一；ACTIVE 的同客户同场次唯一。复合外键保证 Hold 与 Attempt 的店铺/课程/客户完全一致。
 - Booking：本轮仅实现 shop/customer/session/status/createdAt 容量投影；尚未连接订单、权益和确认接口。CONFIRMED 的同客户同场次唯一。
+- Entitlement：绑定 shop/customer/PassPlan/ProductMapping 与唯一 Shopify Order + Line Item 来源，记录使用窗口、初始次数和 ACTIVE/EXPIRED/REVOKED 状态；来源、归属、期限与初始次数不可改写。
+- EntitlementLedgerEntry：只追加、不更新/删除。每条同时记录 available/reserved/consumed delta：GRANT 增加 available；RESERVE 从 available 移到 reserved；CONSUME 从 reserved 移到 consumed；RELEASE 从 reserved 退回 available；ADJUST、EXPIRE、REVOKE 保留原因和幂等键。数据库锁行并阻止任一余额为负。
 - SQL 触发器统一锁定 ClassSession 行，检查 Hold + confirmed Booking 总数和同客户占用；阻止直接 SQL 超卖及把 capacity 下调到已占数量以下。
 - 过期 Hold 无须等待 Worker 就从 availability 排除；Worker/创建 Hold/恢复 Attempt 时可把它标为 EXPIRED。创建/绑定/释放/到期使用既有不可变 AuditLog；目标 `booking_events` 独立表仍待后续阶段。
-- 新迁移：`booking-app/prisma/migrations/202609100001_booking_foundation/migration.sql`，已应用到本地开发库和专用测试库。
+- 新迁移：`202609120002_entitlement_ledger_drop_in_hold` 与 `202609120003_entitlement_hold_immutability`，已应用到专用测试库和 `127.0.0.1:55432/skyra_booking` 本地开发库。
 
 ### `booking_attempts`
 
@@ -337,7 +339,7 @@ Booking 当前状态是投影，事件记录用于追溯谁在何时执行了改
 - EXPIRE：到期结转为不可用。
 - REVOKE：退款或 chargeback 撤销。
 
-余额计算：`GRANT + RELEASE + ADJUST - RESERVE - CONSUME - REVOKE - EXPIRE`，实现时需避免同一预留既算 RESERVE 又算 CONSUME 两次，可用 entry pair 或 materialized balance 投影。
+实现使用三个正交投影：`available = Σ available_delta`、`reserved = Σ reserved_delta`、`consumed = Σ consumed_delta`。RESERVE 写 `(-1,+1,0)`，CONSUME 写 `(0,-1,+1)`，RELEASE 写 `(+1,-1,0)`，因此同一预留从 reserved 转为 consumed 时不会再次减少 available。
 
 ### `webhook_receipts`
 

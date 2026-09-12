@@ -2,7 +2,7 @@
 
 更新：2026-09-12。此页记录实际代码、开发店联调与验证证据；完整范围仍以 `implementation-backlog.md` 为准。
 
-最新状态：Programs Page 已创建，Drop-in 选择/Review 已实现，64 项测试通过。当前网络慢，最终页面稳定性/真实顾客登录验收和本轮 GitHub 推送暂缓；详见文末 2026-09-12 记录。
+最新状态：Programs Page 与 Drop-in 选择/Review 已实现；Entitlement 追加式台账、有效 Pass 内部选择和 Drop-in Hold 数据约束已完成，71 项测试通过。公开 Checkout、Booking 确认和真实顾客登录验收仍未完成；详见文末 2026-09-12 记录。
 
 ## 已创建与已绑定
 
@@ -110,10 +110,9 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 
 1. 网络恢复后验收 Home / Programs 的真实桌面、手机和 Shopify 登录/退出/返回；Programs Page 已创建，不再重复创建。最终网络稳定性仍待验证。
 2. 推送本轮本地提交至 bookingdev 并核对远程 SHA / CI；之前 743e242 的 CI 通过不代表本轮 CI 已运行。
-3. M3-09 / M3-10：权益台账、已有 Pass 余额/有效期/服务匹配和 Intro 资格；补 Drop-in Hold 模型，现有 PassPlan 外键不能直接支持单次课。
-4. M4 + M5-10：最终商品渠道可售验证、Review 后创建 Hold 与 Shopify Cart / Checkout。
-5. orders/paid 幂等处理、权益生成、Booking 确认和过期付款恢复；M5-09 已有 Pass 原子确认，不走 A$0 Checkout。
-6. Confirmation、付款后 Recovery / Needs Attention；完整链路验收后再开启 onlineBookingsEnabled。
+3. M4 + M5-10：最终商品渠道可售验证、Review 后公开创建 Hold 与 Shopify Cart / Checkout。
+4. orders/paid 幂等处理、权益生成、Booking 确认和过期付款恢复；M5-09 已有 Pass 原子确认，不走 A$0 Checkout。
+5. Confirmation、付款后 Recovery / Needs Attention；完整链路验收后再开启 onlineBookingsEnabled。
 
 详细交接、证据和启动命令见 [2026-09-12 交接文档](handoff-2026-09-12.md)。
 
@@ -166,7 +165,7 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 - Shopify 内容 OAuth 已成功，使用官方 CLI 创建 Page `167140557092`，handle/templateSuffix 均为 `programs`；页面 HTTP 200 且包含共享组件 mount。9 月 11 日记录的 404/授权超时为历史问题，当前已解除；Booking App 正式 scopes 未扩大。
 - `/pass-options` 新增 `purchaseKind=DROP_IN` 与 `dropIn` 选项。Service 从 attempt 的 Session 推导，拒绝客户端 Service/Variant/price 字段及 Drop-in 与 passPlanId 混用。只显示 ACTIVE/SYNCED 且价格与版本一致的课程商品。
 - UI 将单次课与新 Pass 放在同一选择区，选择键包含 kind 和 id；Review 分别展示单次课说明或次数/有效期，并重新校验服务端价格和可用性。Drop-in 商品变更提供重新选择出口。
-- 仍不创建 Hold/Cart/订单。当前内部 Hold 外键仍为 PassPlan；Drop-in Hold、最终渠道可售验证、支付与权益闭环还未接入。
+- 公开流程仍不创建 Hold/Cart/订单。内部 Hold 随后已支持 Drop-in；最终渠道可售验证、支付与 Booking 确认闭环仍未接入。
 - Docker / PostgreSQL / Redis 曾停止，现已恢复。App CLI 曾因 Shopify 开发 GraphQL 连接失败退出，清理了本项目残留 worker 后重启。
 - 复现并捕获 `AggregateError ETIMEDOUT`：IPv4 250ms 超时后 IPv6 `ENETUNREACH`。2 秒窗口仍出现失败；IPv4 优先且禁用地址竞速的 10 次独立连接通过。已将官方 Node 兼容参数放入本项目开发脚本和诊断脚本，不修改系统网络/TLS；上游 503 及网络拥塞仍可能影响预览。
 - 验证：64 项测试通过（增加 3 个 Drop-in 数据库用例），类型/lint/构建通过；官方 8 文件扩展校验通过，公共 schema 刷新失败时使用官方缓存。11 项浏览器 fixture 场景覆盖双 surface 的 Drop-in repricing/Edit/unavailable 和原有恢复流程。
@@ -176,3 +175,12 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 ## 交接完成（2026-09-12）
 
 已整理 [新会话交接文档](handoff-2026-09-12.md)，包含实际完成项、未完成交易链路、测试证据、服务/主题入口、下一步顺序及 Git 保护项。最后启动日志确认 App / Worker 就绪且无待执行迁移。此为启动状态，不代表最终 Shopify 登录或网络稳定性验收；本轮本地提交后暂缓推送。
+
+## 最新交付：Entitlement 台账与 Drop-in Hold 基础（2026-09-12）
+
+- 新增 Entitlement 与不可变 Ledger，使用 available/reserved/consumed 三个 delta 显式完成 grant → reserve → consume/release，支持带原因的 adjust、expire/revoke；Shopify Order + Line Item 来源和每个操作键均幂等。
+- 数据库在写 Ledger 时锁定 Entitlement 并拒绝负余额；Ledger UPDATE/DELETE、同一 reservation 重复 reserve 或重复 terminal settlement 均被数据库约束拒绝。内部有效 Pass 查询按店铺/客户/Service/有效期/余额过滤并按最早到期排序。
+- Intro 采用保守首次客户规则：已有非待处理权益或非取消 Booking 即不再符合；当前规则已接新 Pass options 与内部 Hold。若业务要细分退款/取消/Drop-in 历史，需在开放交易前确认。
+- BookingHold 现在用 purchaseKind 区分 NEW_PASS 与 DROP_IN；Drop-in 不保存客户端 Service/Variant/价格，仍从 Attempt 的 Session → Service 映射验证。原 15 分钟、Session → Attempt 锁顺序、幂等和防超售保持不变。
+- `npm.cmd run test:db` 为 71/71，通过权益最后 1 次的 10 路并发、Ledger 不可变/非负、资格/到期排序、Intro、Drop-in Hold 幂等与非法目标；`npm.cmd run check` 的类型、lint、生产构建通过。
+- 这些仍是内部后端基础：没有公开 Hold endpoint、Cart/Checkout、orders/paid、Booking 确认、已有 Pass UI/确认或付款后 Recovery；`onlineBookingsEnabled=false`、`checkoutAvailable=false`、`ownedPassesAvailable=false` 保持不变。

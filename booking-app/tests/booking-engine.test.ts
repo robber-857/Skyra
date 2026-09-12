@@ -88,9 +88,13 @@ async function fixture(capacity = 4) {
       shopId,
       ownerType: "PASS_PLAN",
       ownerId: pass.id,
+      productGid: "gid://shopify/Product/123",
       variantGid: "gid://shopify/ProductVariant/123",
       syncStatus: "SYNCED",
       productStatus: "ACTIVE",
+      requestedVersion: 1,
+      shopifyVersion: 1,
+      publishedPrice: "220.00",
     },
   });
   const actor = (id: number | null = 1): BookingActor => ({
@@ -457,7 +461,7 @@ test("database foreign keys prohibit a hold with a different attempt customer or
   expect(a.token).toHaveLength(43);
 });
 
-test("a Pass that expires before class and an unchecked intro Pass cannot hold seats", async () => {
+test("a Pass must cover the class date and Intro is limited to first-time customers", async () => {
   const f = await fixture(),
     a = await f.start();
   await db.passPlan.update({
@@ -471,8 +475,22 @@ test("a Pass that expires before class and an unchecked intro Pass cannot hold s
     where: { id: f.pass.id },
     data: { validityDays: 90, introOnly: true },
   });
-  await expect(f.hold(a.token)).rejects.toMatchObject({
-    code: "INTRO_NOT_READY",
+  const firstHold = await f.hold(a.token);
+  expect(firstHold.purchaseKind).toBe("NEW_PASS");
+  await releaseSeatHold(f.actor(), a.token);
+  const profile = await db.customerProfile.findFirstOrThrow({
+    where: { shopId: f.shopId },
+  });
+  await db.booking.create({
+    data: {
+      shopId: f.shopId,
+      sessionId: f.session.id,
+      customerId: profile.id,
+    },
+  });
+  const returning = await f.start();
+  await expect(f.hold(returning.token)).rejects.toMatchObject({
+    code: "INTRO_INELIGIBLE",
   });
 });
 
@@ -543,12 +561,20 @@ test("Review rejects expired attempts and closed or full classes", async () => {
     bookingPassOptions(f.actor(), { token: a.token }),
   ).rejects.toMatchObject({ code: "ATTEMPT_EXPIRED" });
 });
-test("Only eligible active synchronized non-intro Passes are shown", async () => {
+test("Only eligible active synchronized Passes are shown and Intro requires a first-time customer", async () => {
   const f = await fixture();
   await selectablePass(f);
   const { token } = await f.start();
+  await db.passPlan.update({
+    where: { id: f.pass.id },
+    data: { introOnly: true },
+  });
+  expect((await bookingPassOptions(f.actor(), { token })).passes).toHaveLength(1);
+  await db.passPlan.update({
+    where: { id: f.pass.id },
+    data: { introOnly: false },
+  });
   for (const change of [
-    { introOnly: true },
     { status: "DRAFT" },
     { validityDays: 1 },
   ]) {
@@ -559,6 +585,25 @@ test("Only eligible active synchronized non-intro Passes are shown", async () =>
       data: { introOnly: false, status: "ACTIVE", validityDays: 90 },
     });
   }
+  const profile = await db.customerProfile.findFirstOrThrow({
+    where: { shopId: f.shopId },
+  });
+  await db.booking.create({
+    data: {
+      shopId: f.shopId,
+      sessionId: f.session.id,
+      customerId: profile.id,
+    },
+  });
+  await db.passPlan.update({
+    where: { id: f.pass.id },
+    data: { introOnly: true },
+  });
+  expect((await bookingPassOptions(f.actor(), { token })).passes).toEqual([]);
+  await db.passPlan.update({
+    where: { id: f.pass.id },
+    data: { introOnly: false },
+  });
   await db.passEligibility.deleteMany({ where: { passPlanId: f.pass.id } });
   expect((await bookingPassOptions(f.actor(), { token })).passes).toEqual([]);
 });
@@ -704,4 +749,97 @@ test("Drop-in rejects browser prices, foreign service selection and ambiguous pu
   await expect(
     bookingPassOptions(other.actor(), { token, purchaseKind: "DROP_IN" }),
   ).rejects.toMatchObject({ code: "NOT_FOUND" });
+});
+
+test("Drop-in holds derive the product from the attempted Session and remain idempotent", async () => {
+  const f = await fixture(1);
+  await selectableDropIn(f);
+  const { token } = await f.start();
+  const idempotencyKey = randomUUID();
+  const hold = await createSeatHold(f.actor(), {
+    token,
+    purchaseKind: "DROP_IN",
+    idempotencyKey,
+  });
+  const replay = await createSeatHold(f.actor(), {
+    token,
+    purchaseKind: "DROP_IN",
+    idempotencyKey,
+  });
+  expect(replay.id).toBe(hold.id);
+  expect(hold).toMatchObject({
+    purchaseKind: "DROP_IN",
+    passPlanId: null,
+  });
+  expect(
+    (await classAvailability(f.shopId, [f.session.id])).get(f.session.id),
+  ).toBe(0);
+  await expect(
+    createSeatHold(f.actor(), {
+      token,
+      purchaseKind: "NEW_PASS",
+      passPlanId: f.pass.id,
+      idempotencyKey: randomUUID(),
+    }),
+  ).rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT" });
+});
+
+test("Drop-in hold validation rejects unavailable mappings and invalid purchase targets", async () => {
+  const f = await fixture();
+  const mapping = await selectableDropIn(f);
+  const { token } = await f.start();
+  await db.productMapping.update({
+    where: { id: mapping.id },
+    data: { publishedPrice: "1.00" },
+  });
+  await expect(
+    createSeatHold(f.actor(), {
+      token,
+      purchaseKind: "DROP_IN",
+      idempotencyKey: randomUUID(),
+    }),
+  ).rejects.toMatchObject({ code: "DROP_IN_UNAVAILABLE" });
+  await expect(
+    createSeatHold(f.actor(), {
+      token,
+      purchaseKind: "DROP_IN",
+      passPlanId: f.pass.id,
+      idempotencyKey: randomUUID(),
+    }),
+  ).rejects.toThrow();
+  const attempt = await db.bookingAttempt.findFirstOrThrow({
+    where: { shopId: f.shopId },
+  });
+  const profile = await db.customerProfile.findFirstOrThrow({
+    where: { shopId: f.shopId },
+  });
+  await expect(
+    db.bookingHold.create({
+      data: {
+        shopId: f.shopId,
+        attemptId: attempt.id,
+        sessionId: f.session.id,
+        customerId: profile.id,
+        purchaseKind: "DROP_IN",
+        passPlanId: f.pass.id,
+        idempotencyKey: randomUUID(),
+        expiresAt: new Date(Date.now() + 60000),
+      },
+    }),
+  ).rejects.toThrow();
+  await db.productMapping.update({
+    where: { id: mapping.id },
+    data: { publishedPrice: "49.00" },
+  });
+  const hold = await createSeatHold(f.actor(), {
+    token,
+    purchaseKind: "DROP_IN",
+    idempotencyKey: randomUUID(),
+  });
+  await expect(
+    db.bookingHold.update({
+      where: { id: hold.id },
+      data: { purchaseKind: "NEW_PASS", passPlanId: f.pass.id },
+    }),
+  ).rejects.toThrow();
 });

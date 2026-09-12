@@ -10,6 +10,8 @@ try {
   }
   npx.cmd prisma migrate deploy
   if ($LASTEXITCODE -ne 0) { throw 'Test migration failed' }
+  npx.cmd prisma generate
+  if ($LASTEXITCODE -ne 0) { throw 'Prisma client generation failed' }
   npx.cmd vitest run
   if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
 } finally { $env:DATABASE_URL = $originalUrl }

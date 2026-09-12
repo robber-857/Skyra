@@ -156,7 +156,7 @@ Shopify references: [Customer sign-in links and redirects](https://shopify.dev/d
 
 Home and Programs use the same responsive Programs-style component and a 31-day in-section Full Calendar. `POST /apps/skyra-booking/pass-options` requires the verified, bound Shopify customer and opaque Attempt. It validates current session availability and returns eligible active, synchronized non-Intro new Passes with matching price/version and adequate validity. An optional `passPlanId` revalidates a new Pass for Review. `purchaseKind=DROP_IN` selects the synchronized product of the attempt's Service, without accepting a client Service/Variant/price. A Drop-in cannot also submit passPlanId; arbitrary client fields/prices are rejected.
 
-The new-Pass cards and Review summary are implemented for desktop and mobile. Checkout is explicitly unavailable: selection/review create no Hold, Cart, payment or booking. Drop-in cards and Review are now implemented. Owned Passes, Intro history, customer identity summary, final Shopify channel availability and checkout recovery remain pending. The internal Hold currently requires a PassPlan and still needs a Drop-in model before exposing checkout. This is a partial implementation of the full target contract below.
+The new-Pass cards and Review summary are implemented for desktop and mobile. Checkout is explicitly unavailable: selection/review create no Hold, Cart, payment or booking. Drop-in cards and Review are now implemented. The internal Hold supports both NEW_PASS and Session-derived DROP_IN with database target constraints, but remains unexposed. Entitlement ledger primitives, eligible-owned-Pass ordering and conservative Intro history are implemented internally; Owned Pass cards, customer identity summary, final Shopify channel availability, atomic confirmation and checkout recovery remain pending. This is a partial implementation of the full target contract below.
 
 ## 3. PASS_SELECTION state inside the Booking section
 
@@ -242,6 +242,8 @@ The authoritative balance is derived from an immutable `credit_ledger`:
 ```
 
 Do not use Shopify product inventory as remaining class credits. Inventory belongs to the merchant's product catalogue, whereas credits belong to one customer and require expiry, eligibility and transaction history.
+
+The implemented ledger keeps separate available, reserved and consumed deltas. `RESERVE (-1,+1,0)` moves one unit without consuming it; `CONSUME (0,-1,+1)` settles that reservation; `RELEASE (+1,-1,0)` returns it. Entitlement-row locking, non-negative database checks, immutable ledger rows and idempotency keys protect concurrent use. The internal selector returns only active, service-compatible, date-valid entitlements with available units, ordered by earliest expiry.
 
 ### Admin-created catalogue sync
 
@@ -492,11 +494,12 @@ POST /webhooks/products-update
 ```text
 UNIQUE(shop_id, shopify_customer_gid)
 UNIQUE(customer_id, session_id) where booking is active
-UNIQUE(source_order_gid, source_line_item_gid, allocation_index)
+UNIQUE(shop_id, source_order_gid, source_line_item_gid)
 UNIQUE(webhook_id)
-UNIQUE(idempotency_key) on credit_ledger
+UNIQUE(shop_id, idempotency_key) on entitlement_ledger
+UNIQUE(shop_id, entitlement_id, reservation_key) for RESERVE and terminal settlement
 UNIQUE(public_token_hash) on booking_attempts
-CHECK(credits_granted >= 0)
+CHECK(granted_units > 0)
 CHECK(expires_at > starts_at)
 ```
 

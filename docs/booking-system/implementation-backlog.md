@@ -169,14 +169,14 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 
 - [x] M3-01 实现公开 Class availability 查询：扣除 confirmed Booking 与未过期 ACTIVE Hold，no-store，并返回预约窗口状态；2026-09-10 PostgreSQL/HTTP 验证通过。
 - [ ] M3-02 实现 Appointment availability 查询。
-- [x] M3-03 实现 15 分钟 Booking Hold 内部服务：认证/归属、Pass 适用性/有效期和店铺开关校验；创建 Cart 与公开交易入口属于 M4，当前未开放。
+- [x] M3-03 实现 15 分钟 Booking Hold 内部服务：认证/归属、Pass 适用性/有效期、Drop-in Session 商品推导和店铺开关校验；创建 Cart 与公开交易入口属于 M4，当前未开放。
 - [x] M3-04 实现 Hold idempotency、释放与自动过期：重试不延长 TTL；过期立即不计入容量；Worker 每 30 秒清理，事件幂等。
 - [x] M3-05 实现 Class capacity 事务锁和数据库触发器：20 人抢最后一个名额、20 个直接数据库写入均仅 1 个成功；容量不得低于已占用数量。
 - [ ] M3-06 实现 Coach/Location/Resource 时间重叠约束。
 - [ ] M3-07 实现 Booking 状态机。当前只有容量投影表和 Attempt/Hold 状态，确认/取消/签到仍未实现。
 - [ ] M3-08 实现 Booking Event audit trail。Attempt 创建/绑定及 Hold 创建/释放/到期已有追加式审计；完整 Booking 事件未实现。
-- [ ] M3-09 实现 Entitlement grant/reserve/consume/release/adjust/revoke ledger。
-- [ ] M3-10 实现有效 Pass 选择算法：适用服务、有效期、余额、先到期先用。
+- [x] M3-09 实现 Entitlement grant/reserve/consume/release/adjust/revoke ledger：追加式三余额流水、来源订单行与操作幂等、数据库非负约束及不可变触发器已完成；尚未接 orders/paid 或 Booking 状态机。
+- [x] M3-10 实现有效 Pass 选择算法：按 Customer/Service/有效期/可用余额筛选并按最早到期排序；Intro 使用保守首次客户规则。Storefront 已有 Pass 卡片与原子确认仍属 M5-07/M5-09。
 - [ ] M3-11 实现原子改期：新 Hold 成功后再释放旧占用。
 - [ ] M3-12 实现取消政策计算。
 - [ ] M3-13 实现 Admin 手工 Booking。
@@ -397,10 +397,19 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 ## 2026-09-12 续开发
 
 - Programs Page 已建立并通过 HTTP/mount 检查，解除内容授权和 404 阻塞；双端真实完整页面与 Shopify 客户登录仍待网络恢复后验收。
-- Drop-in 选择/Review 已完成，使用 Session 对应 Service 商品同步价；当前不产生 Hold/Cart。Drop-in Hold 仍需扩展现有仅指向 PassPlan 的模型。
+- Drop-in 选择/Review 已完成，使用 Session 对应 Service 商品同步价；内部 Hold 模型随后已扩展为 NEW_PASS/DROP_IN，但当前公开流程仍不产生 Hold/Cart。
 - 64 项测试、构建/lint、官方扩展校验与 11 个浏览器 fixture 场景通过。已加入 IPv4 开发兼容启动参数；用户网络卡，停止连续联网验证，本批 GitHub 推送暂缓。
 - 下一顺序：最终双页面/真实登录验收与推送 → 可售校验/Drop-in Hold/Cart/Checkout → paid webhook/权益台账 → 预约确认和付款后恢复。
 
 ### 2026-09-12 新会话执行入口
 
 具体交接见 [开发交接](handoff-2026-09-12.md)。先完成真实双入口登录验收和本轮 Git 推送；后续按权益台账/Drop-in Hold → 商品可售验证/Cart → orders/paid/确认 → 已有 Pass/付款后恢复推进。Programs Page 创建、新 Pass/Drop-in Review 已完成，不再列为待创建 UI；完整交易链路仍未完成。
+
+### 2026-09-12 权益与 Hold 基础续开发
+
+- 新增 `Entitlement` 与追加式 `EntitlementLedgerEntry`：available/reserved/consumed 三个独立 delta 避免 RESERVE → CONSUME 重复扣次；grant、reserve、consume、release、adjust、expire/revoke 均有内部幂等原语。
+- 数据库锁定 Entitlement 行并拒绝负余额，Ledger 禁止 UPDATE/DELETE；订单行、操作键、reservation terminal 均有唯一约束。有效 Pass 按店铺、客户、服务、当前状态、Session 日期和余额筛选，并按最早到期优先。
+- Intro 暂按保守“首次客户”规则：已有非待处理 Entitlement 或非取消 Booking 的客户不再显示/创建 Intro Hold。业务若需要把退款、免费取消或 Drop-in 历史细分，需在公开交易前确认规则。
+- `BookingHold` 新增 `purchaseKind`，`NEW_PASS` 必须有 passPlanId，`DROP_IN` 必须没有 passPlanId 且商品只能从 Attempt 对应 Session 的 Service 推导；原 Session → Attempt 锁顺序、15 分钟期限、幂等与防超售不变。
+- 独立测试库 71 项通过，包含 10 路并发抢最后 1 个权益次数、Drop-in Hold 幂等/非法目标、Ledger 不可变和 Intro 历史；类型、lint、生产构建通过。
+- 下一步仍是 Shopify 最终渠道可售校验和公开 Review → Hold → Cart/Checkout；随后接 orders/paid、Booking 确认、已有 Pass 原子确认与付款后 Recovery。开关继续关闭。

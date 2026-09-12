@@ -9,6 +9,7 @@ import { DateTime } from "luxon";
 import { z } from "zod";
 import db from "../db.server";
 import { DomainError } from "../lib/errors.server";
+import { introOfferEligible } from "./entitlements.server";
 
 type Tx = Prisma.TransactionClient;
 export type BookingActor = { shopId: string; customerGid: string | null };
@@ -124,6 +125,22 @@ async function audit(
     },
   });
 }
+function purchaseMappingReady(
+  mapping: ProductMapping | null | undefined,
+  owner: { version: number; requestedPriceCents: number },
+) {
+  return Boolean(
+    mapping?.variantGid &&
+    mapping.productGid &&
+    mapping.syncStatus === "SYNCED" &&
+    mapping.productStatus === "ACTIVE" &&
+    mapping.shopifyVersion === owner.version &&
+    mapping.requestedVersion === owner.version &&
+    /^\d+(\.\d{1,2})?$/.test(mapping.publishedPrice || "") &&
+    Math.round(Number(mapping.publishedPrice) * 100) ===
+      owner.requestedPriceCents,
+  );
+}
 export async function classAvailability(
   shopId: string,
   ids: string[],
@@ -206,6 +223,8 @@ async function snapshot(
         ? {
             id: hold.id,
             status: hold.status,
+            purchaseKind: hold.purchaseKind,
+            passPlanId: hold.passPlanId,
             expiresAt: hold.expiresAt.toISOString(),
           }
         : null,
@@ -334,10 +353,19 @@ export async function resumeAttempt(actor: BookingActor, token: string) {
 export const holdInput = z
   .object({
     token: tokenSchema,
-    passPlanId: z.string().uuid(),
+    purchaseKind: z.enum(["NEW_PASS", "DROP_IN"]).default("NEW_PASS"),
+    passPlanId: z.string().uuid().optional(),
     idempotencyKey: z.string().uuid(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (input) => input.purchaseKind !== "DROP_IN" || !input.passPlanId,
+    "A drop-in cannot select a Pass",
+  )
+  .refine(
+    (input) => input.purchaseKind !== "NEW_PASS" || Boolean(input.passPlanId),
+    "Select a Pass before creating a hold",
+  );
 // Internal commerce primitive. No public hold/checkout endpoint until M4 can create a cart safely.
 export async function createSeatHold(actor: BookingActor, raw: unknown) {
   const input = holdInput.parse(raw);
@@ -368,7 +396,8 @@ export async function createSeatHold(actor: BookingActor, raw: unknown) {
     if (
       replay &&
       (replay.attemptId !== attempt.id ||
-        replay.passPlanId !== input.passPlanId)
+        replay.purchaseKind !== input.purchaseKind ||
+        replay.passPlanId !== (input.passPlanId || null))
     )
       fail(
         "IDEMPOTENCY_CONFLICT",
@@ -378,7 +407,10 @@ export async function createSeatHold(actor: BookingActor, raw: unknown) {
       replay ||
       (await tx.bookingHold.findUnique({ where: { attemptId: attempt.id } }));
     if (existing) {
-      if (existing.passPlanId !== input.passPlanId)
+      if (
+        existing.purchaseKind !== input.purchaseKind ||
+        existing.passPlanId !== (input.passPlanId || null)
+      )
         fail(
           "IDEMPOTENCY_CONFLICT",
           "The selected Pass has changed. Start a new booking.",
@@ -390,42 +422,63 @@ export async function createSeatHold(actor: BookingActor, raw: unknown) {
         );
       return existing;
     }
-    const eligible = await tx.passEligibility.findFirst({
-      where: {
-        shopId: shop.id,
-        serviceId: session.serviceId,
-        passPlanId: input.passPlanId,
-      },
-      include: { passPlan: true },
-    });
-    const mapping = await tx.productMapping.findUnique({
-      where: {
-        shopId_ownerType_ownerId: {
+    if (input.purchaseKind === "NEW_PASS") {
+      const passPlanId = input.passPlanId!;
+      const eligible = await tx.passEligibility.findFirst({
+        where: {
           shopId: shop.id,
-          ownerType: "PASS_PLAN",
-          ownerId: input.passPlanId,
+          serviceId: session.serviceId,
+          passPlanId,
         },
-      },
-    });
-    if (
-      !eligible ||
-      eligible.passPlan.status !== "ACTIVE" ||
-      !mapping?.variantGid ||
-      mapping.syncStatus !== "SYNCED" ||
-      mapping.productStatus !== "ACTIVE"
-    )
-      fail("PASS_UNAVAILABLE", "This Pass is not available for this class.");
-    const validUntil = DateTime.fromJSDate(now, { zone: session.timezone })
-      .plus({ days: eligible.passPlan.validityDays })
-      .toMillis();
-    if (session.startsAt.getTime() >= validUntil)
-      fail(
-        "PASS_EXPIRES_BEFORE_CLASS",
-        "This Pass would expire before the class.",
-      );
-    // Intro-history eligibility will be enabled with the entitlement ledger, never guessed.
-    if (eligible.passPlan.introOnly)
-      fail("INTRO_NOT_READY", "Intro Pass eligibility is not available yet.");
+        include: { passPlan: true },
+      });
+      const mapping = await tx.productMapping.findUnique({
+        where: {
+          shopId_ownerType_ownerId: {
+            shopId: shop.id,
+            ownerType: "PASS_PLAN",
+            ownerId: passPlanId,
+          },
+        },
+      });
+      if (
+        !eligible ||
+        eligible.passPlan.status !== "ACTIVE" ||
+        !purchaseMappingReady(mapping, eligible.passPlan)
+      )
+        fail("PASS_UNAVAILABLE", "This Pass is not available for this class.");
+      const validUntil = DateTime.fromJSDate(now, { zone: session.timezone })
+        .plus({ days: eligible.passPlan.validityDays })
+        .toMillis();
+      if (session.startsAt.getTime() >= validUntil)
+        fail(
+          "PASS_EXPIRES_BEFORE_CLASS",
+          "This Pass would expire before the class.",
+        );
+      if (
+        eligible.passPlan.introOnly &&
+        !(await introOfferEligible(tx, shop.id, attempt.customerId))
+      )
+        fail(
+          "INTRO_INELIGIBLE",
+          "This introductory Pass is only available to first-time customers.",
+        );
+    } else {
+      const mapping = await tx.productMapping.findUnique({
+        where: {
+          shopId_ownerType_ownerId: {
+            shopId: shop.id,
+            ownerType: "SERVICE",
+            ownerId: session.serviceId,
+          },
+        },
+      });
+      if (!purchaseMappingReady(mapping, session.service))
+        fail(
+          "DROP_IN_UNAVAILABLE",
+          "Single-class booking is not available right now.",
+        );
+    }
     await expireSessionHolds(tx, shop.id, session.id, now);
     const occupied = await tx.bookingHold.findFirst({
       where: {
@@ -458,7 +511,8 @@ export async function createSeatHold(actor: BookingActor, raw: unknown) {
         attemptId: attempt.id,
         customerId: attempt.customerId,
         sessionId: session.id,
-        passPlanId: input.passPlanId,
+        purchaseKind: input.purchaseKind,
+        passPlanId: input.passPlanId || null,
         idempotencyKey: input.idempotencyKey,
         createdAt: now,
         expiresAt: new Date(now.getTime() + 15 * 60000),
@@ -476,6 +530,8 @@ export async function createSeatHold(actor: BookingActor, raw: unknown) {
     await audit(tx, actor, "HOLD_CREATED", hold.id, {
       attemptId: attempt.id,
       sessionId: session.id,
+      purchaseKind: hold.purchaseKind,
+      passPlanId: hold.passPlanId,
       expiresAt: hold.expiresAt.toISOString(),
     });
     return hold;
@@ -561,22 +617,6 @@ export const passOptionsInput = z
     "Select a Pass for review",
   );
 
-function purchaseMappingReady(
-  mapping: ProductMapping | null | undefined,
-  owner: { version: number; requestedPriceCents: number },
-) {
-  return Boolean(
-    mapping?.variantGid &&
-    mapping.productGid &&
-    mapping.syncStatus === "SYNCED" &&
-    mapping.productStatus === "ACTIVE" &&
-    mapping.shopifyVersion === owner.version &&
-    mapping.requestedVersion === owner.version &&
-    /^\d+(\.\d{1,2})?$/.test(mapping.publishedPrice || "") &&
-    Math.round(Number(mapping.publishedPrice) * 100) ===
-      owner.requestedPriceCents,
-  );
-}
 export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
   const input = passOptionsInput.parse(raw);
   return withAttempt(actor, input.token, async (tx, attempt, shop, now) => {
@@ -591,11 +631,15 @@ export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
     const spots =
       (await classAvailability(shop.id, [session.id], tx)).get(session.id) || 0;
     if (!spots) fail("SOLD_OUT", "This class is full. Choose another class.");
+    const canUseIntro = await introOfferEligible(
+      tx,
+      shop.id,
+      attempt.customerId,
+    );
     const plans = await tx.passPlan.findMany({
       where: {
         shopId: shop.id,
         status: "ACTIVE",
-        introOnly: false,
         services: { some: { shopId: shop.id, serviceId: session.serviceId } },
       },
       orderBy: [{ requestedPriceCents: "asc" }, { id: "asc" }],
@@ -610,6 +654,7 @@ export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
       },
     });
     const passes = plans.flatMap((plan) => {
+      if (plan.introOnly && !canUseIntro) return [];
       const mapping = mappings.find((m) => m.ownerId === plan.id);
       if (
         !purchaseMappingReady(mapping, plan) ||
