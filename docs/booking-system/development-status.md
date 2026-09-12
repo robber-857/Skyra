@@ -2,7 +2,7 @@
 
 更新：2026-09-12。此页记录实际代码、开发店联调与验证证据；完整范围仍以 `implementation-backlog.md` 为准。
 
-最新状态：Programs Page、Drop-in 选择/Review、Entitlement 追加式台账、有效 Pass 内部选择和 Drop-in Hold 数据约束已完成。Shopify 登录已改为全端同页顶层跳转并真实到达托管登录页；用户反馈的 **Continue with Shop** 仍待真实账户复测。公开 Checkout 与 Booking 确认仍未完成；详见文末 2026-09-12 记录。
+最新状态：商品可售检查已接入 Admin 与客户 Review，按澳洲/AUD 复核 Shopify Admin 和 Storefront；104 项测试通过。真实开发店存在商品未发布、Booking 归属字段未读到、渠道锁定阻止 Storefront 查询三个阻塞。登录修复已推送 GitHub；Continue with Shop 真实账户复测、Checkout/付款/Booking 确认尚未完成。
 
 ## 已创建与已绑定
 
@@ -109,8 +109,8 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 ## 下一阶段执行顺序（2026-09-12 更新）
 
 1. 由用户在当前 Shopify 托管登录页复测 **Continue with Shop**，再验收 Home / Programs 的登录完成、退出和签名返回；Programs Page 已创建，不再重复创建。
-2. 推送本轮本地提交至 bookingdev 并核对远程 SHA / CI；之前 743e242 的 CI 通过不代表本轮 CI 已运行。
-3. M4 + M5-10：最终商品渠道可售验证、Review 后公开创建 Hold 与 Shopify Cart / Checkout。
+2. 登录修复已推送 e8d0b2b，CI 34672286983 通过。可售检查提交/CI 以当前 bookingdev HEAD 为准。
+3. M4 + M5-10：先修复测试商品归属/发布和锁定开发店的 Storefront 接入，再接公开 Hold 与 Shopify Cart / Checkout；实时校验代码已就绪。
 4. orders/paid 幂等处理、权益生成、Booking 确认和过期付款恢复；M5-09 已有 Pass 原子确认，不走 A$0 Checkout。
 5. Confirmation、付款后 Recovery / Needs Attention；完整链路验收后再开启 onlineBookingsEnabled。
 
@@ -192,3 +192,13 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 - 修复本地主题预览中相对登录地址落到 `http://127.0.0.1:9292/customer_authentication/login` 并返回 401 的问题。前端现在校验 Liquid 提供的 canonical `*.myshopify.com` 域名，读取 Shopify 运行时 theme id，并把 `preview_theme_id` 安全加入相对 `return_to`。
 - 浏览器 fixture 12/12 通过：Home / Programs × 320/390/430/1440、桌面/手机同页返回、禁用 storage 恢复、canonical shop + preview-theme return。真实浏览器已在同一标签页到达 `shopify.com/authentication/.../login`，页面标题为 `Sign in - Skyra Booking Dev`。
 - 仍未用用户个人账号完成 **Continue with Shop**、验证码/账户授权、退出和返回后的 `logged_in_customer_id` 验收；这一步需要用户在 Shopify 托管页操作。此次未收款、未创建 Booking，也未打开交易能力开关。
+
+## 最新交付：实时商品可售检查与 Review 防护（2026-09-12）
+
+- 登录修复 e8d0b2b5711611d18e06d02cc7f5ef3636f960dc 已推送 origin/bookingdev，远程 SHA 一致；[CI 34672286983](https://github.com/robber-857/Skyra/actions/runs/34672286983) 通过。
+- Classes & Passes 每个商品新增 **Check availability**，只读查询当前 Shopify 数据并给出检查时间与问题。检查本地同步版本、产品/唯一变体映射、App 归属、ACTIVE、Online Store 发布、可售状态、AUD 价格，以及澳洲 Storefront 可见性/价格/配送/订阅/Bundle 限制。
+- 客户点击 Pass/Drop-in 的 Continue 时先验证签名身份、Attempt 和资格，再执行实时检查，随后复核 Attempt、课程状态、余位和价格。网络调用不占用 Session/Attempt 数据库锁；结果不持久化为交易授权。列表仍展示同步数据，实际交易入口必须重新检查。
+- 新增 npm.cmd run preview:purchasability（可附加 -- -Diagnostics）。固定 Skyra Booking 和开发店，通过 CLI 在子进程中载入 App 环境，官方 SDK 刷新现有离线会话；凭据不输出、不写入 .env。检查不写商品/Cart/Hold；会话刷新会更新本地 Session。
+- 真实开发店：两个测试商品 Admin 为 ACTIVE、变体可售、价格 A$49/A$220，但 onlineStoreUrl=null；当前 App 未读到 booking_owner_id/entitlement_kind。Storefront HTTP 400 返回 “Online Store channel is locked.”。后台分别报告 ONLINE_STORE_UNPUBLISHED、OWNER_MISMATCH、STOREFRONT_LOCKED，公开 Review 返回恢复提示。未解除店铺保护、发布商品或重写归属。
+- 验证：专用测试库 vitest run 104/104（新增 33 项），覆盖权限隔离、数据库/远端价格变化、上下架、锁定渠道、配送/订阅/Bundle、接口故障、检查期间编辑与课程取消；类型/lint/生产构建通过。Admin 与 Storefront 查询通过官方 schema 校验。12 项浏览器 fixture 是上一轮布局/恢复证据，本轮未宣称真实支付或后台人工视觉验收。
+- 无新迁移。公开 Hold/Cart/Checkout、orders/paid、权益发放/预约确认、已有 Pass UI/确认、付款后 Recovery 尚未交付；三个能力开关保持 false。下一轮先解决上述商品/Storefront 阻塞，再继续 Cart。

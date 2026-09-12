@@ -158,7 +158,7 @@ Shopify references: [Customer sign-in links and redirects](https://shopify.dev/d
 
 Home and Programs use the same responsive Programs-style component and a 31-day in-section Full Calendar. `POST /apps/skyra-booking/pass-options` requires the verified, bound Shopify customer and opaque Attempt. It validates current session availability and returns eligible active, synchronized non-Intro new Passes with matching price/version and adequate validity. An optional `passPlanId` revalidates a new Pass for Review. `purchaseKind=DROP_IN` selects the synchronized product of the attempt's Service, without accepting a client Service/Variant/price. A Drop-in cannot also submit passPlanId; arbitrary client fields/prices are rejected.
 
-The new-Pass cards and Review summary are implemented for desktop and mobile. Checkout is explicitly unavailable: selection/review create no Hold, Cart, payment or booking. Drop-in cards and Review are now implemented. The internal Hold supports both NEW_PASS and Session-derived DROP_IN with database target constraints, but remains unexposed. Entitlement ledger primitives, eligible-owned-Pass ordering and conservative Intro history are implemented internally; Owned Pass cards, customer identity summary, final Shopify channel availability, atomic confirmation and checkout recovery remain pending. This is a partial implementation of the full target contract below.
+The new-Pass cards and Review summary are implemented for desktop and mobile. Checkout is explicitly unavailable: selection/review create no Hold, Cart, payment or booking. Drop-in cards and Review are now implemented. The internal Hold supports both NEW_PASS and Session-derived DROP_IN with database target constraints, but remains unexposed. Entitlement ledger primitives, eligible-owned-Pass ordering and conservative Intro history are implemented internally. Live Shopify availability checks are now connected to Review, but the development store fails the checks (see Delivered preflight below). Owned Pass cards, customer identity summary, atomic confirmation and checkout recovery remain pending. This is a partial implementation of the full target contract below.
 
 ## 3. PASS_SELECTION state inside the Booking section
 
@@ -302,6 +302,18 @@ On `orders/paid`:
 4. If the class is now full, keep the newly purchased pass active and inform the customer to choose another class. Never oversell or silently consume a credit.
 
 ## 6. Cart and Checkout hand-off
+
+### Delivered preflight, 2026-09-12
+
+Selected-option Review now checks live Shopify Admin and Australian Storefront data. The backend first resolves the Pass or Session-owned Drop-in through the signed Booking Attempt; no browser Product/Variant/Service/price is trusted. Admin checks cover shop currency/identity, app ownership, ACTIVE status, Online Store publication, exactly one matching variant, availability and price. Storefront uses @inContext(country: AU) to check market visibility, AUD price, one-time/non-bundle purchase and no shipping.
+
+Network calls run outside Session/Attempt locks. The catalog fingerprint and then Attempt ownership/expiry, eligibility, Session status and capacity are checked again before responding. This is a read-only observation, not a Hold or payment authorization; the future Cart endpoint must repeat validation. Admin Check availability displays actionable issues and a timestamp; customer errors use retry/reselect recovery.
+
+The development store is not ready: both test products have onlineStoreUrl=null and no readable App Booking ownership fields. Tokenless Storefront returns “Online Store channel is locked.”. Product configuration and authenticated Storefront access must be resolved before real Review/Checkout acceptance. No product publication, store unlock or ownership repair was performed.
+
+References: [Admin product](https://shopify.dev/docs/api/admin-graphql/2026-07/queries/product), [Storefront product and market context](https://shopify.dev/docs/api/storefront/2026-07/queries/product).
+
+### Remaining Cart implementation
 
 Before adding the pass variant to Shopify cart, the app creates:
 

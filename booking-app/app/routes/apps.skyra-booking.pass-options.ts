@@ -1,7 +1,14 @@
 import type { ActionFunctionArgs } from "react-router";
-import { bookingPassOptions } from "../services/booking.server";
+import { bookingPurchaseReview } from "../services/booking-purchase-review.server";
+import { storefrontReadClient } from "../services/shopify-purchasability.server";
+import { unauthenticated } from "../shopify.server";
 import { bookingRequest, bookingJson } from "../services/booking-proxy.server";
 export const loader = () => bookingJson({ code: "METHOD_NOT_ALLOWED" }, 405);
 export function action({ request }: ActionFunctionArgs) {
-  return bookingRequest(request, bookingPassOptions);
+  return bookingRequest(request, (actor, input) =>
+    bookingPurchaseReview(actor, input, async (domain) => ({
+      admin: (await unauthenticated.admin(domain)).admin.graphql,
+      storefront: storefrontReadClient(domain),
+    })),
+  );
 }

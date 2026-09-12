@@ -26,6 +26,7 @@
     "check": "npm run typecheck && npm run lint && npm run build",
     "build:theme-extension": "esbuild theme-extension-src/attempt.js --bundle --minify --outfile=extensions/skyra-booking-embed/assets/attempt.js && esbuild theme-extension-src/login.js --bundle --minify --outfile=extensions/skyra-booking-embed/assets/login.js && esbuild theme-extension-src/booking.js --bundle --minify --outfile=extensions/skyra-booking-embed/assets/booking.js && esbuild theme-extension-src/calendar.js --bundle --minify --outfile=extensions/skyra-booking-embed/assets/calendar.js && esbuild theme-extension-src/transaction.js --bundle --minify --outfile=extensions/skyra-booking-embed/assets/transaction.js",
     "preview:check": "node scripts/preview-health.mjs",
+    "preview:purchasability": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/dev-store-purchasability.ps1",
     "preview:theme": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/dev-theme.ps1",
     "preview:app": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/dev-app.ps1"
   },

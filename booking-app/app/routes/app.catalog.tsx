@@ -17,15 +17,32 @@ import {
 } from "../services/catalog.server";
 import { publicError } from "../lib/errors.server";
 import { Feedback, Field, Status } from "../components/admin-ui";
+import { CatalogAvailability } from "../components/catalog-availability";
+import {
+  checkCatalogPurchase,
+  storefrontReadClient,
+} from "../services/shopify-purchasability.server";
 export async function loader({ request }: LoaderFunctionArgs) {
   const { actor, shop } = await adminContext(request);
   return { ...(await catalogData(actor.shopId)), domain: shop.domain };
 }
 export async function action({ request }: ActionFunctionArgs) {
-  const { actor } = await adminContext(request);
+  const { actor, admin, shop } = await adminContext(request);
   const form = await request.formData();
   try {
     const intent = String(form.get("intent"));
+    if (intent === "check-availability") {
+      return {
+        availability: await checkCatalogPurchase(
+          actor,
+          String(form.get("id")),
+          {
+            admin: admin.graphql,
+            storefront: storefrontReadClient(shop.domain),
+          },
+        ),
+      };
+    }
     if (intent === "retry") await retrySync(actor, String(form.get("id")));
     else {
       const price = String(form.get("price"));
@@ -302,6 +319,19 @@ export default function Catalog() {
                 <Status>{mapping?.syncStatus || "PENDING"}</Status>
                 {mapping?.lastError && (
                   <p className="sync-error">{mapping.lastError}</p>
+                )}
+                {mapping && (
+                  <CatalogAvailability
+                    key={[
+                      mapping.id,
+                      record.version,
+                      mapping.syncStatus,
+                      mapping.shopifyVersion,
+                      mapping.productGid,
+                      mapping.variantGid,
+                    ].join(":")}
+                    mappingId={mapping.id}
+                  />
                 )}
               </div>
               <div className="record-actions">

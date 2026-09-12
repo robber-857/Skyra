@@ -17,12 +17,18 @@
 
 1. 选择 **2026-09-12**：`[DEV] Aerial Foundations`，18:30，Development Coach，60 分钟。
 2. 月份标题、前后 7 天、未来 31 天 Full Calendar、Class type / Instructor、剩余名额和 Details；未开放与已关闭文案区分。
-3. 未登录 Book 显示弹层，进入 Shopify 登录；桌面 popup、手机同页返回。完整真实顾客登录/退出/跨域返回尚未验收。
-4. 登录后新 Pass 和 **Single class (Drop-in)** 选择、Review、修改选择。Drop-in 仅覆盖当前场次，不显示次数卡有效期。商品未同步或价格/版本不一致时选项隐藏，Review 再次校验。
+3. 未登录 Book 显示弹层，桌面/手机统一当前标签页进入 Shopify 托管登录，保留课程 Attempt/预览主题返回。Continue with Shop 完成登录、退出和签名返回仍待真实账户复测。
+4. 登录后选择新 Pass 或 Single class (Drop-in)，Continue 进入 Review 前执行 Shopify Admin + 澳洲 Storefront 实时检查。当前测试商品配置阻塞会触发恢复提示，尚不能完成真实 Review/Checkout；Drop-in 仅覆盖当前场次。
 5. 测试临时断线重试、attempt 过期重新选课、商品变更重新选择，以及登录失效后重新认证。上述异常流程已用本地 fixture 验证。
-6. Admin 可编辑 Classes & Passes、People、Settings、Weekly Schedule，观察商品同步状态。
+6. Admin 可编辑 Classes & Passes、People、Settings、Weekly Schedule；在 Classes & Passes 点击 Check availability 查看每个商品的可售问题和检查时间。
 
-**当前不能支付、扣课或确认预约。** `onlineBookingsEnabled=false`，选择/Review 不创建 Hold、Cart 或订单。已有 Pass、Intro 资格、Customer/Coach 个人中心尚未完成。内部 Hold 目前仅支持新 Pass，Drop-in Hold 模型仍待扩展。
+**当前不能支付、扣课或确认预约。** onlineBookingsEnabled=false，选择/Review 不创建 Hold、Cart 或订单。内部 NEW_PASS/DROP_IN Hold、Entitlement 台账、有效 Pass 选择和保守 Intro 资格已完成；已有 Pass UI/原子确认、Customer/Coach 个人中心尚未完成。
+
+## 商品检查与当前阻塞
+
+从 D:/Skyra/booking-app 运行 npm.cmd run preview:purchasability。需要已登录且绑定 Skyra Booking 的 Shopify CLI；脚本只在子进程载入凭据，SDK 刷新离线会话，不改 .env。诊断模式：npm.cmd run preview:purchasability -- -Diagnostics。
+
+2026-09-12 真实结果：Class/Pass 的 Admin 价格分别 A$49/A$220、均 ACTIVE，但未发布 Online Store，当前 App 的 Booking 归属字段未读到；tokenless Storefront 因渠道锁定返回 400。命令非零表示存在阻塞。下一步核对商品归属/发布、配置锁定开发店可用的 Storefront 接入；不要为通过测试而移除保护或开放付款。
 
 ## 启动或恢复开发预览
 
@@ -58,10 +64,10 @@ npm run preview:check
 
 - Booking Admin 编辑课程名称、介绍、时长、价格、容量、地点、教练和排期；Pass 编辑价格、次数、有效期及适用课程。
 - 保存课程/Pass 后由 outbox/worker 同步 Shopify Product + Variant，通常无需手工重复上传。单次课程商品与 Pass 是购买项，某日场次保留在 PostgreSQL，不为每场课复制商品。
-- 当前 `SYNCED` 只代表商品同步成功；还需商品渠道可售验证、Cart/Attempt 关联、Shopify Checkout、`orders/paid` 幂等处理、权益发放/扣减、预约确认及退款/取消对账。
+- 当前 `SYNCED` 只代表商品同步成功；实时商品渠道可售检查已接入但开发店未通过。仍需解决检查报告中的配置阻塞，再完成 Cart/Attempt 关联、Shopify Checkout、`orders/paid` 幂等处理、权益发放/扣减、预约确认及退款/取消对账。
 - 付款使用 Shopify Checkout；不自建支付表单。已有 Pass 应直接确认并扣课，不进入 A$0 Checkout。
 - 店铺还需 Customer Accounts、支付服务/测试支付、币种税务、订单通知与政策配置；折扣/礼品卡按业务需要启用，自动续费订阅另行接入。
 
 ## 验证边界
 
-64 项数据库/接口测试通过，类型、lint、构建通过，官方扩展 8 文件检查通过（使用缓存 schema，关闭遥测）。11 项浏览器 fixture 场景覆盖双 surface、320/390/430/1440px、登录导航、异常恢复及 Drop-in 选择/价格刷新。Home 之前已完成真实双端布局验证；本轮因网络卡暂停最终 Home/Programs 全流程页面验收，不能把 fixture 写成真实 Shopify 登录或付款通过。
+最新数据库/接口测试 104 项通过，类型/lint/构建通过，新增 Admin/Storefront 查询通过官方校验。上一轮 12 项浏览器 fixture 覆盖双 surface、320/390/430/1440px、同页登录返回、异常恢复及 Drop-in 价格变化。真实 Continue with Shop、完整交易及后台按钮人工视觉验收仍未完成；商品检查不等于真实登录或支付成功。

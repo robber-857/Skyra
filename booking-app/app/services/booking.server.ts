@@ -3,13 +3,13 @@ import {
   Prisma,
   type BookingAttempt,
   type Shop,
-  type ProductMapping,
 } from "@prisma/client";
 import { DateTime } from "luxon";
 import { z } from "zod";
 import db from "../db.server";
 import { DomainError } from "../lib/errors.server";
 import { introOfferEligible } from "./entitlements.server";
+import { purchaseMappingReady } from "./purchase-mapping.server";
 
 type Tx = Prisma.TransactionClient;
 export type BookingActor = { shopId: string; customerGid: string | null };
@@ -124,22 +124,6 @@ async function audit(
       after,
     },
   });
-}
-function purchaseMappingReady(
-  mapping: ProductMapping | null | undefined,
-  owner: { version: number; requestedPriceCents: number },
-) {
-  return Boolean(
-    mapping?.variantGid &&
-    mapping.productGid &&
-    mapping.syncStatus === "SYNCED" &&
-    mapping.productStatus === "ACTIVE" &&
-    mapping.shopifyVersion === owner.version &&
-    mapping.requestedVersion === owner.version &&
-    /^\d+(\.\d{1,2})?$/.test(mapping.publishedPrice || "") &&
-    Math.round(Number(mapping.publishedPrice) * 100) ===
-      owner.requestedPriceCents,
-  );
 }
 export async function classAvailability(
   shopId: string,

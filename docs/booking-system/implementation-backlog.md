@@ -196,7 +196,8 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 
 ### 任务
 
-- [ ] M4-01 根据适用 Pass Variant 创建/更新 Shopify Cart。
+- [x] M4-00 实现实时商品可售检查：Admin 店铺/归属/产品/变体/Online Store 发布/价格与澳洲 Storefront 可见性/可售/价格/配送限制，接入后台 Check availability 和客户 Review；网络故障、检查期间变更均拒绝放行。这里只完成检查代码，真实开发店配置仍有阻塞。
+- [ ] M4-01 根据适用 Pass Variant 创建/更新 Shopify Cart。前置待处理：两个测试商品的 Online Store 发布、App Booking 归属字段和锁定店铺的 Storefront 接入；本地 SYNCED 不等于可购买。
 - [ ] M4-02 将 opaque booking hold reference 写入 Cart line attributes。
 - [ ] M4-03 确认预约摘要进入 Order 但不包含敏感数据。
 - [ ] M4-04 订阅并验证订单、付款、取消、退款 Webhooks。
@@ -229,7 +230,7 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 - [ ] M5-04 完成共享 BROWSE：按 Programs Find a Class 视觉实现月标题、七日日期条、前后周、Class type/Instructor filters、实时容量、loading/empty/error 和区块内 Full calendar。七日条、筛选和实时 Session 已联调；本轮补充独立 Book 与 Show details，2026-09-11 已完成 Programs 共享宽面板、31 天 Full Calendar 和跨月选择；本轮已补齐月份标题、独立前后周与未开放文案；剩余真实 Programs 入口及完整 E2E。
 - [ ] M5-05 完成 DETAILS：Show details 在 Session 行内展开或在同一 surface 替换内容，显示课程、老师、地点、level、policy、剩余名额；Back 恢复日期、筛选、滚动和焦点。
 - [ ] M5-06 完成 LOGIN_REQUIRED：Shopify 登录 modal 与全端同页顶层跳转已实现，并已接服务器 opaque Attempt 与固定返回路径；签名身份绑定、无 storage 恢复通过本地验证。2026-09-12 用户反馈 Shopify 托管页 **Continue with Shop** 点击后疑似无响应；已移除桌面弹窗层，并修复本地预览误把登录请求发到 `127.0.0.1` 的 401。当前已验证开发店域名能在同一标签页打开 Shopify 托管登录并保留 `preview_theme_id`，但真实账户完成登录、退出、跨域 cookie 与签名返回仍待用户复测，保持部分完成。
-- [ ] M5-07 完成 PASS_SELECTION：采用参考图的主栏 Pass cards + 右栏 Booking Details；已有适用 Pass 优先显示余额、到期与 `A$0 due today`，购买选项显示已同步 Shopify Variant 实时价格，未选择时 Continue 禁用。2026-09-11 已完成新 Pass cards、资格/同步价格检查和响应式 Booking Details；2026-09-12 已补充 Drop-in 卡片与价格复核；已有 Pass/最终 Shopify 可售校验待接。
+- [ ] M5-07 完成 PASS_SELECTION：采用参考图的主栏 Pass cards + 右栏 Booking Details；已有适用 Pass 优先显示余额、到期与 `A$0 due today`，购买选项显示已同步 Shopify Variant 实时价格，未选择时 Continue 禁用。2026-09-11 已完成新 Pass cards、资格/同步价格检查和响应式 Booking Details；2026-09-12 已补充 Drop-in 卡片、价格复核及 Continue 时的实时 Shopify 可售校验。已有 Pass UI 待接；开发店实际可售检查尚未通过，具体阻塞见 M4-00 最新进度。
 - [ ] M5-08 新增 REVIEW：采用参考图的交易摘要结构，显示 Customer、Class、日期时间、Coach、Location、选中 Pass/Drop-in、价格与 Edit；这是当前 Booking section 的状态，不是 Customer Account 或独立 Cart 页面。2026-09-11 已完成新 Pass 摘要、服务端价格/名额复核及 Edit；2026-09-12 已补充 Drop-in 摘要；Customer/已有 Pass 与支付交接未完成。
 - [ ] M5-09 已有 Pass 从 REVIEW 走原子确认并显示 CONFIRMING → CONFIRMED，不创建 A$0 Checkout。
 - [ ] M5-10 新 Pass/Drop-in 从 REVIEW 创建 15 分钟 Hold、写 Cart line attribute，并通过 `checkoutUrl` 进入原生 Shopify Checkout；Booking App 不渲染支付表单。
@@ -413,3 +414,10 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 - `BookingHold` 新增 `purchaseKind`，`NEW_PASS` 必须有 passPlanId，`DROP_IN` 必须没有 passPlanId 且商品只能从 Attempt 对应 Session 的 Service 推导；原 Session → Attempt 锁顺序、15 分钟期限、幂等与防超售不变。
 - 独立测试库 71 项通过，包含 10 路并发抢最后 1 个权益次数、Drop-in Hold 幂等/非法目标、Ledger 不可变和 Intro 历史；类型、lint、生产构建通过。
 - 下一步仍是 Shopify 最终渠道可售校验和公开 Review → Hold → Cart/Checkout；随后接 orders/paid、Booking 确认、已有 Pass 原子确认与付款后 Recovery。开关继续关闭。
+
+### 2026-09-12 实时商品检查续开发（优先于上方历史待办说明）
+
+- M4-00 已完成，M5-07/M5-08 的 Shopify 实时 Review 复核已接入。新增 33 项测试，总计 104 项通过。查询使用现有 read_products（由 write_products 覆盖）与 tokenless Storefront，没有扩大 App scopes。
+- 真实检查发现测试 Class/Pass 未发布 Online Store、当前 App 的归属字段未读到、开发店渠道锁定使 Storefront 查询返回 400。问题已定位并有明确提示，配置修复及真实 Review/Checkout 验收仍未完成。
+- 登录修复已推送 e8d0b2b，CI 34672286983 通过；Continue with Shop 真实账户复测仍待办。
+- 下一顺序：商品归属核对/恢复 → 开发店 Storefront 认证与发布 → Cart/Hold → orders/paid/权益/确认 → 已有 Pass/付款后恢复。检查通过不是付款或预约成功。
