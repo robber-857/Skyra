@@ -1,5 +1,25 @@
 # Booking V3 — 开发状态
 
+## 最新功能批次：Customer Account、取消改期、Coach 到课与 Reports（2026-09-13）
+
+本轮已实现客户 Upcoming/History/My Passes、本人取消与原子改期；Admin 预约详情、账本、操作历史、取消豁免和改期；Coach 名册、签到、出席/No-show；真实数据 Reports。银行、商户认证与邮箱配置按用户决定留给实际经营者，支付继续全部使用 Shopify 原生模块，自动资金退款不做。
+
+实现规则和接通步骤见 [客户账号与预约生命周期](customer-account-and-lifecycle.md)。数据库已有 11 条迁移，开发库和测试库均已应用。Customer Account 扩展尚未在真实客户账号页面完成安装/配置/登录验收，Coach 名册的真实客户姓名解析和真实邮件也未接通。所有公开新购买开关仍关闭。
+
+本轮验证：22 个测试文件 / 300 项测试；应用与客户扩展 TypeScript、ESLint、生产构建、Prisma validate、Shopify app build 均通过。Coach 390/1440px 实际页面操作与 Customer 390/1440px 本地交互夹具通过；真实 UAT 尚未签收。
+
+此节优先于下面旧日期快照。最新测试证据和未完成列表以 [交接文档](handoff-2026-09-13.md) 为准；此批次尚未再次 commit/push。
+
+## 当前进度：已有 Pass 确认与结果恢复（2026-09-13）
+
+- 已按“先提交，再继续”推送上一批 Webhook/Worker/邮件基础/Coach 个人中心：`a372b1103cae1a2c472b9aad26ea38f3e4888812`，分支 `bookingdev`，本地与远程 SHA 一致；[CI 34697492538](https://github.com/robber-857/Skyra/actions/runs/34697492538) success。
+- 此后的本轮新增代码仍在本地，尚未再次 commit/push。已完成：已有 Pass 列表/Review、同事务预约与 1 credit RESERVE、Customer/Coach 通知任务、签名 App Proxy 的 confirm/result 接口、Home/Programs 同区块 CONFIRMED/PROCESSING/NEEDS_ATTENTION/UNKNOWN 恢复。不创建 A$0 订单；新 Pass/Drop-in 继续使用 Shopify 原生 Cart/Checkout。
+- 验证：16 文件、255 项完整测试通过；TypeScript、ESLint、生产构建、Prisma validate、本地 Theme Check（0 findings）通过；9 条迁移已应用本地开发库与测试库。Playwright 16 组场景通过，其中新增 Home/Programs × 390/1440px 的已有 Pass、丢失确认响应、过期付款恢复、UNKNOWN 重试；截图已检查。
+- 三个公开能力开关仍关闭。浏览器新流程使用确定性 API fixture，数据库事务使用专用测试库；不代表真实 Shopify 登录、支付或邮件已验收。
+- 用户最新范围：自动客户退款不做，由 Admin 线下退款。后续补取消/课次释放、可审计人工处理和对账，但不由 Booking App 划款或自动标记“已退款”。收款账户尚未绑定；Payment methods 由 Shopify 管理，不自建卡号/支付表单。
+
+下一轮入口与剩余工作见 [2026-09-13 交接](handoff-2026-09-13.md)。以下带日期的旧段落保留历史事实；旧的“尚未 commit/Worker 未实现”等表述不覆盖此节。
+
 ## 最新续开发：付款确认、邮件与 Coach（2026-09-12）
 
 已在本地接通 ORDER_PAID_RECEIVED Worker：冻结购买条款、NEW_PASS/Drop-in 权益、原子 GRANT/RESERVE/CONFIRMED、PaidBookingResult 的 Checkout/Order-Line 去重、可恢复过期 Hold 的容量重查与 Needs Attention。预约确认同时生成 Customer + 对应 Coach 两条幂等通知；含邮件模板、预览、投递 adapter 接口和重试/UNKNOWN 状态，**尚未配置或发送真实邮件**。
@@ -260,3 +280,11 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 - 对命中的 Checkout 严格验证同店 reference、READY 状态、Customer、Product、Variant、单行 quantity=1、AUD、line/subtotal/final amount、paid 状态及未取消。全部通过才投递 `ORDER_PAID_RECEIVED`；任一不匹配进入 Needs Attention，不发 Pass、不写 Booking。
 - 专用测试库迁移成功，12 个测试文件共 212 项通过；`npm.cmd run check` 的类型、lint、生产构建通过，本地开发库 6 条迁移 up to date。官方 schema 验证了后续 Order 对账查询，但它需要订单/客户/商品读取权限，因此本轮未扩大 App scopes、未注册真实订阅。
 - 尚未完成：Outbox Worker 的 grant → reserve → Booking Confirmed、过期 Hold 付款恢复、乱序/重复业务处理、真实 webhook 注册/触发、退款/取消与 reconciliation。三个能力开关保持 false，本轮没有真实订单、付款、权益或预约。
+
+## 本轮收尾验证（2026-09-13 Australia/Sydney）
+
+App/Worker 已恢复，Theme dev 保持运行。preview:check 对 Home、Programs、App host、Booking API 和 Shopify upstream 各检查三次，全部 HTTP 200。只读核对开发店 holds=0、bookings=0、notifications=0、onlineBookingsEnabled=false；本地开发数据库已完成 9 条迁移。当前预览 App 端口 54099，入口使用原来的 9292/9293；端口和 tunnel 会随下次启动变化。
+
+## 2026-09-13 整站验收准备
+
+新增 [上线准备与真实验收清单](launch-readiness-and-uat.md)：8 类未完成工作、30 条待签收验收场景、Shopify 商户/银行/身份/邮箱配置入口。30 条是验收基线，不是剩余自动化测试数量；最近已通过测试仍为 255 项，本次未重新执行测试。

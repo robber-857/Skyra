@@ -1,12 +1,29 @@
 # Booking 邮件与 Coach 课程报名
 
+## 最新功能批次：Customer Account、取消改期、Coach 到课与 Reports（2026-09-13）
+
+本轮已实现客户 Upcoming/History/My Passes、本人取消与原子改期；Admin 预约详情、账本、操作历史、取消豁免和改期；Coach 名册、签到、出席/No-show；真实数据 Reports。银行、商户认证与邮箱配置按用户决定留给实际经营者，支付继续全部使用 Shopify 原生模块，自动资金退款不做。
+
+实现规则和接通步骤见 [客户账号与预约生命周期](customer-account-and-lifecycle.md)。数据库已有 11 条迁移，开发库和测试库均已应用。Customer Account 扩展尚未在真实客户账号页面完成安装/配置/登录验收，Coach 名册的真实客户姓名解析和真实邮件也未接通。所有公开新购买开关仍关闭。
+
+此节优先于下面旧日期快照。最新测试证据和未完成列表以 [交接文档](handoff-2026-09-13.md) 为准；此批次尚未再次 commit/push。
+
+## 最新配置与状态（2026-09-13）
+
+- 品牌邮箱 `hello@skyrastudio.com.au`：用户认为在 GoDaddy 购买域名时一起购买。本次只读 DNS 查询得到 MX `skyrastudio-com-au.mail.protection.outlook.com`，priority 0，说明邮件路由至 Microsoft 365；这与 GoDaddy 代售 Microsoft 365 相符，但不能单独证明销售商。没有读取邮件/凭据或修改 DNS。
+- 收信邮箱可留在原服务商。Shopify Settings → Notifications → Sender email 配置订单发件地址，按后台实际给出的记录认证域名；Booking 事务邮件需要独立 provider/adapter 和品牌发信认证，两个系统可以使用相同 From/Reply-To。当前均未声称已接通。
+- 已有 Pass 的确认现已生成 Customer + Coach 通知任务；Coach 仍可按未来 7 天/30 天/自定义区间查看报名。邮件任务和模板已完成，真实邮箱解析、provider、邀请发送和收件验收尚未完成，Coach 暂不会收到本系统真实通知邮件。
+- 自动退款不实现，Admin 线下办理；今后取消/课次处理与线下退款记录分别审计，不发送虚假的退款完成通知。
+
+最新测试和 Git 状态见 [本轮交接](handoff-2026-09-13.md)。
+
 更新：2026-09-12。本页区分业务合同、已实现代码和仍需配置的真实服务。
 
 ## 通知由谁负责
 
 - Shopify：继续发送订单/付款相关通知。购买 Pass 的订单成功不等于课程名额已经确认；订单邮件不能提前写成 Booking confirmed。
 - Skyra Booking：数据库成功完成 `Entitlement GRANT → RESERVE → Booking CONFIRMED` 后，在同一事务内为 Customer 和该 Session 当前分配的 Coach 各生成一条 `BookingNotification`。
-- 已有 Pass 将来调用相同的确认/通知服务，不创建 A$0 订单，因此不能只靠 Shopify 新订单触发通知。
+- 已有 Pass 现已调用相同通知入队服务，与预约和 RESERVE 同事务；不创建 A$0 订单，因此不能只靠 Shopify 新订单触发通知。
 - Shopify Flow 的 Send internal email 可用于内部邮件，但自定义 App 的 Flow 扩展仅适用于 Plus；本项目不把 Flow 作为预约通知的必需依赖。
 
 官方依据：[Shopify Store notifications](https://help.shopify.com/en/manual/fulfillment/setup/notifications)、[Flow Send internal email](https://help.shopify.com/en/manual/shopify-flow/reference/actions/send-email)、[Flow 自定义 App 限制](https://shopify.dev/docs/apps/build/flow)。
@@ -29,11 +46,11 @@
 - 原子 claim 防止并发重发；明确拒绝可退避重试，最多 5 次；网络结果不确定或过期 SENDING 进入 UNKNOWN，需 provider 对账，不能盲目重发。
 - 状态 `ACCEPTED` 只表示 provider 接受，不能声称已进入收件箱；DELIVERED/bounce 回执尚未实现。
 - Admin → Bookings 可查看通知状态，打开 HTML/纯文本预览。尚未接发信 provider；Worker 不会主动发任何真实邮件。
-- Reminder、改期、取消、候补以及付款异常客户通知模板仍待后续定义，不标为完成。
+- 取消模板已实现；改期生成旧课取消 + 新课确认任务。Reminder、单封合并改期、候补和付款异常通知仍待完成。
 
 ## Coach 个人中心
 
-独立只读 `/coach` 页面，沿用原规划的 Coach 单次链接登录，无 Shopify Admin 访问权。
+独立受保护的 `/coach` 页面，沿用原规划的 Coach 单次链接登录，无 Shopify Admin 访问权。
 
 - 默认未来 7 天；另有未来 30 天和自定义日期。7/30 指从今天起的本地日历日，不是本周/自然月。
 - 按 Session 上课日期筛选，不按客户下单日期；自定义首尾日期均包含；数据库用 UTC 半开区间，按 Shop timezone 解释筛选，每节课使用自己的 timezone 显示。
@@ -54,7 +71,7 @@
 - 合法已付款订单在可恢复的过期 Hold 场景重新检查窗口与容量；满员等情况保留已购权益、无 RESERVE/Booking/成功邮件，进入 Needs Attention。
 - Attempt 自身到期、显式释放、课程变更/停用、报名关闭等进入恢复，不自动分配其他课程。异常的外部订单校验仍由已有收件服务拒绝。
 - 新增确认事务不依赖“允许新预约”的开关，因为已经收款的历史事件也必须处理；公开创建 Checkout 的三项 gate 继续关闭。
-- 退款/取消/争议乱序、订单 reconciliation、UNKNOWN Cart 的人工操作仍未实现，不能启用真实支付闭环。
+- 取消/订单变更乱序、订单 reconciliation、UNKNOWN Cart 的人工操作仍未实现；自动退款按 2026-09-13 用户决定不在当前范围，由 Admin 线下处理。真实支付闭环仍未启用。
 
 ## 用户提供的品牌邮箱
 

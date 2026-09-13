@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "types": [
+      "@shopify/ui-extensions/customer-account.page.render"
+    ]
+  },
+  "include": [
+    "src/**/*.tsx",
+    "src/**/*.d.ts",
+    "shopify.d.ts"
+  ]
+}

@@ -17,7 +17,8 @@ export async function bookingPurchaseReview(
 ) {
   const input = passOptionsInput.parse(raw);
   const options = await bookingPassOptions(actor, input);
-  if (!options.selected) return options;
+  if (!options.selected || options.selected.kind === "OWNED_PASS")
+    return options;
   const selected = options.selected;
   const ownerType = selected.kind === "DROP_IN" ? "SERVICE" : "PASS_PLAN";
   // selected.id comes from the server's Session/eligibility resolution, never a client Variant or Service ID.

@@ -21,7 +21,7 @@ window.SkyraBookingTransaction = function ({
     b.addEventListener("click", action);
     return b;
   };
-  const money = (pass) =>
+  const money = (pass) => kind(pass) === "OWNED_PASS" ? "1 class credit" :
     new Intl.NumberFormat("en-AU", {
       style: "currency",
       currency: pass.currency,
@@ -29,11 +29,12 @@ window.SkyraBookingTransaction = function ({
   const kind = (option) => option.kind || "NEW_PASS";
   const key = (option) => kind(option) + ":" + option.id;
   const options = (data) => [
+    ...(data.ownedPasses || []),
     ...(data.dropIn ? [data.dropIn] : []),
     ...data.passes,
   ];
   const terms = (option) =>
-    kind(option) === "DROP_IN"
+    kind(option) === "OWNED_PASS" ? option.availableUnits + " credits available · Expires " + format(option.expiresAt, {day:"numeric",month:"short",year:"numeric"}) : kind(option) === "DROP_IN"
       ? "One booking · This class only"
       : option.credits +
         " classes · Valid for " +
@@ -130,7 +131,7 @@ window.SkyraBookingTransaction = function ({
         body: JSON.stringify({
           token: attempt.token(),
           ...(option
-            ? kind(option) === "DROP_IN"
+            ? kind(option) === "OWNED_PASS" ? {purchaseKind:"OWNED_PASS", entitlementId:option.id} : kind(option) === "DROP_IN"
               ? { purchaseKind: "DROP_IN" }
               : { purchaseKind: "NEW_PASS", passPlanId: option.id }
             : {}),
@@ -199,6 +200,69 @@ window.SkyraBookingTransaction = function ({
     next.dataset.passContinue = "";
     main.append(group, next);
   }
+  async function resultRequest(path, body = {}) {
+    const response = await fetch((root.dataset.proxyBase || "/apps/skyra-booking") + path, {
+      method:"POST", credentials:"same-origin", cache:"no-store", referrerPolicy:"no-referrer",
+      headers:{"Content-Type":"application/json", Accept:"application/json", "X-Skyra-Booking":"1"},
+      body:JSON.stringify({token:attempt.token(), ...body}), signal:AbortSignal.timeout(10000),
+    });
+    const data = await response.json();
+    if (!response.ok) { const error = new Error(data.error || "We could not check your booking."); error.code=data.code; error.status=response.status; error.bookingError=true; throw error; }
+    return data;
+  }
+  function resultView(data, retry) {
+    const copy = {
+      CONFIRMED:["Booking confirmed", "Your place is reserved. You can find the class details here."],
+      PROCESSING:["Confirming your booking", "Your payment has been received. We are confirming your place. Check again shortly; please do not pay again."],
+      AWAITING_PAYMENT:["Checking your payment", "We have not received a verified payment confirmation yet. If you have paid, check again shortly or contact Skyra Studio before making another payment."],
+      NEEDS_ATTENTION:["We need to check your booking", "Your place is not confirmed. Please contact Skyra Studio so we can resolve your booking. Do not make another payment for this booking."],
+      NOT_CONFIRMED:["Booking not confirmed", "No place has been reserved for this attempt. Check your Pass and try again."],
+      CANCELLED:["Booking cancelled", "This booking is cancelled. Contact Skyra Studio if you need help."],
+      ATTENDED:["Class attended", "Attendance has been recorded for this booking."],
+      LATE_CANCEL:["Booking cancelled", "This booking was cancelled after the cancellation deadline."],
+      NO_SHOW:["Class missed", "This booking is recorded as a missed class."],
+    };
+    const text = copy[data.status] || ["Check your booking", "We could not confirm your booking status. Check again or contact Skyra Studio before booking again."];
+    const main=frame(text[0]);
+    main.dataset.bookingResult=data.status || "UNKNOWN";
+    main.append(el("p", "skyra-booking__notice", text[1]));
+    if(data.bookingReference) main.append(el("p", "", "Booking reference: " + data.bookingReference));
+    if (!["CONFIRMED","ATTENDED","CANCELLED","LATE_CANCEL","NO_SHOW"].includes(data.status))
+      main.append(button("Check booking status", "skyra-booking__primary", ()=>checkResult(false, retry)));
+    if(data.status === "NOT_CONFIRMED" && retry) main.append(button("Try this Pass again", "skyra-booking__primary", retry));
+    if(data.status === "NOT_CONFIRMED") main.append(button("Choose another Pass", "skyra-booking__back", load));
+    if(data.status === "NEEDS_ATTENTION") {
+      const contact=el("a", "skyra-booking__back", "Contact Skyra Studio");
+      contact.href="mailto:hello@skyrastudio.com.au"; main.append(contact);
+    }
+  }
+  async function checkResult(allowSelection = false, retry) {
+    const version=++revision;
+    frame("Checking your booking").append(el("p", "skyra-booking__notice", "Checking the latest booking status…"));
+    try {
+      const data=await resultRequest("/result");
+      if(version!==revision || !root.contains(host)) return;
+      if(data.status==="NOT_CONFIRMED" && allowSelection) return load();
+      resultView(data, retry);
+    } catch(error) {
+      if(version!==revision || !root.contains(host)) return;
+      resultView({status:"UNKNOWN"}, retry);
+      if(error.code==="LOGIN_REQUIRED") host.querySelector("[data-booking-result]").append(button("Sign in to check", "skyra-booking__primary", signIn));
+    }
+  }
+  async function confirm(pass) {
+    const version=++revision;
+    attempt.remember();
+    frame("Confirming your booking").append(el("p", "skyra-booking__notice", "Reserving your place with one class credit…"));
+    try {
+      const result=await resultRequest("/confirm", {entitlementId:pass.id});
+      if(version===revision && root.contains(host)) resultView(result);
+    } catch(error) {
+      if(version!==revision || !root.contains(host)) return;
+      // A lost response may follow a committed booking. Query before offering any retry.
+      await checkResult(false, ()=>confirm(pass));
+    }
+  }
   async function load() {
     const version = ++revision;
     frame("Select a Pass").append(
@@ -241,7 +305,7 @@ window.SkyraBookingTransaction = function ({
         el(
           "p",
           "",
-          (kind(pass) === "DROP_IN" ? "Single class: " : "New Pass: ") +
+          (kind(pass) === "OWNED_PASS" ? "Your Pass: " : kind(pass) === "DROP_IN" ? "Single class: " : "New Pass: ") +
             pass.name,
         ),
         el("p", "skyra-booking__pass-meta", terms(pass)),
@@ -251,7 +315,7 @@ window.SkyraBookingTransaction = function ({
         el(
           "strong",
           "",
-          kind(pass) === "DROP_IN" ? "Class price" : "Pass price",
+          kind(pass) === "OWNED_PASS" ? "Booking uses" : kind(pass) === "DROP_IN" ? "Class price" : "Pass price",
         ),
         el("strong", "", money(pass)),
       );
@@ -266,20 +330,20 @@ window.SkyraBookingTransaction = function ({
         el(
           "p",
           "skyra-booking__notice",
-          "Online checkout is not available yet. Your place has not been reserved and no payment has been taken.",
+          kind(pass) === "OWNED_PASS" ? (data.ownedPassesAvailable ? "Confirm to reserve your place using one credit from your Pass." : "Booking with an existing Pass is not available yet. Your credits have not changed.") : "Online checkout is not available yet. Your place has not been reserved and no payment has been taken.",
         ),
       );
       const checkout = button(
-        "Continue to Shopify Checkout",
+        kind(pass) === "OWNED_PASS" ? "Confirm booking" : "Continue to Shopify Checkout",
         "skyra-booking__primary",
-        () => {},
+        () => { if(kind(pass) === "OWNED_PASS" && data.ownedPassesAvailable) confirm(pass); },
       );
-      checkout.disabled = true;
+      checkout.disabled = kind(pass) !== "OWNED_PASS" || !data.ownedPassesAvailable;
       main.append(checkout);
     } catch (error) {
       if (version === revision && root.contains(host)) errorView(error, load);
     }
   }
-  load();
+  checkResult(true);
 };
 document.dispatchEvent(new Event("skyra:features-ready"));

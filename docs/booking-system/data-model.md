@@ -1,5 +1,23 @@
 # Skyra Booking System — 数据模型与 ERD
 
+## 最新功能批次：Customer Account、取消改期、Coach 到课与 Reports（2026-09-13）
+
+本轮已实现客户 Upcoming/History/My Passes、本人取消与原子改期；Admin 预约详情、账本、操作历史、取消豁免和改期；Coach 名册、签到、出席/No-show；真实数据 Reports。银行、商户认证与邮箱配置按用户决定留给实际经营者，支付继续全部使用 Shopify 原生模块，自动资金退款不做。
+
+实现规则和接通步骤见 [客户账号与预约生命周期](customer-account-and-lifecycle.md)。数据库已有 11 条迁移，开发库和测试库均已应用。Customer Account 扩展尚未在真实客户账号页面完成安装/配置/登录验收，Coach 名册的真实客户姓名解析和真实邮件也未接通。所有公开新购买开关仍关闭。
+
+此节优先于下面旧日期快照。最新测试证据和未完成列表以 [交接文档](handoff-2026-09-13.md) 为准；此批次尚未再次 commit/push。
+
+## 2026-09-13 已有 Pass 确认增量
+
+迁移 `202609120008_owned_booking_confirmation` 为 Booking 增加可空、唯一的 `ownedAttemptId`。复合外键同时约束 Shop/Attempt/Session/Customer 一致；ownedAttemptId 与 checkoutId 互斥，已有 Pass 来源关联不可修改。已付款 Booking 继续使用 checkoutId + Order/Line，不伪造 A$0 订单。
+
+已有 Pass 确认锁顺序为 Session → Attempt → Entitlement；同事务创建 Booking、RESERVE(-1 available/+1 reserved)、CONFIRMED、审计及两条通知。余额不足会回滚整笔事务；同 Attempt 重试返回原 Booking，更换 Pass 返回 IDEMPOTENCY_CONFLICT。另一 Attempt 对同一 Customer/Class 不重复预约。重放即使 Attempt 已过期也能返回现有结果。
+
+result 接口严格绑定签名 Shopify Customer，按真实 Booking/PaidBookingResult/Outbox 状态返回 allowlist 的 status + bookingReference；不返回 Cart secret、Order GID、邮箱或客户 GID，不写入业务数据。RESERVE 保留在 reserved，签到后 CONSUME 属于下一轮。
+
+线下退款由 Admin 执行；当前数据模型没有自动资金退款指令或已完成线下退款的假定事实，人工记录及权益调整待实现。
+
 ## 1. 数据所有权
 
 | 领域 | 唯一可信来源 | 说明 |

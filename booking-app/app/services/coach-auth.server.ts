@@ -4,7 +4,7 @@ import { databaseNow } from "./booking.server";
 import { requireOperations, type Actor } from "./authorization";
 import { DomainError } from "../lib/errors.server";
 
-const cookieName = "skyra_coach_session";
+const cookieName = "skyra_coach_session_v2";
 const hash = (token: string) => {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token))
     throw new DomainError(
@@ -143,7 +143,7 @@ export async function coachIdentity(token: string): Promise<CoachIdentity> {
 }
 export function coachCookie(token: string, logout = false) {
   if (!logout) hash(token);
-  return `${cookieName}=${token}; Path=/coach; HttpOnly; SameSite=Lax; Max-Age=${logout ? 0 : 28800}${process.env.NODE_ENV === "production" ? "; Secure" : ""}`;
+  return `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${logout ? 0 : 28800}${process.env.NODE_ENV === "production" ? "; Secure" : ""}`;
 }
 export function requestCoachToken(request: Request) {
   return (

@@ -36,6 +36,7 @@ try {
   browser = await chromium.launch({ headless: true, channel: "chrome" });
   const results = [];
   for (const width of [390,1440]) {
+    const f = await paidFixture(); await processPaidBookingEvent((await queuePaid(f)).id);
     const context = await browser.newContext({ viewport: { width, height: 1000 } });
     const page = await context.newPage();
     const pageErrors=[];
@@ -54,6 +55,29 @@ try {
     await page.screenshot({ path: resolve(output,`coach-${width}.png`), fullPage: true });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     assert.equal(overflow, false);
+    await page.getByRole("link", {name:"View roster"}).click();
+    await page.getByRole("heading", {name:"Class roster"}).waitFor();
+    assert.equal(await page.getByRole("button", {name:"Apply booking action"}).count(),0);
+    const startsAt=new Date(Date.now()-60000), endsAt=new Date(Date.now()+3540000);
+    await db.classSession.update({where:{id:f.session.id},data:{startsAt,endsAt,busyStartsAt:startsAt,busyEndsAt:endsAt}});
+    await page.reload();
+    await page.getByLabel("Reason").fill("Arrived for class");
+    await page.getByRole("checkbox").check();
+    await page.getByRole("button",{name:"Apply booking action"}).click();
+    await page.getByText("Checked in",{exact:true}).waitFor();
+    assert.equal(await db.entitlementLedgerEntry.count({where:{shopId:f.shop.id,kind:"CONSUME"}}),0);
+    const endedStart=new Date(Date.now()-7200000),endedEnd=new Date(Date.now()-3600000);
+    await db.classSession.update({where:{id:f.session.id},data:{startsAt:endedStart,endsAt:endedEnd,busyStartsAt:endedStart,busyEndsAt:endedEnd}});
+    await page.reload();
+    await page.getByLabel("Booking action").selectOption("COMPLETE");
+    await page.getByLabel("Reason").fill("Class completed");
+    await page.getByRole("checkbox").check();
+    await page.getByRole("button",{name:"Apply booking action"}).click();
+    await page.getByText("This booking is attended.",{exact:false}).waitFor();
+    assert.equal(await db.entitlementLedgerEntry.count({where:{shopId:f.shop.id,kind:"CONSUME"}}),1);
+    await page.screenshot({path:resolve(output,'roster-'+width+'.png'),fullPage:true});
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    await page.getByRole("link",{name:"Back to your classes"}).click();
     await page.getByLabel("Show classes").selectOption("custom");
     await page.getByLabel("From (custom dates)").fill("2020-01-01");
     await page.getByLabel("To (custom dates)").fill("2020-01-02");
@@ -63,7 +87,7 @@ try {
     await page.waitForURL(base+"/coach/login");
     await page.goto(base+"/coach"); assert.ok(page.url().endsWith("/coach/login"));
     assert.deepEqual(pageErrors,[]);
-    results.push({ width, login:true, monthFilter:true, customEmptyState:true, logout:true, noHorizontalOverflow:!overflow, pageErrors });
+    results.push({ width, login:true, monthFilter:true, roster:true, checkIn:true, completion:true, customEmptyState:true, logout:true, noHorizontalOverflow:!overflow, pageErrors });
     await context.close();
   }
   await writeFile(resolve(output,"results.json"),JSON.stringify(results,null,2));

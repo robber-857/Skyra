@@ -329,6 +329,9 @@ model Booking {
   shopId                   String                   @db.Uuid
   sessionId                String                   @db.Uuid
   customerId               String                   @db.Uuid
+  version                  Int                      @default(1)
+  checkedInAt              DateTime?                @db.Timestamptz
+  ownedAttemptId           String?                  @unique @db.Uuid
   checkoutId               String?                  @unique @db.Uuid
   sourceOrderGid           String?
   sourceLineItemGid        String?
@@ -438,4 +441,32 @@ model CoachAccessToken {
   createdAt DateTime @default(now()) @db.Timestamptz
 
   @@index([shopId, coachId, status])
+}
+
+model BookingChange {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  bookingId String @db.Uuid
+  idempotencyKey String @db.Uuid
+  actorKind String
+  actorId String
+  action String
+  reason String
+  fromStatus String
+  toStatus String
+  createdAt DateTime @default(now()) @db.Timestamptz
+  @@unique([shopId, idempotencyKey])
+  @@index([shopId, bookingId, createdAt])
+}
+model BookingReschedule {
+ id String @id @default(uuid()) @db.Uuid
+ shopId String @db.Uuid
+ oldBookingId String @unique @db.Uuid
+ newBookingId String @unique @db.Uuid
+ idempotencyKey String @db.Uuid
+ actorKind String
+ actorId String
+ reason String
+ createdAt DateTime @default(now()) @db.Timestamptz
+ @@unique([shopId,idempotencyKey])
 }

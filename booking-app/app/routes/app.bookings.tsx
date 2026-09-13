@@ -46,6 +46,7 @@ export default function Bookings() {
                   }).toFormat("d LLL yyyy · h:mm a")}
                 </p>
                 <p className="muted">{item.id}</p>
+                <Link to={`/app/bookings/${item.id}`}>Manage booking</Link>
               </div>
               <Status>{item.status}</Status>
             </article>

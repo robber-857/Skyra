@@ -31,3 +31,5 @@ database.sqlite
 !.env.example
 /coverage
 /test-results
+
+/extensions/*/manifest.json

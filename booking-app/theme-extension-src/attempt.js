@@ -12,7 +12,7 @@ window.SkyraBookingAttempt = function (root) {
     } catch { return { shopDomain: "", themeId: "" }; }
   })();
   let current, sessionId, generation = 0;
-  const terminal = data => ["EXPIRED", "RECOVERY"].includes(data.status);
+  const terminal = data => !data.resultAvailable && ["EXPIRED", "RECOVERY"].includes(data.status);
   async function request(path, body) {
     const response = await fetch((root.dataset.proxyBase || "/apps/skyra-booking") + path, {
       method: "POST", credentials: "same-origin", cache: "no-store", referrerPolicy: "no-referrer",

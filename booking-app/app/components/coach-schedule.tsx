@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { DateTime } from "luxon";
 import type { coachSchedule } from "../services/coach-schedule.server";
 import { Field, Status } from "./admin-ui";
@@ -93,6 +94,7 @@ export function CoachScheduleView({
                     }).toFormat("h:mm a")}
                   </p>
                   <h3>{row.className}</h3>
+                  <Link to={`/coach/classes/${row.id}`}>View roster</Link>
                   <p className="muted">
                     {row.location} · {row.timezone}
                   </p>

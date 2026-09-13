@@ -19,12 +19,14 @@ module.exports = {
     commonjs: true,
     es6: true,
   },
-  ignorePatterns: ["!**/.server", "!**/.client", "extensions/skyra-booking-embed/assets/*.js"],
+  ignorePatterns: ["!**/.server", "!**/.client", "extensions/skyra-booking-embed/assets/*.js", "extensions/*/shopify.d.ts"],
 
   // Base config
   extends: ["eslint:recommended"],
 
   overrides: [
+    // Shopify CLI regenerates this module declaration, including its ts-ignore.
+    { files: ["extensions/*/shopify.d.ts"], rules: {"@typescript-eslint/ban-ts-comment":"off"} },
     // React
     {
       files: ["**/*.{js,jsx,ts,tsx}"],

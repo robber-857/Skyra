@@ -1,5 +1,21 @@
 # Skyra Booking System — V3 开发规划与 MVP 任务清单
 
+## 最新功能批次：Customer Account、取消改期、Coach 到课与 Reports（2026-09-13）
+
+本轮已实现客户 Upcoming/History/My Passes、本人取消与原子改期；Admin 预约详情、账本、操作历史、取消豁免和改期；Coach 名册、签到、出席/No-show；真实数据 Reports。银行、商户认证与邮箱配置按用户决定留给实际经营者，支付继续全部使用 Shopify 原生模块，自动资金退款不做。
+
+实现规则和接通步骤见 [客户账号与预约生命周期](customer-account-and-lifecycle.md)。数据库已有 11 条迁移，开发库和测试库均已应用。Customer Account 扩展尚未在真实客户账号页面完成安装/配置/登录验收，Coach 名册的真实客户姓名解析和真实邮件也未接通。所有公开新购买开关仍关闭。
+
+本轮验证：22 个测试文件 / 300 项测试；应用与客户扩展 TypeScript、ESLint、生产构建、Prisma validate、Shopify app build 均通过。Coach 390/1440px 实际页面操作与 Customer 390/1440px 本地交互夹具通过；真实 UAT 尚未签收。
+
+此节优先于下面旧日期快照。最新测试证据和未完成列表以 [交接文档](handoff-2026-09-13.md) 为准；此批次尚未再次 commit/push。
+
+## 2026-09-13 范围和进度更新（优先于旧快照）
+
+上一批已推送 `a372b1103cae1a2c472b9aad26ea38f3e4888812`，GitHub CI 34697492538 已通过。本轮已有 Pass 原子确认及 Home/Programs 结果恢复通过 255 项测试和 16 组浏览器场景；新批次尚未再次提交。真实交易和发信仍关闭。
+
+用户明确：支付全部使用 Shopify 原生 Checkout 和后台启用的支付方式；目前收款银行账户未配置。自动退款移出当前 MVP，Admin 线下处理退款；取消/改期/课次恢复、人工处理记录和订单对账仍要做。最新执行顺序见 [交接](handoff-2026-09-13.md)。
+
 ## 1. MVP 目标
 
 第一版必须完成一个可真实运营的闭环：
@@ -11,7 +27,7 @@ Admin 配置服务与排期
 → 系统确认 Booking
 → Customer 与 Coach 查看日程
 → Coach 签到
-→ Admin 取消、改期、退款与查错
+→ Admin 取消、改期、异常查错；退款由 Admin 线下处理
 ```
 
 ### 已批准的交付形态
@@ -27,7 +43,7 @@ Admin 配置服务与排期
 ### P0 — 上线必须有
 
 - Customer：Shopify Home + Programs 同区块 Booking、My Overview、My Passes、Bookings & History、Appointments、取消/改期与老师留言。
-- Commerce：Single Pass、次数 Pack、Shopify Cart/Checkout、Discount、Order、Refund 映射。
+- Commerce：Single Pass、次数 Pack、Shopify 原生 Cart/Checkout、Discount、Order 映射；当前不做自动资金退款。
 - Admin：Overview、People、Classes & Passes、Weekly Schedule、Bookings、Reports；Settings 为低频入口。
 - Coach：Today、Schedule、Roster、Appointment Detail、Attendance、Availability。
 - Engine：容量锁、Appointment 冲突、Hold、Entitlement ledger、Webhook 幂等、通知。
@@ -117,7 +133,7 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 - [ ] M1-04 接入 PostgreSQL、migration、seed 与连接池。
 - [ ] M1-05 建立 Redis/Queue 与 Worker。
 - [ ] M1-06 实现 Shopify Admin App authentication。
-- [ ] M1-07 实现 Customer Account Session Token 验证。
+- [x] M1-07 Customer Account Session Token 后端验签、audience/时效/店铺/Customer 校验已实现；SDK 真签名与伪造签名测试通过，真实店铺授权仍待验收。
 - [ ] M1-08 实现 Coach magic link/OTP 与 Staff RBAC。
 - [ ] M1-09 建立统一日志、request ID、error monitoring。
 - [ ] M1-10 建立 CI：lint、typecheck、unit test、migration check。
@@ -173,12 +189,12 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 - [x] M3-04 实现 Hold idempotency、释放与自动过期：重试不延长 TTL；过期立即不计入容量；Worker 每 30 秒清理，事件幂等。
 - [x] M3-05 实现 Class capacity 事务锁和数据库触发器：20 人抢最后一个名额、20 个直接数据库写入均仅 1 个成功；容量不得低于已占用数量。
 - [ ] M3-06 实现 Coach/Location/Resource 时间重叠约束。
-- [ ] M3-07 实现 Booking 状态机。当前只有容量投影表和 Attempt/Hold 状态，确认/取消/签到仍未实现。
+- [x] M3-07 Class Booking 付费/已有 Pass 确认、取消、改期、签到、出席及 No-show 状态转换已实现。
 - [ ] M3-08 实现 Booking Event audit trail。Attempt 创建/绑定及 Hold 创建/释放/到期已有追加式审计；完整 Booking 事件未实现。
-- [x] M3-09 实现 Entitlement grant/reserve/consume/release/adjust/revoke ledger：追加式三余额流水、来源订单行与操作幂等、数据库非负约束及不可变触发器已完成；尚未接 orders/paid 或 Booking 状态机。
-- [x] M3-10 实现有效 Pass 选择算法：按 Customer/Service/有效期/可用余额筛选并按最早到期排序；Intro 使用保守首次客户规则。Storefront 已有 Pass 卡片与原子确认仍属 M5-07/M5-09。
-- [ ] M3-11 实现原子改期：新 Hold 成功后再释放旧占用。
-- [ ] M3-12 实现取消政策计算。
+- [x] M3-09 实现 Entitlement grant/reserve/consume/release/adjust/revoke ledger：追加式三余额流水、来源订单行与操作幂等、数据库非负约束及不可变触发器已完成；已接 orders/paid 和已有 Pass 原子确认；取消/签到仍待接入。
+- [x] M3-10 实现有效 Pass 选择算法：按 Customer/Service/有效期/可用余额筛选并按最早到期排序；Intro 使用保守首次客户规则。Storefront 已有 Pass 卡片与原子确认已接通，发布 gate 仍关闭；见 M5-07/M5-09。
+- [x] M3-11 Class 原子改期：两个 Session 按 ID 排序锁定，新预约/旧释放同事务，失败保留原预约；不增加 Checkout Hold。Appointment 改期仍待私教流程。
+- [x] M3-12 实现提前 12 小时边界、Late Cancel、Admin 豁免与课次结算；不自动退款。
 - [ ] M3-13 实现 Admin 手工 Booking。
 - [ ] M3-14 实现 Booking attempt：opaque token hash、HOME/PROGRAMS 固定返回路径、登录后 Customer 原子绑定、跨店/跨客户隔离、30 分钟恢复及到期已完成；前端已使用服务器恢复，Checkout/Webhook 状态尚待 M4，保持部分完成。
 
@@ -203,11 +219,11 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 - [x] M4-02 将服务器随机生成、无 PII 且与公开 Attempt/Hold ID 分离的 opaque booking reference 写入 Cart line attribute `_skyra_booking_ref`；完整 Cart ID/secret 仅服务器保存。
 - [ ] M4-03 确认预约摘要进入 Order 但不包含敏感数据。
 - [ ] M4-04 已实现 Shopify SDK HMAC 验证后的 `orders/paid` 路由和主题拒绝；真实订阅、所需订单权限、CLI trigger 联调，以及取消/退款 topics 尚未完成。
-- [ ] M4-05 已建立 `webhook_receipts` 的 payload hash、`(shopId, webhookId)` 并发去重、状态约束和最小化 Outbox 分类；`ORDER_PAID_RECEIVED` Worker 消费、失败重试/告警和运维重放尚未完成。
+- [ ] M4-05 已建立 `webhook_receipts` 的 payload hash、`(shopId, webhookId)` 并发去重、状态约束和最小化 Outbox 分类；`ORDER_PAID_RECEIVED` Worker 消费和有界失败重试已完成，告警与运维重放尚未完成。
 - [x] M4-06 内部 orders/paid Worker 完成 NEW_PASS/Drop-in GRANT → RESERVE → CONFIRMED；事务包括两条预约通知。真实订阅/支付验收仍属于 M4-04/M8-11。
 - [x] M4-07 同事件重试、不同 delivery ID、同订单并发由 Checkout/Order-Line 唯一记录和事务锁去重，不重复发权益、确认或通知。
-- [ ] M4-08 退款后执行 Entitlement reversal 与 Booking projection 更新。
-- [ ] M4-09 订单引用/客户/Product/Variant/数量/币种/金额/付款状态异常已进入 `ORDER_PAID_REVIEW` 与 Receipt NEEDS_ATTENTION；Admin 队列、过期 Hold 付款决策和人工恢复尚未完成。
+- [ ] M4-08 当前延期：不实现自动客户退款。Admin 线下退款；后续另做已验证人工处理记录、对应 Entitlement/Booking 调整，绝不把操作备注当成已完成资金退款。
+- [ ] M4-09 订单引用/客户/Product/Variant/数量/币种/金额/付款状态异常已进入 `ORDER_PAID_REVIEW` 与 Receipt NEEDS_ATTENTION；Admin 只读队列和过期 Hold 重查决策已实现；可审计人工恢复操作尚未完成。
 - [ ] M4-10 实现订单 reconciliation job 与 Admin 手工 Reconcile。
 - [ ] M4-11 内部服务已严格核对并仅返回允许店铺/Shopify host 的 HTTPS checkoutUrl，以及固定 Home/Programs returnPath；前端跳转、Thank-you/支付后返回与真实店联调尚未实现。
 
@@ -232,9 +248,9 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 - [ ] M5-04 完成共享 BROWSE：按 Programs Find a Class 视觉实现月标题、七日日期条、前后周、Class type/Instructor filters、实时容量、loading/empty/error 和区块内 Full calendar。七日条、筛选和实时 Session 已联调；本轮补充独立 Book 与 Show details，2026-09-11 已完成 Programs 共享宽面板、31 天 Full Calendar 和跨月选择；本轮已补齐月份标题、独立前后周与未开放文案；剩余真实 Programs 入口及完整 E2E。
 - [ ] M5-05 完成 DETAILS：Show details 在 Session 行内展开或在同一 surface 替换内容，显示课程、老师、地点、level、policy、剩余名额；Back 恢复日期、筛选、滚动和焦点。
 - [ ] M5-06 完成 LOGIN_REQUIRED：Shopify 登录 modal 与全端同页顶层跳转已实现，并已接服务器 opaque Attempt 与固定返回路径；签名身份绑定、无 storage 恢复通过本地验证。2026-09-12 用户反馈 Shopify 托管页 **Continue with Shop** 点击后疑似无响应；已移除桌面弹窗层，并修复本地预览误把登录请求发到 `127.0.0.1` 的 401。当前已验证开发店域名能在同一标签页打开 Shopify 托管登录并保留 `preview_theme_id`，但真实账户完成登录、退出、跨域 cookie 与签名返回仍待用户复测，保持部分完成。
-- [ ] M5-07 完成 PASS_SELECTION：采用参考图的主栏 Pass cards + 右栏 Booking Details；已有适用 Pass 优先显示余额、到期与 `A$0 due today`，购买选项显示已同步 Shopify Variant 实时价格，未选择时 Continue 禁用。2026-09-11 已完成新 Pass cards、资格/同步价格检查和响应式 Booking Details；2026-09-12 已补充 Drop-in 卡片、价格复核及 Continue 时的实时 Shopify 可售校验。开发店两个测试商品的真实检查现已通过；已有 Pass UI、真实账号 Review 仍待验收。
-- [ ] M5-08 新增 REVIEW：采用参考图的交易摘要结构，显示 Customer、Class、日期时间、Coach、Location、选中 Pass/Drop-in、价格与 Edit；这是当前 Booking section 的状态，不是 Customer Account 或独立 Cart 页面。2026-09-11 已完成新 Pass 摘要、服务端价格/名额复核及 Edit；2026-09-12 已补充 Drop-in 摘要；Customer/已有 Pass 与支付交接未完成。
-- [ ] M5-09 已有 Pass 从 REVIEW 走原子确认并显示 CONFIRMING → CONFIRMED，不创建 A$0 Checkout。
+- [ ] M5-07 完成 PASS_SELECTION：采用参考图的主栏 Pass cards + 右栏 Booking Details；已有适用 Pass 优先显示余额、到期与 `1 class credit`，购买选项显示已同步 Shopify Variant 实时价格，未选择时 Continue 禁用。2026-09-11 已完成新 Pass cards、资格/同步价格检查和响应式 Booking Details；2026-09-12 已补充 Drop-in 卡片、价格复核及 Continue 时的实时 Shopify 可售校验。开发店两个测试商品的真实检查现已通过；2026-09-13 已有 Pass 卡片/余额/到期/Review 已实现，真实账号 Review 仍待验收。
+- [ ] M5-08 新增 REVIEW：采用参考图的交易摘要结构，显示 Customer、Class、日期时间、Coach、Location、选中 Pass/Drop-in、价格与 Edit；这是当前 Booking section 的状态，不是 Customer Account 或独立 Cart 页面。2026-09-11 已完成新 Pass 摘要、服务端价格/名额复核及 Edit；2026-09-12 已补充 Drop-in 摘要；2026-09-13 已有 Pass 摘要和原子确认已完成；Customer 展示、实际支付交接未完成。
+- [x] M5-09 已有 Pass 从 REVIEW 走原子确认并显示 CONFIRMING → CONFIRMED，不创建 A$0 Checkout；10 并发只扣 1 credit，末次课/最后名额争抢通过。发布 gate 仍关闭，真实客户验收在 M8。
 - [ ] M5-10 新 Pass/Drop-in 的内部 Review → 15 分钟 Hold → 单 Cart 编排及 line attribute 已完成；公开接口/前端跳转仍关闭，待 orders/paid、预约确认和付款后恢复具备后再联调 Shopify Checkout。Booking App 不渲染支付表单。
 - [ ] M5-11 Checkout 返回后恢复 attempt，显示 webhook processing、confirmed、payment complete but seat unavailable、Needs Attention 和 retry/recovery。
 - [ ] M5-12 Home 与 Programs 的 UI、状态机、API client、analytics 与错误文案只实现一次；`data-surface` 仅控制标题、介绍文案或初始筛选。
@@ -243,11 +259,11 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 Customer Account 后续独立交付，不使用本轮交易截图作为页面结构：
 
 - [ ] M5-14 Customer Account full-page：My Overview，显示 Pass、下一节 Class/Appointment、快捷操作和最新老师留言。
-- [ ] M5-15 Bookings & History：Upcoming、Attended、Cancelled、Late Cancel、No-show 与 Pass 来源。
-- [ ] M5-16 Class/Booking Detail：Add to calendar、Cancel、Reschedule、Customer-visible coach message。
-- [ ] M5-17 My Passes：余额、Reserved、Expiry、Eligibility、Usage history 与 Shopify order link。
+- [ ] M5-15 Upcoming/History 状态与改期关联已实现；关联 Pass/Shopify order 的完整导航和真实账号验收待完成。
+- [ ] M5-16 Cancel/Reschedule 已实现；Add to calendar、Customer-visible coach message 待完成。
+- [ ] M5-17 My Passes 余额/Reserved/Used、Expiry、Eligibility、最近 20 条 Usage history 与分页已实现；Shopify order link、更多历史导航待完成。
 - [ ] M5-18 Appointments：Service/Coach/slot、已有 Pass、Checkout hand-off、Upcoming/History 与老师留言。
-- [ ] M5-19 Customer Account session token 获取与后端 JWT 验证，不信任浏览器提交的 Customer ID。
+- [x] M5-19 每次请求获取 Customer Account session token，后端验签和归属验证；浏览器不能指定 Customer 身份。
 ### 验收
 
 - 新客可以完成“选课 → 登录 → 买 Drop-in → 付款 → 查看 Booking”。
@@ -269,13 +285,13 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 
 - [ ] M6-01 Coach Today dashboard。
 - [ ] M6-02 Day/Week schedule。已实现 /coach 的未来 7 天/30 天/自定义日期只读课程列表；日历视图及真实邀请登录验收待完成。
-- [ ] M6-03 Class Session roster。
-- [ ] M6-04 Check-in、Attended、No-show。
+- [ ] M6-03 Class Session roster 和状态操作已实现；真实客户姓名/有限联系资料接通待完成。
+- [x] M6-04 Check-in、Attended、No-show 及权限、截止时间、账本幂等和并发测试完成。
 - [ ] M6-05 Appointment detail 与有限客户信息。
 - [ ] M6-06 Availability recurring hours。
 - [ ] M6-07 Time off / exception。
 - [ ] M6-08 Schedule change notifications。
-- [ ] M6-09 Coach 数据访问审计。当前 /coach 课程报名查询已有审计；其他 Coach 操作待实现。
+- [ ] M6-09 Coach 数据访问审计。当前课程查询、Roster 和到课操作已有审计；未来私教/留言操作审计待实现。
 - [ ] M6-10 Coach 创建 PRE_CLASS/POST_CLASS 留言，并明确选择 Customer-visible 或 Internal。
 
 ### 验收
@@ -296,10 +312,10 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 - [ ] M7-03 Classes & Passes：一个页面创建/编辑 Class 与 Pass；Class 包含名称、drop-in price、duration、capacity、location、eligible coaches 和 suggested defaults。
 - [ ] M7-04 Pass package：Shopify Variant price mapping，加 Booking DB credits、validity、eligible classes、online sale state。
 - [ ] M7-05 Weekly Schedule：周 Calendar、copy last week、actual date/time/coach、conflict detection、draft/publish。
-- [ ] M7-06 Bookings：index、saved filters、detail panel；Admin 创建、改期、取消、waitlist、attendance。
-- [ ] M7-07 Booking detail 同页显示 Customer、Session、Payment/Pass、Entitlement、Timeline。
-- [ ] M7-08 Reports：per-customer spending CSV 与 purchased-but-unused Pass credits/expiry CSV。
-- [ ] M7-09 Refund、Restore Credit、Cancel 是三个分离动作，危险操作二次确认并记录原因。
+- [ ] M7-06 Bookings 列表、详情、改期、取消、attendance 已实现；saved filters、Admin 手工创建、waitlist 待完成。
+- [ ] M7-07 Booking detail 已显示 Session、Customer 内部引用、Entitlement 流水、Timeline 和改期关联；真实 Customer 资料/完整 Payment 导航待完成。
+- [ ] M7-08 Reports 已有日期筛选、预约状态、已验证购买值及当前未用课次汇总；per-customer spending 和 credits/expiry CSV 待完成。
+- [ ] M7-09 Cancel / Admin 豁免课次已分离并要求确认/原因；资金退款不实现，线下处理记录待完成。
 - [ ] M7-10 Settings：notifications、locations/resources、policy、roles、integration health、failed webhook/reconcile、audit。
 
 ### 验收
@@ -331,7 +347,7 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 - [ ] M8-09 Shopify Webhook replay integration tests。
 - [ ] M8-10 三端权限 integration tests。
 - [ ] M8-11 Customer 购买和预约 E2E。
-- [ ] M8-12 Admin 改期/取消/退款 E2E。
+- [ ] M8-12 Admin 改期/取消/线下处理记录 E2E；自动资金退款不在当前范围。
 - [ ] M8-13 时区与澳洲夏令时边界测试。
 - [ ] M8-14 Accessibility、mobile、browser smoke tests。
 
@@ -348,7 +364,7 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 ### 上线验收
 
 - 并发容量和 Appointment 冲突测试通过。
-- 支付、退款、重复 Webhook、漏 Webhook 对账通过。
+- 支付、取消/课次处理、重复 Webhook、漏 Webhook 对账通过；自动退款暂不纳入验收。
 - 三种角色的越权测试通过。
 - 迁移总数、余额总数、未来 Booking 数量与旧系统对账。
 - 自动备份、恢复演练、告警和 Runbook 完成。
@@ -462,4 +478,4 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 - [x] 内部 Coach 一次性登录/8 小时会话/退出与停用检查；公开未授权访问被拒绝。
 - [ ] Coach 真实邮箱维护、邀请发信、自助重发和真实身份登录验收。
 - [ ] 事务邮件 provider、Customer/Coach verified recipient 解析、域名配置、投递回执和真实收信验收。
-- [ ] 退款/取消/争议乱序、订单 reconciliation、异常队列可审计人工恢复；完成前不开放 Checkout。
+- [ ] 取消/订单变更乱序、订单 reconciliation、异常队列可审计人工恢复；自动退款已按用户决定延期。完成真实支付验收前不开放 Checkout。

@@ -8,7 +8,7 @@
 
 ## 当前开发进度
 
-已创建并绑定 **Skyra Booking** App；工程和第一轮 Admin Catalog/Schedule 代码位于 [booking-app](../../booking-app/README.md)。实际验证、待确认规则和未完成项见 [开发状态](./development-status.md)。2026-09-10 已完成 Class Booking 基础：服务器 Attempt、真实容量、15 分钟 Hold、幂等/过期和防超售数据库锁。2026-09-12 已完成新 Pass / Drop-in 选择与 Review、付款前 Recovery，并创建 Programs 开发店页面；权益账本、付款与确认闭环仍未完成，也未部署正式主题。
+已创建并绑定 **Skyra Booking**。目前已实现团课预约/付款回调/课次账本的本地闭环、客户个人中心与取消改期、Coach 排期人数/名册/到课操作、Admin 预约管理与基础 Reports。真实 Shopify 登录与 Checkout、联系方式/发信、异常人工处理、私教和生产运行等仍未全部完成。请优先阅读 [2026-09-13 交接](handoff-2026-09-13.md)、[开发状态](development-status.md) 和 [本轮功能说明](customer-account-and-lifecycle.md)。
 
 ## 推荐阅读顺序
 
@@ -42,7 +42,7 @@
 10. Home 与 Programs 不复制两套 Booking 代码：两个主题占位节点由同一个 Theme App Extension app embed 挂载。
 11. 浏览、课程详情、Pass 选择、已有 Pass 确认和结果状态都在当前 Booking section 内切换；登录和付款分别使用 Shopify Customer Account 与 Shopify Checkout，完成后返回原 section 并恢复 Booking attempt。
 12. Book 必须即时验证 Shopify Customer Account 登录；未登录弹出 Skyra 登录提示，桌面打开 Shopify 登录窗口，手机/受限浏览器同页登录，返回原课程并重新验证。当前已接服务端 opaque Attempt、不可换绑的 Shopify 客户身份和固定返回路径；真实开发店客户登录联调尚未完成。
-13. 本轮 Find a Class、Select a pass 和交易摘要参考图只定义 Home / Programs 的下单 UI；Customer Account 的 My Bookings / My Passes 是独立后续范围。
+13. 本轮 Find a Class、Select a pass 和交易摘要参考图只定义 Home / Programs 的下单 UI；Customer Account 的 My Bookings / My Passes 已完成本地实现，真实账号接通待验收。
 
 ## 已清理的旧假设
 
@@ -52,14 +52,6 @@
 - `shopify-theme/sections/skyra-home.liquid` 和 `shopify-theme/sections/skyra-programs.liquid` 已替换为共享挂载节点；根目录静态 HTML 原型不作为后端实现依据。
 
 
-## 当前测试入口（2026-09-12）
+## 测试与交接
 
-参见 [开发预览与测试指南](preview-testing.md)：Home/Booking Admin 入口、当前可测试范围、启动命令及 Shopify 商品和支付分工。先体验当前阶段，再继续未完成交易功能。
-
-当前交付包含共享 Programs 样式、Full Calendar、新 Pass / Drop-in 选择和 Review；支付及已有 Pass 确认未开放。详见 [开发状态](development-status.md)。
-
-- 2026-09-11 续开发：共享月份/翻周、付款前失效恢复与预览健康检查已实现；2026-09-12 已捕获 Node IPv4 超时/IPv6 无路由并加入开发进程兼容设置，Programs Page 已创建。当前网络慢，最终真实页面验收暂缓。入口及重启命令见 [开发预览与测试](preview-testing.md)，完整剩余任务见 [当前进度](development-status.md)。
-
-## 新会话交接
-
-先读 [2026-09-12 开发交接](handoff-2026-09-12.md)，再按 [当前进度](development-status.md) 与 [开发任务](implementation-backlog.md) 继续。交接明确区分本地测试、真实 Shopify 验收与尚未实现的支付/权益流程。
+参见 [开发预览与测试](preview-testing.md)、[真实 UAT 清单](launch-readiness-and-uat.md) 和 [2026-09-13 交接](handoff-2026-09-13.md)。

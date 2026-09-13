@@ -1,0 +1,21 @@
+api_version = "2026-07"
+
+[[extensions]]
+name = "Skyra bookings and passes"
+handle = "skyra-customer-account"
+uid = "1f42ca1a-89c5-57ac-8ecb-75666048c0bc541ddc5e"
+type = "ui_extension"
+
+[[extensions.targeting]]
+module = "./src/CustomerAccount.tsx"
+target = "customer-account.page.render"
+
+[extensions.capabilities]
+network_access = true
+
+[extensions.settings]
+[[extensions.settings.fields]]
+key = "api_url"
+type = "single_line_text_field"
+name = "Booking API URL"
+description = "HTTPS URL of the Skyra Booking app backend."

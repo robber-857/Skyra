@@ -1,16 +1,18 @@
 import { createHash, randomBytes } from "node:crypto";
-import {
-  Prisma,
-  type BookingAttempt,
-  type Shop,
-} from "@prisma/client";
+import { Prisma, type BookingAttempt, type Shop } from "@prisma/client";
 import { DateTime } from "luxon";
 import { z } from "zod";
 import db from "../db.server";
 import { DomainError } from "../lib/errors.server";
-import { introOfferEligible } from "./entitlements.server";
+import {
+  eligibleEntitlements,
+  introOfferEligible,
+} from "./entitlements.server";
 import { purchaseMappingReady } from "./purchase-mapping.server";
-import { checkoutAvailable, ownedPassesAvailable } from "./commerce-capabilities.server";
+import {
+  checkoutAvailable,
+  ownedPassesAvailable,
+} from "./commerce-capabilities.server";
 
 type Tx = Prisma.TransactionClient;
 export type BookingActor = { shopId: string; customerGid: string | null };
@@ -180,6 +182,7 @@ async function snapshot(
     surface: attempt.surface,
     status: attempt.status,
     requiresLogin,
+    resultAvailable: Boolean(hold) || attempt.status === "CONFIRMED",
     expiresAt: attempt.expiresAt.toISOString(),
     returnPath: attemptReturnPath(attempt.surface, token),
     session: {
@@ -552,7 +555,10 @@ export async function expireBookingWork(batchSize = 100) {
     orderBy: { expiresAt: "asc" },
   });
   const attempts = await db.bookingAttempt.findMany({
-    where: { status: { notIn: ["EXPIRED", "CONFIRMED"] }, expiresAt: { lte: now } },
+    where: {
+      status: { notIn: ["EXPIRED", "CONFIRMED"] },
+      expiresAt: { lte: now },
+    },
     take: batchSize,
     orderBy: { expiresAt: "asc" },
   });
@@ -590,9 +596,17 @@ export const passOptionsInput = z
   .object({
     token: tokenSchema,
     passPlanId: z.string().uuid().optional(),
-    purchaseKind: z.enum(["NEW_PASS", "DROP_IN"]).optional(),
+    entitlementId: z.string().uuid().optional(),
+    purchaseKind: z.enum(["NEW_PASS", "DROP_IN", "OWNED_PASS"]).optional(),
   })
   .strict()
+  .refine(
+    (input) =>
+      input.purchaseKind === "OWNED_PASS"
+        ? Boolean(input.entitlementId) && !input.passPlanId
+        : !input.entitlementId,
+    "Select an owned Pass without a purchase",
+  )
   .refine(
     (input) => input.purchaseKind !== "DROP_IN" || !input.passPlanId,
     "A drop-in cannot select a Pass",
@@ -679,18 +693,37 @@ export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
           currency: "AUD",
         }
       : null;
+    const ownedPasses = (
+      await eligibleEntitlements(tx, {
+        shopId: shop.id,
+        customerId: attempt.customerId,
+        serviceId: session.serviceId,
+        sessionStartsAt: session.startsAt,
+        now,
+      })
+    ).map((item) => ({
+      id: item.id,
+      name: item.name,
+      kind: "OWNED_PASS" as const,
+      availableUnits: item.availableUnits,
+      expiresAt: item.expiresAt.toISOString(),
+      priceCents: 0,
+      currency: "AUD",
+    }));
     const selected =
-      input.purchaseKind === "DROP_IN"
-        ? dropIn
-        : input.passPlanId
-          ? passes.find((p) => p.id === input.passPlanId)
-          : null;
+      input.purchaseKind === "OWNED_PASS"
+        ? ownedPasses.find((item) => item.id === input.entitlementId)
+        : input.purchaseKind === "DROP_IN"
+          ? dropIn
+          : input.passPlanId
+            ? passes.find((p) => p.id === input.passPlanId)
+            : null;
     if (input.purchaseKind === "DROP_IN" && !dropIn)
       fail(
         "DROP_IN_UNAVAILABLE",
         "Single-class booking is not available right now. Choose another option.",
       );
-    if (input.passPlanId && !selected)
+    if ((input.passPlanId || input.entitlementId) && !selected)
       fail(
         "PASS_UNAVAILABLE",
         "This Pass has changed or is no longer available. Choose another Pass.",
@@ -702,7 +735,10 @@ export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
       dropIn,
       selected,
       checkoutAvailable,
-      ownedPassesAvailable,
+      ownedPasses,
+      ownedPassesAvailable:
+        ownedPassesAvailable &&
+        (shop.rules as Record<string, unknown>).onlineBookingsEnabled === true,
     };
   });
 }

@@ -15,6 +15,7 @@ const session = {
 };
 const server = http.createServer((req, res) => {
   const pathname = new URL(req.url, "http://localhost").pathname;
+  if (pathname === "/apps/skyra-booking/result") {res.setHeader("Content-Type", "application/json");return res.end(JSON.stringify({status:"NOT_CONFIRMED",bookingReference:null}));}
   if (["/booking.js", "/login.js", "/attempt.js", "/calendar.js", "/transaction.js", "/booking.css"].includes(pathname)) {
     res.setHeader("Content-Type", pathname.endsWith("css") ? "text/css" : "text/javascript");
     return res.end(fs.readFileSync(path.join(app, "extensions/skyra-booking-embed/assets", pathname.slice(1))));
@@ -221,6 +222,49 @@ const server = http.createServer((req, res) => {
         results.push({ surface, width, overflow: false, dialog: true, keyboard: true, cancellation: true, retry: true, returnRecovery: true, weekBoundaries:true, recoveryRetry:true, expiredAttempt:true, passChanged:true, passReauth:true, dropIn:true });
         await context.close();
       }
+    }
+    // Owned Pass confirmation and lost-response recovery remain in the same section.
+    for (const surface of ["home", "programs"]) for (const width of [390, 1440]) {
+      const context=await browser.newContext({viewport:{width,height:900}});
+      const page=await context.newPage(), errors=[]; page.on("pageerror",e=>errors.push(e.message));
+      let state="NOT_CONFIRMED", confirmCalls=0, lostResponse=true, resultOffline=false, resultAvailable=false;
+      const token="d".repeat(43), reference="11111111-2222-4333-8444-555555555555";
+      const url=base+(surface==="home" ? "/" : "/pages/programs");
+      await context.route("**/apps/skyra-booking/sessions?*",route=>route.fulfill({json:{timezone:"Australia/Sydney",sessions:[session]}}));
+      await context.route("**/apps/skyra-booking/{start,attempt}",route=>route.fulfill({json:{token,surface:surface.toUpperCase(),status:resultAvailable?"EXPIRED":"STARTED",resultAvailable,requiresLogin:false,session:{...session,timezone:"Australia/Sydney",bookingStatus:"OPEN"},returnPath:new URL(url).pathname+"?skyra_attempt="+token+"#skyra-booking-"+surface}}));
+      await context.route("**/apps/skyra-booking/result",route=>resultOffline ? route.abort("failed") : route.fulfill({json:{status:state,bookingReference:state==="CONFIRMED"?reference:null}}));
+      await context.route("**/apps/skyra-booking/pass-options",route=>{
+        const input=route.request().postDataJSON();
+        const pass={id:"owned-pass",name:"My Five Class Pass",kind:"OWNED_PASS",availableUnits:4,expiresAt:new Date(Date.now()+86400000*30).toISOString(),priceCents:0,currency:"AUD"};
+        if(input.purchaseKind) {assert.equal(input.purchaseKind,"OWNED_PASS");assert.equal(input.entitlementId,pass.id);assert.equal(input.passPlanId,undefined);}
+        return route.fulfill({json:{passes:[],ownedPasses:[pass],selected:input.entitlementId?pass:null,ownedPassesAvailable:true,checkoutAvailable:false}});
+      });
+      await context.route("**/apps/skyra-booking/confirm",route=>{
+        confirmCalls++;assert.deepEqual(route.request().postDataJSON(),{token,entitlementId:"owned-pass"});state="CONFIRMED";resultAvailable=true;
+        return lostResponse ? route.abort("failed") : route.fulfill({json:{status:state,bookingReference:reference}});
+      });
+      await page.goto(url);await page.locator("[data-booking-book]").click();await page.getByRole("radio").check();
+      await page.locator("[data-pass-continue]").click();await page.getByRole("heading",{name:"Review your booking"}).waitFor();
+      assert.equal(await page.getByRole("button",{name:"Continue to Shopify Checkout"}).count(),0);
+      assert.equal(await page.getByText("1 class credit",{exact:true}).count(),1);
+      await page.screenshot({path:path.join(output,surface+"-"+width+"-owned-review.png"),fullPage:true});
+      await page.getByRole("button",{name:"Confirm booking",exact:true}).click();
+      await page.locator('[data-booking-result="CONFIRMED"]').waitFor();assert.equal(confirmCalls,1);
+      await page.reload();await page.locator('[data-booking-result="CONFIRMED"]').waitFor();assert.equal(confirmCalls,1);
+      await page.screenshot({path:path.join(output,surface+"-"+width+"-confirmed.png"),fullPage:true});
+      for (const next of ["PROCESSING","AWAITING_PAYMENT","NEEDS_ATTENTION"]) {
+        state=next;await page.reload();await page.locator('[data-booking-result="'+next+'"]').waitFor();
+        assert.equal(await page.getByRole("button",{name:"Continue to Shopify Checkout"}).count(),0);
+        assert.equal(await page.getByRole("button",{name:"Confirm booking",exact:true}).count(),0);
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+        assert.equal(await page.evaluate(k=>sessionStorage.getItem(k),"skyra-booking:"+surface+":attempt"),token);
+      }
+      resultOffline=true;await page.reload();await page.locator('[data-booking-result="UNKNOWN"]').waitFor();
+      assert.equal(confirmCalls,1);resultOffline=false;state="CONFIRMED";
+      await page.getByRole("button",{name:"Check booking status"}).click();await page.locator('[data-booking-result="CONFIRMED"]').waitFor();
+      assert.deepEqual(errors,[]);
+      results.push({surface,width,ownedPass:true,lostConfirmationResponse:true,expiredPaidRecovery:true,unknownRetry:true,duplicateConfirmation:false,overflow:false});
+      await context.close();
     }
     // Follow real browser navigation/window behavior with a controlled Shopify redirect fixture.
     for (const { width, blockedStorage } of [{ width: 390, blockedStorage: false }, { width: 1440, blockedStorage: false }, { width: 390, blockedStorage: true }]) {

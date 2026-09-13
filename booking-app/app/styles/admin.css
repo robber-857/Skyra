@@ -224,3 +224,9 @@ select:focus-visible {
     width: 100%;
   }
 }
+
+.booking-action-form {display:grid;gap:14px;margin-top:24px;max-width:640px}.booking-action-form textarea{font:inherit;width:100%;box-sizing:border-box;padding:10px}.booking-confirm-check{display:flex;align-items:flex-start;gap:10px}.roster-booking{padding:24px 0;border-top:1px solid #ddd}.roster-booking p{overflow-wrap:anywhere}.booking-action-form button{justify-self:start}
+.report-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:20px; margin:16px 0; }
+.report-grid > div { display:flex; flex-direction:column; gap:6px; }
+.report-grid strong { font-size:28px; font-weight:600; }
+.report-grid span { color:#5b6660; font-size:14px; }
