@@ -32,7 +32,7 @@ export async function addSessions(actor: Actor, raw: unknown) {
           id: input.serviceId,
           shopId: actor.shopId,
           status: "ACTIVE",
-          kind: { in: ["CLASS", "APPOINTMENT"] },
+          kind: { in: ["CLASS", "APPOINTMENT", "COURSE"] },
         },
         include: { location: true },
       });
@@ -191,7 +191,7 @@ export async function updateSession(actor: Actor, raw: unknown) {
         id: input.serviceId,
         shopId: actor.shopId,
         status: "ACTIVE",
-        kind: { in: ["CLASS", "APPOINTMENT"] },
+        kind: { in: ["CLASS", "APPOINTMENT", "COURSE"] },
       },
       include: { location: true },
     });

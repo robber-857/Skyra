@@ -28,7 +28,7 @@ const rules = {
   seatHoldMinutes: 15,
   onlineBookingsEnabled: true,
 };
-async function fixture(capacity = 4) {
+async function fixture(capacity = 4, serviceKind = "CLASS") {
   const shop = await db.shop.create({
     data: {
       domain: randomUUID() + "-booking-test.myshopify.com",
@@ -46,6 +46,7 @@ async function fixture(capacity = 4) {
       shopId,
       locationId: location.id,
       name: "Class",
+      kind: serviceKind,
       durationMin: 55,
       capacity,
       requestedPriceCents: 4900,
@@ -109,7 +110,7 @@ async function fixture(capacity = 4) {
       passPlanId: pass.id,
       idempotencyKey: key,
     });
-  return { shop, shopId, session, pass, actor, start, hold };
+  return { shop, shopId, service, session, pass, actor, start, hold };
 }
 
 test("attempts are hashed, anonymous browsing has no occupancy, and return paths are allowlisted", async () => {
@@ -136,6 +137,14 @@ test("attempts are hashed, anonymous browsing has no occupancy, and return paths
     (await classAvailability(f.shopId, [f.session.id])).get(f.session.id),
   ).toBe(4);
   expect(await db.bookingHold.count({ where: { shopId: f.shopId } })).toBe(0);
+});
+
+test("published Workshops enter the public booking and eligible Pass flow", async () => {
+  const f = await fixture(12, "COURSE");
+  const attempt = await f.start();
+  expect(attempt.session.service.kind).toBe("COURSE");
+  const options = await bookingPassOptions(f.actor(), { token: attempt.token });
+  expect(options.passes.map((pass) => pass.id)).toEqual([f.pass.id]);
 });
 
 test("login claims an attempt once; cross-customer and cross-shop access are rejected", async () => {

@@ -162,6 +162,8 @@ erDiagram
 | shopify_product_mapping_id | uuid | 对应 drop-in Shopify Product/Variant，可空 |
 | status | enum | DRAFT / ACTIVE / INACTIVE |
 
+实现约束（2026-09-15）：`Service.kind` 只允许 `CLASS`、`APPOINTMENT`、`COURSE`。`APPOINTMENT` 容量固定为 1；`COURSE` 当前表示可按日期排入 Weekly Schedule 的 Workshop，并使用配置容量。已有 Session 或 Pass eligibility 的 Service 不能直接改 kind，应创建新 Service，避免历史预约和已售 Pass 改变语义。
+
 ### `coach_services`
 
 - 多对多连接 Coach 与 Service。

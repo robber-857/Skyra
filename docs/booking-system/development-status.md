@@ -1,5 +1,17 @@
 # Booking V3 — 开发状态
 
+## 2026-09-15：团课、私教与 Workshop 类型隔离
+
+三个开发店预约开关已由用户在 Render 与 Skyra Booking Settings 依次开启。当前只适用于 `skyra-booking-dev.myshopify.com`；本轮只读复核 Render `/health` 返回 200。开关开启是测试前提，不等于已经完成测试付款或创建 Booking。
+
+本批完成 `CLASS` 普通团课、`APPOINTMENT` 私教和 `COURSE` Workshop 的完整后台与公开预约路径：Classes & Passes 可创建 Workshop，Weekly Schedule 可排 Workshop，Home/Programs 可展示并进入 Workshop 预约，课程卡和详情显示明确类型。私教继续由服务器强制容量为 1，Workshop 保留配置容量。
+
+Pass 现在只能选择同一种 Service kind 的 Eligible classes；团课 Pass 不能混入私教或 Workshop。应用服务在保存时返回 `PASS_TYPE_MISMATCH`，数据库迁移 `202609150012_service_type_pass_isolation` 同时增加允许值约束、跨类型 Eligibility 拒绝和已关联 Pass 的 Service 类型锁，防止绕过 Admin UI。顾客购买 Review、已有 Pass 确认和 paid Worker 仍按准确的 `serviceId` 再次校验，浏览器不能指定可用资格。
+
+验证：专用 `skyra_booking_test` 已应用 13 条迁移；28 个测试文件 / **350 项测试全部通过**。TypeScript、Customer Extension、ESLint、生产构建、Prisma schema 与 diff 检查通过。Home/Programs 16 组 320/390/430/1440px 浏览器 fixture 回归通过，包含登录、恢复、Drop-in、已有 Pass 与无横向溢出。fixture 不等于真实 Shopify 顾客登录或测试付款。
+
+仍未完成：真实开发店 Drop-in → Shopify 测试 Checkout → `orders/paid` → Worker → Entitlement/Booking E2E；随后是新 Pass 测试付款和已有 Pass 预约。Customer Profile 可选个人签名/训练目标尚未实现。
+
 ## 2026-09-14：开发店三个预约开关安全门控（本地）
 
 已把 Checkout 与已有 Pass 的硬编码关闭改为显式 Render 环境门控，并将目标域名固定为 `skyra-booking-dev.myshopify.com`；正式店域名不能通过环境变量误开启。Booking App Settings 新增第三个在线预约规则控制，只有开发店 ADMIN、两个 Render 门控均已开启且预约窗口规则已批准时才能启用，并写 `DEVELOPMENT_BOOKING_ENABLED` / `DEVELOPMENT_BOOKING_DISABLED` 审计。前台只有三个开关全部开启时才会显示可用 Checkout/已有 Pass 操作。

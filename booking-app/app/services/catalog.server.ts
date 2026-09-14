@@ -71,13 +71,16 @@ export async function saveService(actor: Actor, raw: unknown) {
     if (
       old &&
       old.kind !== input.kind &&
-      (await tx.classSession.count({
+      ((await tx.classSession.count({
         where: { shopId: actor.shopId, serviceId: old.id },
-      }))
+      })) ||
+        (await tx.passEligibility.count({
+          where: { shopId: actor.shopId, serviceId: old.id },
+        })))
     )
       throw new DomainError(
         "SERVICE_KIND_LOCKED",
-        "Create a new service to change the type of a scheduled service.",
+        "Create a new service to change the type of a scheduled or Pass-eligible service.",
       );
     const ids = [...new Set(coachIds)];
     const [location, coaches] = await Promise.all([
@@ -130,14 +133,19 @@ export async function savePass(actor: Actor, raw: unknown) {
         409,
       );
     const ids = [...new Set(serviceIds)];
-    if (
-      (await tx.service.count({
-        where: { shopId: actor.shopId, id: { in: ids } },
-      })) !== ids.length
-    )
+    const services = await tx.service.findMany({
+      where: { shopId: actor.shopId, id: { in: ids } },
+      select: { id: true, kind: true },
+    });
+    if (services.length !== ids.length)
       throw new DomainError(
         "INVALID_REFERENCE",
         "Choose classes belonging to this shop.",
+      );
+    if (new Set(services.map((service) => service.kind)).size !== 1)
+      throw new DomainError(
+        "PASS_TYPE_MISMATCH",
+        "A Pass can cover only one service type: group classes, private appointments, or Workshops.",
       );
     const saved = old
       ? await tx.passPlan.update({
@@ -227,7 +235,11 @@ export async function catalogData(shopId: string) {
     }),
     db.passPlan.findMany({
       where: { shopId },
-      include: { services: true },
+      include: {
+        services: {
+          include: { service: { select: { kind: true, name: true } } },
+        },
+      },
       orderBy: { name: "asc" },
     }),
     db.coach.findMany({ where: { shopId }, orderBy: { name: "asc" } }),

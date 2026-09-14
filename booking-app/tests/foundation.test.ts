@@ -121,6 +121,63 @@ test("Pass requires eligible services belonging to its shop", async () => {
     await db.passEligibility.count({ where: { passPlanId: saved.id } }),
   ).toBe(1);
 });
+test("Workshop scheduling is supported and Passes cannot mix service types", async () => {
+  const workshop = await saveService(actor, {
+    ...input(),
+    name: "Aerial Workshop",
+    kind: "COURSE",
+    capacity: 16,
+  });
+  const privateAppointment = await saveService(actor, {
+    ...input(),
+    name: "Private coaching",
+    kind: "APPOINTMENT",
+    capacity: 8,
+  });
+  expect(workshop.capacity).toBe(16);
+  expect(privateAppointment.capacity).toBe(1);
+
+  const workshopPass = await savePass(actor, {
+    name: "Workshop Pass",
+    status: "ACTIVE",
+    credits: 2,
+    validityDays: 60,
+    requestedPriceCents: 16000,
+    serviceIds: [workshop.id],
+  });
+  expect(
+    await db.passEligibility.count({ where: { passPlanId: workshopPass.id } }),
+  ).toBe(1);
+
+  await expect(
+    savePass(actor, {
+      name: "Mixed Pass",
+      status: "ACTIVE",
+      credits: 2,
+      validityDays: 60,
+      requestedPriceCents: 16000,
+      serviceIds: [serviceId, privateAppointment.id],
+    }),
+  ).rejects.toMatchObject({ code: "PASS_TYPE_MISMATCH" });
+
+  await expect(
+    db.passEligibility.create({
+      data: {
+        shopId: actor.shopId,
+        passPlanId: workshopPass.id,
+        serviceId,
+      },
+    }),
+  ).rejects.toThrow();
+
+  const sessions = await addSessions(actor, {
+    serviceId: workshop.id,
+    coachId,
+    localStart: "2030-08-03T13:00",
+    requestId: randomUUID(),
+  });
+  expect(sessions[0].serviceId).toBe(workshop.id);
+});
 test("20 simultaneous overlapping schedule requests permit only one", async () => {
   const outcomes = await Promise.allSettled(
     Array.from({ length: 20 }, () =>

@@ -1,5 +1,15 @@
 # Skyra Booking System — V3 开发规划与 MVP 任务清单
 
+## 2026-09-15：课程类型与 Pass 隔离
+
+- [x] `CLASS` 团课、`APPOINTMENT` 私教、`COURSE` Workshop 均可在 Classes & Passes 创建，并在 Weekly Schedule 排为 dated Session。
+- [x] 三类已进入公开 availability / attempt / Pass selection；前台课程卡与详情显示类型。私教容量继续固定为 1，Workshop 使用配置容量。
+- [x] Pass 的 Eligible classes 只能来自同一种 Service kind；应用保存与 PostgreSQL trigger 双层拒绝混合类型，交易时仍按准确 Service eligibility 再校验。
+- [ ] 真实开发店分别录入并同步私教、Workshop 测试商品和未来排期，完成 Shopify 登录、测试付款、已有 Pass 与错误类型拒绝 UAT。
+- [ ] Customer Profile 可选个人签名/训练目标。
+
+本批验证为 28 个测试文件 / 350 项、生产检查及 Home/Programs 16 组浏览器 fixture；真实 Shopify 测试交易不在本批完成项内。
+
 ## 2026-09-14：接口恢复与测试版准备
 
 课表代理 500 已恢复：旧临时隧道失效，普通重启仍出现 Cloudflare 1033；切换到经核实 Booking 代理的独立 HTTP2/IPv4 隧道后，6 项健康检查各连续 3 次通过。本轮只恢复开发预览，未正式发布或开放交易。当前未来 7 天没有已发布课程，空列表不表示接口故障。
@@ -161,7 +171,7 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 ### 任务
 
 - [ ] M2-01 实现 Service Category CRUD。
-- [ ] M2-02 实现 Service CRUD：Class / Appointment / Course 类型。
+- [x] M2-02 实现 Service CRUD：Class / Appointment / Course 类型；2026-09-15 补齐 Workshop 后台创建、排课和公开预约。
 - [ ] M2-03 实现 Coach、Location、Resource CRUD。
 - [x] M2-04 实现 Coach ↔ Service assignment。
 - [x] M2-05 实现 Service/Pass → Shopify Product/Variant 的 `productSet` upsert、映射表、Outbox、同步状态与重试。

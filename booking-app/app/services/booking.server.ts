@@ -86,7 +86,7 @@ export async function classForBooking(
   if (
     !session ||
     session.service.status !== "ACTIVE" ||
-    !["CLASS", "APPOINTMENT"].includes(session.service.kind) ||
+    !["CLASS", "APPOINTMENT", "COURSE"].includes(session.service.kind) ||
     session.coach.status !== "ACTIVE"
   )
     return fail("UNAVAILABLE", "This class is no longer available.");

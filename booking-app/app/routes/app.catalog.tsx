@@ -21,6 +21,14 @@ import { CatalogAvailability } from "../components/catalog-availability";
 import { unauthenticated } from "../shopify.server";
 import { authenticatedStorefrontClient } from "../services/storefront-access.server";
 import { checkCatalogPurchase } from "../services/shopify-purchasability.server";
+
+const serviceKindLabel = (kind: string) =>
+  ({
+    CLASS: "Group class",
+    APPOINTMENT: "Private appointment",
+    COURSE: "Workshop",
+  })[kind] || "Service";
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const { actor, shop } = await adminContext(request);
   return { ...(await catalogData(actor.shopId)), domain: shop.domain };
@@ -169,12 +177,13 @@ export default function Catalog() {
                       <option value="APPOINTMENT">
                         Private appointment (one customer)
                       </option>
+                      <option value="COURSE">Workshop</option>
                     </select>
                   </Field>
                   <p className="muted">
-                    Private appointments always have one place. Publish
-                    available times in Weekly Schedule. Valid bookings confirm
-                    directly.
+                    Private appointments always have one place. Workshops keep
+                    their configured capacity. Publish all available times in
+                    Weekly Schedule; valid bookings confirm directly.
                   </p>
                   <Field label="Duration (minutes)">
                     <input
@@ -273,12 +282,24 @@ export default function Catalog() {
                         pass?.services.map((x) => x.serviceId) || []
                       }
                     >
-                      {data.services.map((x) => (
-                        <option key={x.id} value={x.id}>
-                          {x.name}
-                        </option>
-                      ))}
+                      {(["CLASS", "APPOINTMENT", "COURSE"] as const).map(
+                        (kind) => (
+                          <optgroup key={kind} label={serviceKindLabel(kind)}>
+                            {data.services
+                              .filter((service) => service.kind === kind)
+                              .map((service) => (
+                                <option key={service.id} value={service.id}>
+                                  {service.name}
+                                </option>
+                              ))}
+                          </optgroup>
+                        ),
+                      )}
                     </select>
+                    <small>
+                      Select services from one type only. Group-class Passes
+                      cannot book private appointments or Workshops.
+                    </small>
                   </Field>
                   <label>
                     <input
@@ -331,6 +352,13 @@ export default function Catalog() {
                   · {"A$" + (record.requestedPriceCents / 100).toFixed(2)}
                 </p>
                 <Status>{record.status}</Status>{" "}
+                <Status>
+                  {"durationMin" in record
+                    ? serviceKindLabel(record.kind)
+                    : serviceKindLabel(
+                        record.services[0]?.service.kind || "CLASS",
+                      ) + " Pass"}
+                </Status>{" "}
                 <Status>{mapping?.syncStatus || "PENDING"}</Status>
                 {mapping?.lastError && (
                   <p className="sync-error">{mapping.lastError}</p>

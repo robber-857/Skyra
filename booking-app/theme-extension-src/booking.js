@@ -235,6 +235,7 @@
             element("p", "", session.coach.name)
           );
           if(session.service.kind === "APPOINTMENT") sessionCopy.append(element("p","","Private appointment · 1 customer"));
+          if(session.service.kind === "COURSE") sessionCopy.append(element("p","","Workshop"));
           const availability = element(
             "span",
             "skyra-booking__availability" + (spots <= 0 ? " is-full" : ""),
@@ -312,6 +313,7 @@
       );
       const list = element("dl");
       [
+        ["Type", session.service.kind === "APPOINTMENT" ? "Private appointment" : session.service.kind === "COURSE" ? "Workshop" : "Group class"],
         ["Time", formatTime(session.startsAt, state.timezone)],
         ["Coach", session.coach.name],
         ["Location", session.location.name],

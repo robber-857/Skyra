@@ -126,7 +126,15 @@ export default function Schedule() {
       >
         <span className="calendar-event-time">{start.toFormat("HH:mm")}</span>
         <strong>{session.service.name}</strong>
-        <span>{session.coach.name}</span>
+        <span>
+          {session.service.kind === "APPOINTMENT"
+            ? "Private appointment"
+            : session.service.kind === "COURSE"
+              ? "Workshop"
+              : "Group class"}
+          {" · "}
+          {session.coach.name}
+        </span>
         <span>
           {session.occupied}/{session.capacity} places · {session.status}
         </span>
@@ -358,11 +366,18 @@ export default function Schedule() {
                     .filter(
                       (service) =>
                         service.status === "ACTIVE" &&
-                        ["CLASS", "APPOINTMENT"].includes(service.kind),
+                        ["CLASS", "APPOINTMENT", "COURSE"].includes(
+                          service.kind,
+                        ),
                     )
                     .map((service) => (
                       <option key={service.id} value={service.id}>
-                        {service.name}
+                        {service.name} ·{" "}
+                        {service.kind === "APPOINTMENT"
+                          ? "Private"
+                          : service.kind === "COURSE"
+                            ? "Workshop"
+                            : "Group"}
                       </option>
                     ))}
                 </select>
@@ -454,11 +469,18 @@ export default function Schedule() {
                     .filter(
                       (service) =>
                         service.status === "ACTIVE" &&
-                        ["CLASS", "APPOINTMENT"].includes(service.kind),
+                        ["CLASS", "APPOINTMENT", "COURSE"].includes(
+                          service.kind,
+                        ),
                     )
                     .map((service) => (
                       <option key={service.id} value={service.id}>
-                        {service.name}
+                        {service.name} ·{" "}
+                        {service.kind === "APPOINTMENT"
+                          ? "Private"
+                          : service.kind === "COURSE"
+                            ? "Workshop"
+                            : "Group"}
                       </option>
                     ))}
                 </select>
