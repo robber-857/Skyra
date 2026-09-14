@@ -175,3 +175,17 @@ test.each([
     expect((error as Response).status).toBe(403);
   }
 });
+
+test("coach form accepts the Render external URL when no explicit App URL is set", () => {
+  development();
+  vi.stubEnv("SHOPIFY_APP_URL", "");
+  vi.stubEnv("RENDER_EXTERNAL_URL", "https://skyra-booking-web.onrender.com");
+  expect(() =>
+    requireCoachFormOrigin(
+      new Request("http://localhost:3000/coach/login", {
+        method: "POST",
+        headers: { Origin: "https://skyra-booking-web.onrender.com" },
+      }),
+    ),
+  ).not.toThrow();
+});

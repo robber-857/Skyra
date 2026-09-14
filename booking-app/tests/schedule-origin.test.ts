@@ -129,3 +129,19 @@ test("allowing the public origin does not bypass the schedule authentication gat
   expect(response.status).toBe(401);
   expect(vi.mocked(adminContext)).toHaveBeenCalledOnce();
 });
+
+test("Render external URL supplies the exact action origin", async () => {
+  vi.stubEnv("SHOPIFY_APP_URL", "");
+  vi.stubEnv("HOST", "");
+  vi.stubEnv("RENDER_EXTERNAL_URL", "https://skyra-booking-web.onrender.com");
+  vi.stubEnv("RENDER_EXTERNAL_HOSTNAME", "");
+  vi.resetModules();
+  try {
+    const renderOrigins = (await import("../react-router.config")).default
+      .allowedActionOrigins;
+    expect(renderOrigins).toEqual(["skyra-booking-web.onrender.com"]);
+  } finally {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  }
+});

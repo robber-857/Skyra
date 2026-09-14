@@ -1,3 +1,16 @@
 .cache
+.git
+.github
+.react-router
+.shopify
+.shopify.lock
+.env
+.env.*
 build
+coverage
 node_modules
+output
+test-results
+tests
+*.log
+npm-debug.log*

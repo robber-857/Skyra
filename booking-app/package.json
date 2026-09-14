@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "build": "react-router build",
+    "build:worker": "esbuild scripts/worker.ts --bundle --platform=node --format=esm --packages=external --outfile=build/worker/index.js",
     "dev": "shopify app dev",
     "dev:stack": "concurrently --kill-others --names app,worker \"react-router dev\" \"tsx scripts/worker.ts\"",
     "config:link": "shopify app config link",
@@ -11,8 +12,11 @@
     "config:use": "shopify app config use",
     "env": "shopify app env",
     "start": "react-router-serve ./build/server/index.js",
+    "start:worker": "node ./build/worker/index.js",
+    "start:render": "node ./scripts/start-render.mjs",
     "docker-start": "npm run setup && npm run start",
     "setup": "prisma generate && prisma migrate deploy",
+    "migrate:deploy": "prisma migrate deploy",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
     "shopify": "shopify",
     "prisma": "prisma",
@@ -37,8 +41,6 @@
   },
   "dependencies": {
     "@prisma/client": "^6.16.3",
-    "@react-router/dev": "^7.12.0",
-    "@react-router/fs-routes": "^7.12.0",
     "@react-router/node": "^7.12.0",
     "@react-router/serve": "^7.12.0",
     "@shopify/app-bridge-react": "^4.2.4",
@@ -53,10 +55,11 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router": "^7.12.0",
-    "vite-tsconfig-paths": "^5.1.4",
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@react-router/dev": "^7.18.3",
+    "@react-router/fs-routes": "^7.18.3",
     "@shopify/api-codegen-preset": "^1.2.0",
     "@shopify/polaris-types": "^1.0.1",
     "@types/eslint": "^9.6.1",
@@ -67,6 +70,7 @@
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "concurrently": "^10.0.5",
+    "esbuild": "0.25.12",
     "eslint": "^8.57.1",
     "eslint-import-resolver-typescript": "^3.10.1",
     "eslint-plugin-import": "^2.32.0",
@@ -78,6 +82,7 @@
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "vite": "^6.3.6",
+    "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^5.0.0"
   },
   "workspaces": [

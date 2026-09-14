@@ -24,7 +24,12 @@ export async function coachTestLogin(actor: Actor, coachId: string) {
       "Coach test access is only available to development-store admins.",
       403,
     );
-  const configured = process.env.SHOPIFY_APP_URL || process.env.HOST;
+  const configured =
+    process.env.SHOPIFY_APP_URL ||
+    process.env.RENDER_EXTERNAL_URL ||
+    (process.env.RENDER_EXTERNAL_HOSTNAME
+      ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`
+      : process.env.HOST);
   const url = configured ? new URL(configured) : null;
   if (
     !url ||

@@ -163,7 +163,12 @@ export async function revokeCoachSession(token: string) {
 }
 export function requireCoachFormOrigin(request: Request) {
   const origin = request.headers.get("origin");
-  const configured = process.env.SHOPIFY_APP_URL || process.env.HOST;
+  const configured =
+    process.env.SHOPIFY_APP_URL ||
+    process.env.RENDER_EXTERNAL_URL ||
+    (process.env.RENDER_EXTERNAL_HOSTNAME
+      ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`
+      : process.env.HOST);
   // The public HTTPS form can arrive through Shopify CLI's local HTTP proxy.
   const publicOrigin = configured ? new URL(configured).origin : null;
   if (
