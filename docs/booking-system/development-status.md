@@ -1,5 +1,13 @@
 # Booking V3 — 开发状态
 
+## 2026-09-14：Weekly Schedule 周日历与场次编辑
+
+Admin Weekly Schedule 已从单列课程清单升级为七天周日历：桌面按 Morning / Afternoon / Evening 展示，手机切换为逐日日程；支持按 Coach 筛选，并在课程卡显示时间、课程、Coach、已占用/容量和 DRAFT/PUBLISHED 状态。点击任一课程卡可打开编辑区，修改课程类型、Coach、日期时间和容量；已有预约或有效 Checkout Hold 时课程类型锁定。
+
+后端新增事务化 `updateSession`：仅允许未来 DRAFT/PUBLISHED 场次，重新校验课程/Coach 资格、悉尼时区和 Coach/Location 冲突；有效 Hold 阻止编辑，容量不得低于确认预约，版本号阻止并发覆盖，成功写入 `SESSION_UPDATED` 审计。现有复制上周、草稿、发布和移除草稿流程保留。
+
+本地验证：`npm.cmd run check` 通过；专用 `skyra_booking_test` 数据库 **26 个测试文件 / 339 项测试全部通过**，新增覆盖冲突回滚、成功更新时间/容量、审计、旧版本拒绝和跨店拒绝。此处仅证明本地代码和专用测试库通过；Shopify 开发店中的真实点击编辑仍需部署后验收，未开放正式店付款或预约开关。
+
 ## 2026-09-14：Git 交付与 Coach 测试入口
 
 Appointment/留言/Today 与登录、排课保存修复已提交并推送 `698f7c2` 至 bookingdev，远程 SHA 一致，[CI 34812945622](https://github.com/robber-857/Skyra/actions/runs/34812945622) 通过。以下旧日期的“尚未提交”仅保留当时状态。
@@ -7,7 +15,6 @@ Appointment/留言/Today 与登录、排课保存修复已提交并推送 `698f7
 随后补充开发店 Admin 专用 Coach 测试登录：People → Create test sign-in link → Open coach test portal → Continue to my schedule。15 分钟单次链接、受限 Coach 会话；正式环境与其他店铺不可签发。Buffer 增加页面说明，并修复 Coach POST 经过本地代理的 Origin 校验。**336 项完整测试、类型/lint/构建以及 Coach 手机/桌面浏览器流程通过**。详细使用方法与边界见 [Coach 测试入口](coach-test-access.md)。
 
 真实老师邮箱邀请、稳定部署、完整真实账号/付款验收仍未完成。本轮没有正式店发布或开放付款；后台测试入口不等于正式老师认证已接通。
-
 
 ## 2026-09-14：Save draft 400 已修复
 
@@ -17,7 +24,6 @@ Weekly Schedule 的 POST 被 React Router 7.18.3 的来源校验拦在业务 act
 
 Cloudflare 日志证实曾短暂失联，随后自动重连；本轮未更换隧道。另已核实 dev 店本身免费，不增加第二份正式店基础月租；只能模拟支付，真实收款应在现有正式店完成。详见 [保存草稿修复与费用说明](schedule-save-fix.md)。
 
-
 ## 2026-09-14：My account 修复与 Admin 测试入口
 
 My account 原先使用相对 /account，本地预览把 Shopify 认证请求送到 localhost，出现 404/401。现已将 Booking 区块与 Skyra 页面头部/底部统一指向 Shopify 托管账户地址；实际浏览器已到达 Shopify “Sign in - Skyra Booking Dev”，未代用户提交邮箱或验证码。Admin 使用独立的店主/员工入口，顾客登录不授予后台权限。
@@ -25,7 +31,6 @@ My account 原先使用相对 /account，本地预览把 Shopify 认证请求送
 新增验证：24 文件 / **314 项测试通过**，TypeScript、ESLint、生产构建、Shopify app build、8 个 Liquid 文件官方验证与 16 组浏览器回归通过。真实账号登录/退出/返回仍未验收，30 组真实 UAT 仍待签收。修复只同步开发预览，未正式发布或开通云服务器，未再次提交 GitHub。
 
 后台链接、添加课程/排期步骤、登录边界及 Railway/Render/Vercel 成本见 [账户入口与低成本部署](account-access-and-hosting.md)。以便宜为主，优先评估 Railway 测试环境；US$5 是最低用量，整套 App/Worker/DB/Redis 费用需按实测核算。
-
 
 ## 2026-09-14：接口恢复与测试版准备
 
@@ -63,7 +68,6 @@ My account 原先使用相对 /account，本地预览把 Shopify 认证请求送
 
 当前实现和边界详见 [Booking 邮件与 Coach](notifications-and-coach.md)。下方早期记录属于历史快照，最新代码/测试以本节及本轮验证记录为准。三个公开交易开关仍关闭；没有真实付款、Booking、发信、正式部署或 Git commit/push。
 
-
 更新：2026-09-12。此页记录实际代码、开发店联调与验证证据；完整范围仍以 `implementation-backlog.md` 为准。
 
 最新状态：Hold → Cart 已以 `b67694271cbe5ddee75d3a6484c59e23c04eab39` 推送 `bookingdev`，远程 SHA 一致，GitHub CI run 34679489160 已触发。其后已完成 `orders/paid` 的验签路由、Webhook ID 幂等收件、订单归属/商品/数量/AUD 金额/付款状态校验和 Outbox 分类；212 项测试、类型/lint/构建通过。真实订阅、`read_orders` 权限、Worker 权益发放、Booking 确认、付款后恢复和公开 Checkout 仍关闭。Continue with Shop 真实账户复测仍未完成。
@@ -88,12 +92,12 @@ My account 原先使用相对 /account，本地预览把 Shopify 认证请求送
 
 ## 已完成代码
 
-| 范围 | 已完成 | 当前边界 |
-| --- | --- | --- |
-| M1 工程 | Prisma schema/migration、测试库、seed、连接池、官方 Admin 认证、店主初始化 ADMIN、RBAC、审计、健康接口、Redis/BullMQ Worker、根目录 CI | Customer JWT、Coach OTP、托管环境、监控和备份未完成 |
-| M2 Classes & Passes | Class/Pass 创建与编辑、跨店校验、Coach/Location、Coach 与 Pass eligibility、乐观版本检查 | Category/Resource、Appointment/Course 完整表单未完成；Admin iframe 尚未做完整人工视觉验收 |
-| M2 商品同步 | 事务 Outbox、`productSet`、稳定 Product/Variant 映射、`metafieldsSet`、app-owned Service content definition 自愈、Metaobject upsert/read-back、重试和状态刷新 | Coach public Metaobject 与 `products/update` 对账尚未实现 |
-| M2 Weekly Schedule | 按周日期/时间/教练、草稿、发布、删除草稿、4/8/13 周生成、复制上周、时区/DST 校验 | 持久化 Series 编辑、资源分配、Appointment slots、教练可用时间例外未完成 |
+| 范围                     | 已完成                                                                                                                                                             | 当前边界                                                                                                                                                                                                                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M1 工程                  | Prisma schema/migration、测试库、seed、连接池、官方 Admin 认证、店主初始化 ADMIN、RBAC、审计、健康接口、Redis/BullMQ Worker、根目录 CI                             | Customer JWT、Coach OTP、托管环境、监控和备份未完成                                                                                                                                                                                                                              |
+| M2 Classes & Passes      | Class/Pass 创建与编辑、跨店校验、Coach/Location、Coach 与 Pass eligibility、乐观版本检查                                                                           | Category/Resource、Appointment/Course 完整表单未完成；Admin iframe 尚未做完整人工视觉验收                                                                                                                                                                                        |
+| M2 商品同步              | 事务 Outbox、`productSet`、稳定 Product/Variant 映射、`metafieldsSet`、app-owned Service content definition 自愈、Metaobject upsert/read-back、重试和状态刷新      | Coach public Metaobject 与 `products/update` 对账尚未实现                                                                                                                                                                                                                        |
+| M2 Weekly Schedule       | 按周日期/时间/教练、草稿、发布、删除草稿、4/8/13 周生成、复制上周、时区/DST 校验                                                                                   | 持久化 Series 编辑、资源分配、Appointment slots、教练可用时间例外未完成                                                                                                                                                                                                          |
 | M5 Storefront 首个 slice | Theme App Extension app embed、Home/Programs 共享 mount、公开 Session App Proxy、七日 Browse、Class/Coach 筛选、Details、登录提示、loading/empty/error、移动端布局 | 开发店已授权 App Proxy 并启用 app embed；Home 的真实 Browse/Details/Login UI 已联调，后续交易 UI 规范已冻结；本轮已接服务器 Attempt 与真实占位计算，本轮已交付 31 天 Full Calendar、新 Pass / Drop-in selection/Review；已有 Pass、真实客户登录完成/返回验收及 Checkout 仍未完成 |
 
 ## 本轮交付：M3 Class Booking 基础（2026-09-10）
@@ -195,7 +199,8 @@ Appointment 已按 2026-09-13 决定直接确认；Any available coach、通知�
 - Customer Account full-page：My Overview、My Passes、Bookings & History、取消/改期与逐次客户留言（当前已实现，见顶部状态）。
 - Coach Portal、签到和查看本节客户留言（当前已实现，见顶部状态）。
 - 完整 People/Bookings/Reports、通知、旧系统迁移、托管部署与上线。
-上一轮 Theme App Extension 的开发预览曾用 storefront password 启动（本轮未运行）。开发店已批准 `write_app_proxy`，Shopify API 权限检查返回 200，App Proxy 与 app embed 已在 `Development (4a1680-elton)` 主题联调通过。Home/Programs 本地主题代码已替换；正式店未部署，现有未提交的 `shopify-theme/assets/skyra.css` 未修改。没有 Git commit 或 push。
+  上一轮 Theme App Extension 的开发预览曾用 storefront password 启动（本轮未运行）。开发店已批准 `write_app_proxy`，Shopify API 权限检查返回 200，App Proxy 与 app embed 已在 `Development (4a1680-elton)` 主题联调通过。Home/Programs 本地主题代码已替换；正式店未部署，现有未提交的 `shopify-theme/assets/skyra.css` 未修改。没有 Git commit 或 push。
+
 ## 2026-09-11 开发交接
 
 - 按用户要求准备独立 `bookingdev` 分支保存当前 Booking 工作；生产店未部署，无关 `shopify-theme/assets/skyra.css` 不纳入提交。

@@ -17,9 +17,17 @@ import {
   copyPreviousWeek,
   cancelDraft,
   scheduleData,
+  updateSession,
 } from "../services/schedule.server";
 import { publicError } from "../lib/errors.server";
 import { Feedback, Field, Status } from "../components/admin-ui";
+
+const periods = [
+  { key: "morning", label: "Morning", start: 0, end: 12 },
+  { key: "afternoon", label: "Afternoon", start: 12, end: 17 },
+  { key: "evening", label: "Evening", start: 17, end: 24 },
+] as const;
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const { actor, shop } = await adminContext(request);
   const day =
@@ -31,6 +39,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     requestId: crypto.randomUUID(),
   };
 }
+
 export async function action({ request }: ActionFunctionArgs) {
   const { actor } = await adminContext(request);
   const form = await request.formData();
@@ -38,6 +47,10 @@ export async function action({ request }: ActionFunctionArgs) {
     if (form.get("intent") === "add") {
       const sessions = await addSessions(actor, Object.fromEntries(form));
       return { message: sessions.length + " draft session(s) saved." };
+    }
+    if (form.get("intent") === "update") {
+      await updateSession(actor, Object.fromEntries(form));
+      return { message: "Session updated." };
     }
     if (form.get("intent") === "copy")
       return {
@@ -60,63 +73,370 @@ export async function action({ request }: ActionFunctionArgs) {
     return publicError(error);
   }
 }
+
 export default function Schedule() {
   const data = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const busy = useNavigation().state !== "idle";
   const [open, setOpen] = useState(false);
   const [serviceId, setServiceId] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editServiceId, setEditServiceId] = useState("");
+  const [coachFilter, setCoachFilter] = useState("");
   const selected = data.services.find((x) => x.id === serviceId);
   const coachIds = selected?.coaches.map((x) => x.coachId) || [];
-  const week = DateTime.fromISO(data.week);
+  const editing = data.sessions.find((x) => x.id === editingId);
+  const editService = data.services.find((x) => x.id === editServiceId);
+  const editCoachIds = editService?.coaches.map((x) => x.coachId) || [];
+  const week = DateTime.fromISO(data.week, { zone: data.timezone });
+  const days = Array.from({ length: 7 }, (_, index) =>
+    week.plus({ days: index }),
+  );
+  const visibleSessions = data.sessions.filter(
+    (session) => !coachFilter || session.coachId === coachFilter,
+  );
+  const drafts = data.sessions.filter((x) => x.status === "DRAFT").length;
+  const published = data.sessions.filter(
+    (x) => x.status === "PUBLISHED",
+  ).length;
+
+  const localStart = (value: Date | string, zone = data.timezone) =>
+    DateTime.fromJSDate(new Date(value), { zone });
+
+  const openEditor = (session: (typeof data.sessions)[number]) => {
+    setOpen(false);
+    setEditingId(session.id);
+    setEditServiceId(session.serviceId);
+    requestAnimationFrame(() =>
+      document.getElementById("schedule-editor")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      }),
+    );
+  };
+
+  const sessionButton = (session: (typeof data.sessions)[number]) => {
+    const start = localStart(session.startsAt, session.timezone);
+    return (
+      <button
+        type="button"
+        className={`calendar-event ${session.status === "DRAFT" ? "draft" : "published"}`}
+        onClick={() => openEditor(session)}
+        aria-label={`Edit ${session.service.name}, ${start.toFormat("cccc h:mm a")}`}
+      >
+        <span className="calendar-event-time">{start.toFormat("HH:mm")}</span>
+        <strong>{session.service.name}</strong>
+        <span>{session.coach.name}</span>
+        <span>
+          {session.occupied}/{session.capacity} places · {session.status}
+        </span>
+      </button>
+    );
+  };
+
   return (
     <main className="workspace">
       <header className="page-head">
         <div>
           <h1>Weekly Schedule</h1>
           <p className="muted">
-            Assign dates, times and coaches. Times shown in {data.timezone}.
+            See the whole week, then click any class to edit it. Times shown in{" "}
+            {data.timezone}.
           </p>
         </div>
-        <button className="primary" onClick={() => setOpen(true)}>
+        <button
+          className="primary"
+          onClick={() => {
+            setEditingId(null);
+            setOpen(true);
+          }}
+        >
           Add session
         </button>
       </header>
-      <div className="week-bar">
-        <Link
-          className="button"
-          to={"?week=" + week.minus({ weeks: 1 }).toISODate()}
-        >
-          Previous
-        </Link>
-        <Form method="get">
-          <label>
-            Week of{" "}
-            <input
-              type="date"
-              name="week"
-              defaultValue={data.week}
-              key={data.week}
-              required
-            />
-          </label>{" "}
-          <button>Go</button>
-        </Form>
-        <Link
-          className="button"
-          to={"?week=" + week.plus({ weeks: 1 }).toISODate()}
-        >
-          Next
-        </Link>
+
+      <section
+        className="schedule-purpose"
+        aria-label="Weekly schedule purpose"
+      >
+        <strong>This page answers three questions</strong>
+        <span>Which class runs? When does it run? Who teaches it?</span>
+      </section>
+
+      <div className="schedule-toolbar">
+        <div className="week-bar">
+          <Link
+            className="button"
+            to={"?week=" + week.minus({ weeks: 1 }).toISODate()}
+          >
+            Previous week
+          </Link>
+          <Form method="get" className="week-picker">
+            <label>
+              <span className="visually-hidden">Week starting date</span>
+              <input
+                type="date"
+                name="week"
+                defaultValue={data.week}
+                key={data.week}
+                required
+              />
+            </label>
+            <button>Go</button>
+          </Form>
+          <Link
+            className="button"
+            to={"?week=" + week.plus({ weeks: 1 }).toISODate()}
+          >
+            Next week
+          </Link>
+          <label className="coach-filter">
+            <span className="visually-hidden">Filter by coach</span>
+            <select
+              value={coachFilter}
+              onChange={(event) => setCoachFilter(event.target.value)}
+            >
+              <option value="">All coaches</option>
+              {data.coaches
+                .filter((coach) => coach.status === "ACTIVE")
+                .map((coach) => (
+                  <option key={coach.id} value={coach.id}>
+                    {coach.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+        </div>
+        <div className="schedule-actions">
+          <Form method="post">
+            <input type="hidden" name="intent" value="copy" />
+            <input type="hidden" name="week" value={data.week} />
+            <button disabled={busy}>Copy previous week</button>
+          </Form>
+          <Form method="post">
+            <input type="hidden" name="intent" value="publish" />
+            <input type="hidden" name="week" value={data.week} />
+            <button className="primary" disabled={busy || drafts === 0}>
+              Publish week
+            </button>
+          </Form>
+        </div>
       </div>
-      <Form method="post" className="actions">
-        <input type="hidden" name="intent" value="copy" />
-        <input type="hidden" name="week" value={data.week} />
-        <button disabled={busy}>Copy previous week</button>
-      </Form>
+
       <Feedback result={result} />
+
+      <section className="panel schedule-calendar-panel">
+        <div className="schedule-calendar-head">
+          <div>
+            <h2>
+              {week.toFormat("d MMM")} –{" "}
+              {week.plus({ days: 6 }).toFormat("d MMM yyyy")}
+            </h2>
+            <p className="muted">
+              {published} published · {drafts} draft · Click a class to edit
+            </p>
+          </div>
+          {coachFilter && (
+            <button type="button" onClick={() => setCoachFilter("")}>
+              Clear coach filter
+            </button>
+          )}
+        </div>
+
+        {data.sessions.length === 0 ? (
+          <p className="empty">
+            No sessions this week. Add a class to start planning.
+          </p>
+        ) : (
+          <>
+            <div className="schedule-calendar-scroll">
+              <div
+                className="schedule-calendar"
+                role="grid"
+                aria-label="Week calendar"
+              >
+                <div className="calendar-corner" role="columnheader">
+                  Time
+                </div>
+                {days.map((day) => (
+                  <div
+                    className="calendar-day-head"
+                    role="columnheader"
+                    key={day.toISODate()}
+                  >
+                    <span>{day.toFormat("ccc")}</span>
+                    <strong>{day.toFormat("d")}</strong>
+                  </div>
+                ))}
+                {periods.map((period) => (
+                  <div className="calendar-row" role="row" key={period.key}>
+                    <div className="calendar-period" role="rowheader">
+                      {period.label}
+                    </div>
+                    {days.map((day) => {
+                      const sessions = visibleSessions.filter((session) => {
+                        const start = localStart(
+                          session.startsAt,
+                          session.timezone,
+                        );
+                        return (
+                          start.toISODate() === day.toISODate() &&
+                          start.hour >= period.start &&
+                          start.hour < period.end
+                        );
+                      });
+                      return (
+                        <div
+                          className="calendar-cell"
+                          role="gridcell"
+                          key={day.toISODate()}
+                        >
+                          {sessions.map((session) => (
+                            <div key={session.id}>{sessionButton(session)}</div>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="schedule-agenda" aria-label="Mobile week agenda">
+              {days.map((day) => {
+                const sessions = visibleSessions.filter(
+                  (session) =>
+                    localStart(
+                      session.startsAt,
+                      session.timezone,
+                    ).toISODate() === day.toISODate(),
+                );
+                return (
+                  <section className="agenda-day" key={day.toISODate()}>
+                    <h3>{day.toFormat("cccc d MMM")}</h3>
+                    {sessions.length ? (
+                      sessions.map((session) => (
+                        <div key={session.id}>{sessionButton(session)}</div>
+                      ))
+                    ) : (
+                      <p className="muted">No sessions</p>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </section>
+
+      {editing && (
+        <section className="panel schedule-editor" id="schedule-editor">
+          <div className="schedule-calendar-head">
+            <div>
+              <h2>Edit session</h2>
+              <p className="muted">
+                {editing.status} · {editing.occupied}/{editing.capacity} places
+                occupied
+              </p>
+            </div>
+            <Status>{editing.status}</Status>
+          </div>
+          <Form method="post" key={`${editing.id}-${editing.version}`}>
+            <input type="hidden" name="intent" value="update" />
+            <input type="hidden" name="id" value={editing.id} />
+            <input type="hidden" name="version" value={editing.version} />
+            <div className="form-grid">
+              <Field label="Class">
+                <select
+                  name={editing.occupied > 0 ? undefined : "serviceId"}
+                  required
+                  value={editServiceId}
+                  disabled={editing.occupied > 0}
+                  onChange={(event) => setEditServiceId(event.target.value)}
+                >
+                  {data.services
+                    .filter(
+                      (service) =>
+                        service.status === "ACTIVE" &&
+                        ["CLASS", "APPOINTMENT"].includes(service.kind),
+                    )
+                    .map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {service.name}
+                      </option>
+                    ))}
+                </select>
+                {editing.occupied > 0 && (
+                  <>
+                    <input
+                      type="hidden"
+                      name="serviceId"
+                      value={editing.serviceId}
+                    />
+                    <small>
+                      Class type is locked after a booking or checkout hold.
+                    </small>
+                  </>
+                )}
+              </Field>
+              <Field label="Coach">
+                <select name="coachId" required defaultValue={editing.coachId}>
+                  {data.coaches
+                    .filter((coach) => editCoachIds.includes(coach.id))
+                    .map((coach) => (
+                      <option key={coach.id} value={coach.id}>
+                        {coach.name}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+              <Field
+                label={`Date and start time (${data.locations.find((location) => location.id === editService?.locationId)?.timezone || editing.timezone})`}
+              >
+                <input
+                  type="datetime-local"
+                  name="localStart"
+                  required
+                  defaultValue={localStart(
+                    editing.startsAt,
+                    editing.timezone,
+                  ).toFormat("yyyy-MM-dd'T'HH:mm")}
+                />
+              </Field>
+              <Field label="Capacity">
+                <input
+                  type="number"
+                  name="capacity"
+                  min={Math.max(1, editing.occupied)}
+                  max="200"
+                  required
+                  defaultValue={editing.capacity}
+                />
+              </Field>
+            </div>
+            <div className="actions">
+              <button className="primary" disabled={busy}>
+                Save changes
+              </button>
+              <button type="button" onClick={() => setEditingId(null)}>
+                Close
+              </button>
+            </div>
+          </Form>
+          {editing.status === "DRAFT" && (
+            <Form method="post" className="schedule-remove-form">
+              <input name="intent" type="hidden" value="remove" />
+              <input name="id" type="hidden" value={editing.id} />
+              <button className="danger-text" disabled={busy}>
+                Remove draft
+              </button>
+            </Form>
+          )}
+        </section>
+      )}
+
       {open && (
-        <section className="panel">
+        <section className="panel schedule-editor">
           <h2>New session</h2>
           <Form method="post">
             <input type="hidden" name="intent" value="add" />
@@ -132,13 +452,13 @@ export default function Schedule() {
                   <option value="">Choose a class</option>
                   {data.services
                     .filter(
-                      (x) =>
-                        x.status === "ACTIVE" &&
-                        ["CLASS", "APPOINTMENT"].includes(x.kind),
+                      (service) =>
+                        service.status === "ACTIVE" &&
+                        ["CLASS", "APPOINTMENT"].includes(service.kind),
                     )
-                    .map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.name}
+                    .map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {service.name}
                       </option>
                     ))}
                 </select>
@@ -147,23 +467,27 @@ export default function Schedule() {
                 <select name="coachId" required key={serviceId} defaultValue="">
                   <option value="">Choose an eligible coach</option>
                   {data.coaches
-                    .filter((x) => coachIds.includes(x.id))
-                    .map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.name}
+                    .filter((coach) => coachIds.includes(coach.id))
+                    .map((coach) => (
+                      <option key={coach.id} value={coach.id}>
+                        {coach.name}
                       </option>
                     ))}
                 </select>
               </Field>
               <Field
-                label={
-                  "Date and start time (" +
-                  (data.locations.find((x) => x.id === selected?.locationId)
-                    ?.timezone || data.timezone) +
-                  ")"
-                }
+                label={`Date and start time (${
+                  data.locations.find(
+                    (location) => location.id === selected?.locationId,
+                  )?.timezone || data.timezone
+                })`}
               >
-                <input type="datetime-local" name="localStart" required />
+                <input
+                  type="datetime-local"
+                  name="localStart"
+                  required
+                  defaultValue={`${data.week}T10:00`}
+                />
               </Field>
               <Field label="Repeat weekly">
                 <select name="weeks" defaultValue="1">
@@ -185,52 +509,6 @@ export default function Schedule() {
           </Form>
         </section>
       )}
-      <section className="panel">
-        <div className="page-head">
-          <h2>
-            {week.toFormat("d MMM")} –{" "}
-            {week.plus({ days: 6 }).toFormat("d MMM yyyy")}
-          </h2>
-          <Form method="post">
-            <input type="hidden" name="intent" value="publish" />
-            <input type="hidden" name="week" value={data.week} />
-            <button
-              disabled={
-                busy || !data.sessions.some((x) => x.status === "DRAFT")
-              }
-            >
-              Publish week
-            </button>
-          </Form>
-        </div>
-        {data.sessions.length === 0 && (
-          <p className="empty">
-            No sessions this week. Add a class to start planning.
-          </p>
-        )}
-        {data.sessions.map((session) => (
-          <article className="record" key={session.id}>
-            <div>
-              <h3>{session.service.name}</h3>
-              <p className="muted">
-                {DateTime.fromJSDate(new Date(session.startsAt), {
-                  zone: data.timezone,
-                }).toFormat("ccc d MMM · HH:mm")}{" "}
-                · {session.coach.name} · {session.location.name} ·{" "}
-                {session.capacity} places
-              </p>
-              <Status>{session.status}</Status>
-            </div>
-            {session.status === "DRAFT" && (
-              <Form method="post">
-                <input name="intent" type="hidden" value="remove" />
-                <input name="id" type="hidden" value={session.id} />
-                <button disabled={busy}>Remove draft</button>
-              </Form>
-            )}
-          </article>
-        ))}
-      </section>
     </main>
   );
 }

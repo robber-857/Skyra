@@ -1,5 +1,9 @@
 # Skyra Booking System
 
+## 最新交接入口（2026-09-14）
+
+请先阅读 [Render → 付款预约 → 客户账户交接](handoff-2026-09-14.md)。固定 Render 开发环境与 Shopify Checkout handoff 已部署到 `bookingdev`；真实付款 E2E、正式店安装和客户账户验收仍未完成。Admin Weekly Schedule 已新增七天日历、Coach 筛选和受保护的场次编辑，本地 26 文件 / 339 项测试通过，待开发店部署验收。
+
 ## 2026-09-14：Git 交付与 Coach 测试入口
 
 Appointment/留言/Today 与登录、排课保存修复已提交并推送 `698f7c2` 至 bookingdev，远程 SHA 一致，[CI 34812945622](https://github.com/robber-857/Skyra/actions/runs/34812945622) 通过。以下旧日期的“尚未提交”仅保留当时状态。
@@ -8,7 +12,6 @@ Appointment/留言/Today 与登录、排课保存修复已提交并推送 `698f7
 
 真实老师邮箱邀请、稳定部署、完整真实账号/付款验收仍未完成。本轮没有正式店发布或开放付款；后台测试入口不等于正式老师认证已接通。
 
-
 ## 2026-09-14：My account 修复与 Admin 测试入口
 
 My account 原先使用相对 /account，本地预览把 Shopify 认证请求送到 localhost，出现 404/401。现已将 Booking 区块与 Skyra 页面头部/底部统一指向 Shopify 托管账户地址；实际浏览器已到达 Shopify “Sign in - Skyra Booking Dev”，未代用户提交邮箱或验证码。Admin 使用独立的店主/员工入口，顾客登录不授予后台权限。
@@ -16,7 +19,6 @@ My account 原先使用相对 /account，本地预览把 Shopify 认证请求送
 新增验证：24 文件 / **314 项测试通过**，TypeScript、ESLint、生产构建、Shopify app build、8 个 Liquid 文件官方验证与 16 组浏览器回归通过。真实账号登录/退出/返回仍未验收，30 组真实 UAT 仍待签收。修复只同步开发预览，未正式发布或开通云服务器，未再次提交 GitHub。
 
 后台链接、添加课程/排期步骤、登录边界及 Railway/Render/Vercel 成本见 [账户入口与低成本部署](account-access-and-hosting.md)。以便宜为主，优先评估 Railway 测试环境；US$5 是最低用量，整套 App/Worker/DB/Redis 费用需按实测核算。
-
 
 ## 2026-09-14：接口恢复与测试版准备
 
@@ -44,13 +46,13 @@ My account 原先使用相对 /account，本地预览把 Shopify 认证请求送
 
 ## 各文档职责
 
-| 文件 | 用途 |
-| --- | --- |
-| `architecture.md` | 系统边界、三端页面、Shopify 能力、部署架构和数据归属 |
-| `booking-pass-flow.md` | 登录、选择 Pass、Checkout、付款回调、扣次、通知与数据同步 |
-| `wireframes.html` | Customer、Admin、Coach 三端可点击低保真原型；Home 与 Programs 复用同一个 Booking section 状态机；Admin 保持六个日常入口 |
-| `data-model.md` | 核心表、关系、约束、状态和数据所有权 |
-| `implementation-backlog.md` | 当前唯一执行计划：MVP/P1/P2 范围、开发顺序、文件迁移和验收任务 |
+| 文件                        | 用途                                                                                                                    |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `architecture.md`           | 系统边界、三端页面、Shopify 能力、部署架构和数据归属                                                                    |
+| `booking-pass-flow.md`      | 登录、选择 Pass、Checkout、付款回调、扣次、通知与数据同步                                                               |
+| `wireframes.html`           | Customer、Admin、Coach 三端可点击低保真原型；Home 与 Programs 复用同一个 Booking section 状态机；Admin 保持六个日常入口 |
+| `data-model.md`             | 核心表、关系、约束、状态和数据所有权                                                                                    |
+| `implementation-backlog.md` | 当前唯一执行计划：MVP/P1/P2 范围、开发顺序、文件迁移和验收任务                                                          |
 
 ## 核心实现原则
 
@@ -74,7 +76,6 @@ My account 原先使用相对 /account，本地预览把 Shopify 认证请求送
 - 不再设计独立的 Class Details、Select a Pass、Cart 或 Confirm Payment 页面；它们是同一区块内的状态，支付表单只属于 Shopify Checkout。
 - 不为每周的每一场 Session 创建 Shopify Product。Class/Pass 定义可同步 Product/Variant，实际排课只进入 Booking DB。
 - `shopify-theme/sections/skyra-home.liquid` 和 `shopify-theme/sections/skyra-programs.liquid` 已替换为共享挂载节点；根目录静态 HTML 原型不作为后端实现依据。
-
 
 ## 测试与交接
 

@@ -95,15 +95,15 @@ flowchart LR
 
 ### 3.1 当前主题迁移清单
 
-| 文件 | 迁移动作 | 完成标准 |
-| --- | --- | --- |
-| shopify-theme/sections/skyra-home.liquid | 删除静态三条课与 preview box，保留设计外壳并加入 Home mount | 不再输出示例 availability |
-| shopify-theme/sections/skyra-programs.liquid | 删除硬编码课程、Mindbody URL 和跳转式 Book 链接，加入 Programs mount | Book 进入同区块 DETAILS |
-| shopify-theme/assets/skyra.js | 移除 home booking demo filter/preview handler | 不再包含 booking 示例数据 |
-| shopify-theme/assets/skyra.css | 清理只服务旧 demo 的选择器；正式组件样式由 app extension 管理 | 卸载/禁用 app 时主题仍稳定 |
-| Booking App theme extension | 新建 app embed、共享 bundle、mount bootstrap、App Proxy client | 两个页面运行同一 build |
-| Booking App backend | availability、attempt、Pass eligibility、confirm、hold、Checkout return/status APIs | 所有 mutation 验证店铺与 Customer |
-| Customer Account extension | My Overview、Passes、Bookings/History、Appointments | 使用 fresh session token 读取本人数据 |
+| 文件                                         | 迁移动作                                                                            | 完成标准                              |
+| -------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------- |
+| shopify-theme/sections/skyra-home.liquid     | 删除静态三条课与 preview box，保留设计外壳并加入 Home mount                         | 不再输出示例 availability             |
+| shopify-theme/sections/skyra-programs.liquid | 删除硬编码课程、Mindbody URL 和跳转式 Book 链接，加入 Programs mount                | Book 进入同区块 DETAILS               |
+| shopify-theme/assets/skyra.js                | 移除 home booking demo filter/preview handler                                       | 不再包含 booking 示例数据             |
+| shopify-theme/assets/skyra.css               | 清理只服务旧 demo 的选择器；正式组件样式由 app extension 管理                       | 卸载/禁用 app 时主题仍稳定            |
+| Booking App theme extension                  | 新建 app embed、共享 bundle、mount bootstrap、App Proxy client                      | 两个页面运行同一 build                |
+| Booking App backend                          | availability、attempt、Pass eligibility、confirm、hold、Checkout return/status APIs | 所有 mutation 验证店铺与 Customer     |
+| Customer Account extension                   | My Overview、Passes、Bookings/History、Appointments                                 | 使用 fresh session token 读取本人数据 |
 
 Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking 使用 app embed + 显式 mount，不把 Booking 塞进同一个 @app block，也不要求重写现有 Theme Editor 的 Instafeed 配置。
 
@@ -272,6 +272,7 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 - [ ] M5-17 My Passes 余额/Reserved/Used、Expiry、Eligibility、最近 20 条 Usage history 与分页已实现；Shopify order link、更多历史导航待完成。
 - [ ] M5-18 固定私教时段、已有 Pass 直接确认、付款 Worker、Upcoming/History、逐次留言已实现；真实 Checkout hand-off/账号联调待验收。
 - [x] M5-19 每次请求获取 Customer Account session token，后端验签和归属验证；浏览器不能指定 Customer 身份。
+
 ### 验收
 
 - 新客可以完成“选课 → 登录 → 买 Drop-in → 付款 → 查看 Booking”。
@@ -319,7 +320,9 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 - [ ] M7-02 People：一个页面内分 Customer / Coach 区域；Customer 显示 Pass、余额、到期、消费、下次预约，Coach 显示权限、可教课程、availability、weekly load。
 - [ ] M7-03 Classes & Passes：一个页面创建/编辑 Class 与 Pass；Class 包含名称、drop-in price、duration、capacity、location、eligible coaches 和 suggested defaults。
 - [ ] M7-04 Pass package：Shopify Variant price mapping，加 Booking DB credits、validity、eligible classes、online sale state。
-- [ ] M7-05 Weekly Schedule：周 Calendar、copy last week、actual date/time/coach、conflict detection、draft/publish。
+- [x] M7-05 Weekly Schedule：周 Calendar、copy last week、actual date/time/coach、conflict detection、draft/publish。
+  - 桌面七天 Calendar + 手机逐日日程；Coach 筛选；卡片显示占用/容量与发布状态。
+  - 点击场次可编辑课程、Coach、日期时间和容量；未来场次、Coach/Location 冲突、有效 Hold、最低容量、跨店与并发版本均由服务端保护并写审计。
 - [ ] M7-06 Bookings 列表、详情、改期、取消、attendance 已实现；saved filters、Admin 手工创建、waitlist 待完成。
 - [ ] M7-07 Booking detail 已显示 Session、Customer 内部引用、Entitlement 流水、Timeline 和改期关联；真实 Customer 资料/完整 Payment 导航待完成。
 - [ ] M7-08 Reports 已有日期筛选、预约状态、已验证购买值及当前未用课次汇总；per-customer spending 和 credits/expiry CSV 待完成。
@@ -381,16 +384,16 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 
 以 1 名熟悉 Shopify 的全栈开发者为基准，这个 P0 MVP 大约是 50–70 个有效开发日，不含长时间等待 Shopify 权限审批、内容录入和业务确认：
 
-| 模块 | 有效开发日 |
-| --- | ---: |
-| 规则和基础 | 6–9 |
-| Catalog / Schedule | 5–7 |
-| Booking Engine | 7–10 |
-| Shopify Commerce | 6–8 |
-| Customer + dual-surface theme integration | 8–11 |
-| Coach | 4–6 |
-| Admin | 7–9 |
-| QA / Migration / Launch | 7–10 |
+| 模块                                      | 有效开发日 |
+| ----------------------------------------- | ---------: |
+| 规则和基础                                |        6–9 |
+| Catalog / Schedule                        |        5–7 |
+| Booking Engine                            |       7–10 |
+| Shopify Commerce                          |        6–8 |
+| Customer + dual-surface theme integration |       8–11 |
+| Coach                                     |        4–6 |
+| Admin                                     |        7–9 |
+| QA / Migration / Launch                   |       7–10 |
 
 这是开发量估算，不等同于承诺日历工期。若先上线“只有 Class、没有 Appointment/Coach Portal”的精简版，可显著缩短第一阶段。
 
@@ -480,7 +483,6 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 新增独立受保护的 Coach 只读个人中心 /coach，按上课日期筛选未来 7 天、30 天和自定义区间，显示报名人次/容量及出席、取消、No-show。单次链接/会话/退出服务和页面已实现；真实 Coach 邮箱绑定、邀请发信和真实账号验收仍未完成。Admin Bookings 现可只读查看 Needs Attention、近期预约和邮件预览，不能执行退款/人工重新确认。
 
 当前实现和边界详见 [Booking 邮件与 Coach](notifications-and-coach.md)。下方早期记录属于历史快照，最新代码/测试以本节及本轮验证记录为准。三个公开交易开关仍关闭；没有真实付款、Booking、发信、正式部署或 Git commit/push。
-
 
 - [x] Coach 课程报名统计：按 Session 日期、未来 7/30 天、自定义首尾日；报名/取消/出席/No-show 分开，隔离其他 Coach 与店铺。
 - [x] 内部 Coach 一次性登录/8 小时会话/退出与停用检查；公开未授权访问被拒绝。

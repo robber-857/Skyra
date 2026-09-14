@@ -4,6 +4,7 @@ import db from "../app/db.server";
 import { saveService, savePass } from "../app/services/catalog.server";
 import {
   addSessions,
+  updateSession,
   publishWeek,
   copyPreviousWeek,
 } from "../app/services/schedule.server";
@@ -170,6 +171,68 @@ test("Weekly repetition stays at local clock time across Sydney DST", async () =
 test("DST gap and ambiguous times are rejected", () => {
   expect(() => localInstant("2030-10-06T02:30", "Australia/Sydney")).toThrow();
   expect(() => localInstant("2030-04-07T02:30", "Australia/Sydney")).toThrow();
+});
+test("Session edit rechecks conflicts and uses optimistic concurrency", async () => {
+  const original = await db.classSession.findFirstOrThrow({
+    where: {
+      shopId: actor.shopId,
+      startsAt: localInstant("2030-07-02T10:00", "Australia/Sydney"),
+    },
+  });
+  await expect(
+    updateSession(actor, {
+      id: original.id,
+      serviceId,
+      coachId,
+      localStart: "2030-07-01T10:00",
+      capacity: 6,
+      version: original.version,
+    }),
+  ).rejects.toMatchObject({ code: "SCHEDULE_CONFLICT" });
+
+  const saved = await updateSession(actor, {
+    id: original.id,
+    serviceId,
+    coachId,
+    localStart: "2030-07-03T10:00",
+    capacity: 6,
+    version: original.version,
+  });
+  expect(saved.startsAt).toEqual(
+    localInstant("2030-07-03T10:00", "Australia/Sydney"),
+  );
+  expect(saved.capacity).toBe(6);
+  expect(saved.version).toBe(original.version + 1);
+  expect(
+    await db.auditLog.count({
+      where: {
+        shopId: actor.shopId,
+        entityId: original.id,
+        action: "SESSION_UPDATED",
+      },
+    }),
+  ).toBe(1);
+
+  await expect(
+    updateSession(actor, {
+      id: original.id,
+      serviceId,
+      coachId,
+      localStart: "2030-07-03T11:00",
+      capacity: 6,
+      version: original.version,
+    }),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await expect(
+    updateSession(other, {
+      id: original.id,
+      serviceId,
+      coachId,
+      localStart: "2030-07-03T11:00",
+      capacity: 6,
+      version: saved.version,
+    }),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
 });
 test("Week publishing creates no extra Shopify mapping/outbox", async () => {
   const before = await db.outboxEvent.count({
