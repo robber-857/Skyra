@@ -252,15 +252,18 @@ test("today dashboards show current registrations, restrict Coach and omit priva
     data: { customerComment: "Personal goal" },
   });
   await processPaidBookingEvent((await queuePaid(f)).id);
-  const start = new Date(Date.now() - 1800000),
-    end = new Date(Date.now() + 1800000);
+  const start = DateTime.now()
+      .setZone(f.shop.timezone)
+      .startOf("day")
+      .plus({ hours: 12 }),
+    end = start.plus({ hours: 1 });
   await db.classSession.update({
     where: { id: f.session.id },
     data: {
-      startsAt: start,
-      endsAt: end,
-      busyStartsAt: start,
-      busyEndsAt: end,
+      startsAt: start.toJSDate(),
+      endsAt: end.toJSDate(),
+      busyStartsAt: start.toJSDate(),
+      busyEndsAt: end.toJSDate(),
     },
   });
   const admin = await adminToday(f.actor);
