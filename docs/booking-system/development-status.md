@@ -1,5 +1,14 @@
 # Booking V3 — 开发状态
 
+## 2026-09-14：Git 交付与 Coach 测试入口
+
+Appointment/留言/Today 与登录、排课保存修复已提交并推送 `698f7c2` 至 bookingdev，远程 SHA 一致，[CI 34812945622](https://github.com/robber-857/Skyra/actions/runs/34812945622) 通过。以下旧日期的“尚未提交”仅保留当时状态。
+
+随后补充开发店 Admin 专用 Coach 测试登录：People → Create test sign-in link → Open coach test portal → Continue to my schedule。15 分钟单次链接、受限 Coach 会话；正式环境与其他店铺不可签发。Buffer 增加页面说明，并修复 Coach POST 经过本地代理的 Origin 校验。**336 项完整测试、类型/lint/构建以及 Coach 手机/桌面浏览器流程通过**。详细使用方法与边界见 [Coach 测试入口](coach-test-access.md)。
+
+真实老师邮箱邀请、稳定部署、完整真实账号/付款验收仍未完成。本轮没有正式店发布或开放付款；后台测试入口不等于正式老师认证已接通。
+
+
 ## 2026-09-14：Save draft 400 已修复
 
 Weekly Schedule 的 POST 被 React Router 7.18.3 的来源校验拦在业务 action 之前：公网 HTTPS Origin 与代理后的本机 request URL 不一致。新增 react-router.config.ts，仅允许 SHOPIFY_APP_URL 的精确 host；保留陌生来源拦截和 Shopify/Staff 认证。当前开发进程已加载修复，测试库实际保存草稿与重复提交去重通过。

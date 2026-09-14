@@ -91,3 +91,7 @@ Shopify 的配置位置为 Settings → Notifications → Sender email；按该�
 - 本地开发店 holds=0、bookings=0、notifications=0；onlineBookingsEnabled=false、checkoutAvailable=false、ownedPassesAvailable=false。
 - 保留上一轮未提交 Webhook 批次；本轮没有 commit/push、真实收款/发信或正式店发布。
 
+
+## 2026-09-14 开发店手工测试入口
+
+Admin People 已增加 Create test sign-in link，随后 Open coach test portal 可进入所选老师的受限后台。仅本地 development + 指定开发店 + ADMIN 可签发，生产环境禁用；真实老师邮箱邀请仍未完成。用法、Buffer 规则、336 项测试与验证边界见 [Coach 测试入口](coach-test-access.md)。
