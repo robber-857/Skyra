@@ -6,7 +6,7 @@
 
 - 用户已确认两个 Render 状态显示 `open`，并已点击 `Enable development bookings` 开启数据库规则；三个开关按既定顺序完成。
 - 本轮只读检查 Render `/health` 返回 200。尚未通过数据库或订单证据独立签收第一笔交易，因此不能把开关开启写成付款/预约 E2E 已通过。
-- `CLASS` / `APPOINTMENT` / `COURSE` 与 Pass 单一类型隔离已完成代码和本地验证；部署后按第 5 步执行三笔开发店交易。
+- `CLASS` / `APPOINTMENT` / `COURSE` 与 Pass 单一类型隔离已完成代码、本地验证和 Render 后端部署。Shopify 候选版本 `skyra-booking-6` 已创建但未 release；前台扩展需明确批准 release 后，才按第 5 步执行交易。
 
 ## 三个开关
 
