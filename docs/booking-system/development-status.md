@@ -1,5 +1,11 @@
 # Booking V3 — 开发状态
 
+## 2026-09-14：开发店三个预约开关安全门控（本地）
+
+已把 Checkout 与已有 Pass 的硬编码关闭改为显式 Render 环境门控，并将目标域名固定为 `skyra-booking-dev.myshopify.com`；正式店域名不能通过环境变量误开启。Booking App Settings 新增第三个在线预约规则控制，只有开发店 ADMIN、两个 Render 门控均已开启且预约窗口规则已批准时才能启用，并写 `DEVELOPMENT_BOOKING_ENABLED` / `DEVELOPMENT_BOOKING_DISABLED` 审计。前台只有三个开关全部开启时才会显示可用 Checkout/已有 Pass 操作。
+
+本批次验证：28 个测试文件 / 348 项全部通过，TypeScript、Customer Extension 类型检查、ESLint 和生产构建通过。代码仍在本地，Render 配置默认 false，数据库和线上行为没有变化；提交、部署和真实模拟付款尚未执行。操作与回滚见 [开发店三个预约开关](development-store-release.md)。同时记录新范围：团课、私教、Workshop 类型隔离，以及 Customer Profile 可选个人签名/训练目标；后两项功能尚未实现。
+
 ## 2026-09-14：Weekly Schedule 周日历与场次编辑
 
 Admin Weekly Schedule 已从单列课程清单升级为七天周日历：桌面按 Morning / Afternoon / Evening 展示，手机切换为逐日日程；支持按 Coach 筛选，并在课程卡显示时间、课程、Coach、已占用/容量和 DRAFT/PUBLISHED 状态。点击任一课程卡可打开编辑区，修改课程类型、Coach、日期时间和容量；已有预约或有效 Checkout Hold 时课程类型锁定。

@@ -541,6 +541,38 @@ test("Pass options require the bound Shopify customer and isolate shops", async 
   expect(result.checkoutAvailable).toBe(false);
   expect(await db.bookingHold.count({ where: { shopId: f.shopId } })).toBe(0);
 });
+test("all three development gates must be open before Checkout is advertised", async () => {
+  const f = await fixture();
+  await selectablePass(f);
+  const { token } = await f.start();
+  const previous = {
+    shop: process.env.SKYRA_BOOKING_TEST_SHOP,
+    checkout: process.env.SKYRA_BOOKING_CHECKOUT_ENABLED,
+    owned: process.env.SKYRA_BOOKING_OWNED_PASSES_ENABLED,
+  };
+  try {
+    process.env.SKYRA_BOOKING_TEST_SHOP = "skyra-booking-dev.myshopify.com";
+    process.env.SKYRA_BOOKING_CHECKOUT_ENABLED = "true";
+    process.env.SKYRA_BOOKING_OWNED_PASSES_ENABLED = "true";
+    const result = await bookingPassOptions(
+      {
+        ...f.actor(),
+        shopDomain: "skyra-booking-dev.myshopify.com",
+      },
+      { token },
+    );
+    expect(result.checkoutAvailable).toBe(true);
+  } finally {
+    if (previous.shop === undefined) delete process.env.SKYRA_BOOKING_TEST_SHOP;
+    else process.env.SKYRA_BOOKING_TEST_SHOP = previous.shop;
+    if (previous.checkout === undefined)
+      delete process.env.SKYRA_BOOKING_CHECKOUT_ENABLED;
+    else process.env.SKYRA_BOOKING_CHECKOUT_ENABLED = previous.checkout;
+    if (previous.owned === undefined)
+      delete process.env.SKYRA_BOOKING_OWNED_PASSES_ENABLED;
+    else process.env.SKYRA_BOOKING_OWNED_PASSES_ENABLED = previous.owned;
+  }
+});
 test("Review rejects expired attempts and closed or full classes", async () => {
   const f = await fixture(1);
   await selectablePass(f);
@@ -569,15 +601,14 @@ test("Only eligible active synchronized Passes are shown and Intro requires a fi
     where: { id: f.pass.id },
     data: { introOnly: true },
   });
-  expect((await bookingPassOptions(f.actor(), { token })).passes).toHaveLength(1);
+  expect((await bookingPassOptions(f.actor(), { token })).passes).toHaveLength(
+    1,
+  );
   await db.passPlan.update({
     where: { id: f.pass.id },
     data: { introOnly: false },
   });
-  for (const change of [
-    { status: "DRAFT" },
-    { validityDays: 1 },
-  ]) {
+  for (const change of [{ status: "DRAFT" }, { validityDays: 1 }]) {
     await db.passPlan.update({ where: { id: f.pass.id }, data: change });
     expect((await bookingPassOptions(f.actor(), { token })).passes).toEqual([]);
     await db.passPlan.update({

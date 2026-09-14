@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { DomainError } from "../lib/errors.server";
 import { bookingJson, bookingRequest } from "../services/booking-proxy.server";
-import { checkoutAvailable } from "../services/commerce-capabilities.server";
+import { commerceCapabilities } from "../services/commerce-capabilities.server";
 import { prepareBookingCheckout } from "../services/booking-checkout.server";
 import { authenticatedStorefrontClient } from "../services/storefront-access.server";
 import { unauthenticated } from "../shopify.server";
@@ -15,7 +15,7 @@ export function action({ request }: ActionFunctionArgs) {
         "Sign in with Shopify before checkout.",
         401,
       );
-    if (!checkoutAvailable)
+    if (!commerceCapabilities(actor.shopDomain).checkoutAvailable)
       throw new DomainError(
         "CHECKOUT_NOT_AVAILABLE",
         "Checkout is not available yet.",

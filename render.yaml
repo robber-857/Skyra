@@ -24,6 +24,12 @@ services:
         sync: false
       - key: SCOPES
         value: write_products,write_metaobjects,read_metaobjects,write_metaobject_definitions,read_metaobject_definitions,write_app_proxy,unauthenticated_read_product_listings,read_orders
+      - key: SKYRA_BOOKING_TEST_SHOP
+        value: skyra-booking-dev.myshopify.com
+      - key: SKYRA_BOOKING_CHECKOUT_ENABLED
+        value: "false"
+      - key: SKYRA_BOOKING_OWNED_PASSES_ENABLED
+        value: "false"
       - key: DATABASE_URL
         fromDatabase:
           name: skyra-booking-db

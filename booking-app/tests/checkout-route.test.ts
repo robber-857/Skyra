@@ -17,13 +17,19 @@ vi.mock("../app/services/booking-checkout.server", () => ({
 import { action, loader } from "../app/routes/apps.skyra-booking.checkout";
 import type { ActionFunctionArgs } from "react-router";
 beforeEach(() => {
+  vi.unstubAllEnvs();
   vi.resetAllMocks();
   mocks.auth.mockResolvedValue({});
-  mocks.shop.mockResolvedValue({ id: "shop-id", status: "ACTIVE" });
+  mocks.shop.mockResolvedValue({
+    id: "shop-id",
+    domain: "skyra-booking-dev.myshopify.com",
+    status: "ACTIVE",
+  });
+  mocks.prepare.mockResolvedValue({ status: "CHECKOUT_READY" });
 });
 function post(customer = "123", headers: Record<string, string> = {}) {
   const request = new Request(
-    "https://app.example/apps/skyra-booking/checkout?shop=dev.myshopify.com&logged_in_customer_id=" +
+    "https://app.example/apps/skyra-booking/checkout?shop=skyra-booking-dev.myshopify.com&logged_in_customer_id=" +
       customer,
     {
       method: "POST",
@@ -45,6 +51,13 @@ test("public Checkout remains disabled even for a signed logged-in buyer", async
   });
   expect(response.headers.get("Cache-Control")).toContain("no-store");
   expect(mocks.prepare).not.toHaveBeenCalled();
+});
+test("the exact development shop can open Checkout with an explicit gate", async () => {
+  vi.stubEnv("SKYRA_BOOKING_TEST_SHOP", "skyra-booking-dev.myshopify.com");
+  vi.stubEnv("SKYRA_BOOKING_CHECKOUT_ENABLED", "true");
+  const response = await post();
+  expect(response.status).toBe(200);
+  expect(mocks.prepare).toHaveBeenCalledOnce();
 });
 test("anonymous checkout cannot authenticate using a request body", async () => {
   expect((await post("")).status).toBe(401);

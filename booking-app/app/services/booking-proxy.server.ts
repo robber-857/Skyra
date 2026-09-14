@@ -25,7 +25,7 @@ export async function proxyBookingActor(
     throw new DomainError("INVALID_CONTEXT", "Invalid Shopify context.", 400);
   const shop = await db.shop.findUnique({
     where: { domain: shops[0] },
-    select: { id: true, status: true },
+    select: { id: true, domain: true, status: true },
   });
   if (shop?.status !== "ACTIVE")
     throw new DomainError(
@@ -35,6 +35,7 @@ export async function proxyBookingActor(
     );
   return {
     shopId: shop.id,
+    shopDomain: shop.domain,
     customerGid: /^[1-9]\d*$/.test(customers[0] || "")
       ? "gid://shopify/Customer/" + customers[0]
       : null,

@@ -9,13 +9,14 @@ import {
   introOfferEligible,
 } from "./entitlements.server";
 import { purchaseMappingReady } from "./purchase-mapping.server";
-import {
-  checkoutAvailable,
-  ownedPassesAvailable,
-} from "./commerce-capabilities.server";
+import { commerceCapabilities } from "./commerce-capabilities.server";
 
 type Tx = Prisma.TransactionClient;
-export type BookingActor = { shopId: string; customerGid: string | null };
+export type BookingActor = {
+  shopId: string;
+  shopDomain?: string;
+  customerGid: string | null;
+};
 const tokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 const hash = (token: string) =>
   createHash("sha256").update(tokenSchema.parse(token)).digest("hex");
@@ -730,6 +731,9 @@ export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
         "PASS_UNAVAILABLE",
         "This Pass has changed or is no longer available. Choose another Pass.",
       );
+    const onlineBookingsEnabled =
+      (shop.rules as Record<string, unknown>).onlineBookingsEnabled === true;
+    const capabilities = commerceCapabilities(actor.shopDomain);
     return {
       customerComment: attempt.customerComment,
       attemptExpiresAt: attempt.expiresAt.toISOString(),
@@ -737,11 +741,11 @@ export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
       passes,
       dropIn,
       selected,
-      checkoutAvailable,
+      checkoutAvailable:
+        capabilities.checkoutAvailable && onlineBookingsEnabled,
       ownedPasses,
       ownedPassesAvailable:
-        ownedPassesAvailable &&
-        (shop.rules as Record<string, unknown>).onlineBookingsEnabled === true,
+        capabilities.ownedPassesAvailable && onlineBookingsEnabled,
     };
   });
 }
