@@ -2,7 +2,7 @@
 
 ## 最新交接入口（2026-09-14）
 
-请先阅读 [Render → 付款预约 → 客户账户交接](handoff-2026-09-14.md)。固定 Render 开发环境与 Shopify Checkout handoff 已部署到 `bookingdev`；真实付款 E2E、正式店安装和客户账户验收仍未完成。Admin Weekly Schedule 已新增七天日历、Coach 筛选和受保护的场次编辑，本地 26 文件 / 339 项测试通过，待开发店部署验收。
+请先阅读 [Render → 付款预约 → 客户账户交接](handoff-2026-09-14.md)。固定 Render 开发环境与 Shopify Checkout handoff 已部署到 `bookingdev`；真实付款 E2E、正式店安装和客户账户验收仍未完成。Admin Weekly Schedule 已新增七天日历、Coach 筛选和受保护的场次编辑；`4405b31` 已推送并在 Render live，本地 26 文件 / 339 项测试和 1440/390px 视觉检查通过。已登录 Shopify 开发店的最终点击验收仍待完成。
 
 ## 2026-09-14：Git 交付与 Coach 测试入口
 

@@ -6,7 +6,7 @@ Admin Weekly Schedule 已从单列课程清单升级为七天周日历：桌面�
 
 后端新增事务化 `updateSession`：仅允许未来 DRAFT/PUBLISHED 场次，重新校验课程/Coach 资格、悉尼时区和 Coach/Location 冲突；有效 Hold 阻止编辑，容量不得低于确认预约，版本号阻止并发覆盖，成功写入 `SESSION_UPDATED` 审计。现有复制上周、草稿、发布和移除草稿流程保留。
 
-本地验证：`npm.cmd run check` 通过；专用 `skyra_booking_test` 数据库 **26 个测试文件 / 339 项测试全部通过**，新增覆盖冲突回滚、成功更新时间/容量、审计、旧版本拒绝和跨店拒绝。此处仅证明本地代码和专用测试库通过；Shopify 开发店中的真实点击编辑仍需部署后验收，未开放正式店付款或预约开关。
+本地验证：`npm.cmd run check` 通过；专用 `skyra_booking_test` 数据库 **26 个测试文件 / 339 项测试全部通过**，新增覆盖冲突回滚、成功更新时间/容量、审计、旧版本拒绝和跨店拒绝。提交 `4405b31` 已推送且远程 SHA 一致，Render deploy `dep-dajus7tckfvc73a6tos0` 已 live。1440/390px 本地 Playwright 视觉检查通过：桌面周日历与手机日程按断点切换、点击课程显示编辑区、pageErrors=[]、页面无横向溢出。已登录 Shopify 开发店的真实点击验收仍待完成；未开放正式店付款或预约开关。
 
 ## 2026-09-14：Git 交付与 Coach 测试入口
 
