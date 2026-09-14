@@ -251,6 +251,29 @@ window.SkyraBookingTransaction = function ({
       if(error.code==="LOGIN_REQUIRED") host.querySelector("[data-booking-result]").append(button("Sign in to check", "skyra-booking__primary", signIn));
     }
   }
+  async function openCheckout(pass, idempotencyKey = crypto.randomUUID()) {
+    const version=++revision;
+    attempt.remember();
+    frame("Opening Shopify Checkout").append(el("p", "skyra-booking__notice", "Creating a secure checkout and holding your place…"));
+    try {
+      await resultRequest("/comment", {comment});
+      const purchaseKind=kind(pass);
+      const data=await resultRequest("/checkout", {
+        purchaseKind,
+        idempotencyKey,
+        ...(purchaseKind === "NEW_PASS" ? {passPlanId:pass.id} : {}),
+      });
+      if(version!==revision || !root.contains(host)) return;
+      if(data.status !== "CHECKOUT_READY" || typeof data.checkoutUrl !== "string")
+        throw new Error("Shopify Checkout is not ready. Please try again.");
+      const checkoutUrl=new URL(data.checkoutUrl);
+      if(checkoutUrl.protocol !== "https:" || checkoutUrl.username || checkoutUrl.password)
+        throw new Error("Shopify returned an invalid Checkout URL.");
+      window.location.assign(checkoutUrl.href);
+    } catch(error) {
+      if(version===revision && root.contains(host)) errorView(error, ()=>openCheckout(pass, idempotencyKey));
+    }
+  }
   async function confirm(pass) {
     const version=++revision;
     attempt.remember();
@@ -338,15 +361,21 @@ window.SkyraBookingTransaction = function ({
         el(
           "p",
           "skyra-booking__notice",
-          kind(pass) === "OWNED_PASS" ? (data.ownedPassesAvailable ? "Confirm to reserve your place using one credit from your Pass." : "Booking with an existing Pass is not available yet. Your credits have not changed.") : "Online checkout is not available yet. Your place has not been reserved and no payment has been taken.",
+          kind(pass) === "OWNED_PASS"
+            ? (data.ownedPassesAvailable ? "Confirm to reserve your place using one credit from your Pass." : "Booking with an existing Pass is not available yet. Your credits have not changed.")
+            : (data.checkoutAvailable ? "Shopify Checkout will open securely. Your booking is confirmed only after Shopify reports a verified payment." : "Online checkout is not available yet. Your place has not been reserved and no payment has been taken."),
         ),
       );
+      const ownedPass=kind(pass) === "OWNED_PASS";
       const checkout = button(
-        kind(pass) === "OWNED_PASS" ? "Confirm booking" : "Continue to Shopify Checkout",
+        ownedPass ? "Confirm booking" : "Continue to Shopify Checkout",
         "skyra-booking__primary",
-        () => { if(kind(pass) === "OWNED_PASS" && data.ownedPassesAvailable) confirm(pass); },
+        () => {
+          if(ownedPass && data.ownedPassesAvailable) confirm(pass);
+          if(!ownedPass && data.checkoutAvailable) openCheckout(pass);
+        },
       );
-      checkout.disabled = kind(pass) !== "OWNED_PASS" || !data.ownedPassesAvailable;
+      checkout.disabled = ownedPass ? !data.ownedPassesAvailable : !data.checkoutAvailable;
       main.append(checkout);
     } catch (error) {
       if (version === revision && root.contains(host)) errorView(error, load);

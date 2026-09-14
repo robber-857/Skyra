@@ -1,13 +1,13 @@
 client_id = "c9d266a38e2f11a1240139974253b3a1"
 name = "Skyra Booking"
-application_url = "https://shopify.dev/apps/default-app-home"
+application_url = "https://skyra-booking-web.onrender.com"
 embedded = true
 [build]
 automatically_update_urls_on_dev = true
 [access_scopes]
-scopes = "write_products,write_metaobjects,read_metaobjects,write_metaobject_definitions,read_metaobject_definitions,write_app_proxy,unauthenticated_read_product_listings"
+scopes = "write_products,write_metaobjects,read_metaobjects,write_metaobject_definitions,read_metaobject_definitions,write_app_proxy,unauthenticated_read_product_listings,read_orders"
 [auth]
-redirect_urls = ["https://shopify.dev/apps/default-app-home/auth/callback"]
+redirect_urls = ["https://skyra-booking-web.onrender.com/auth/callback"]
 [app_proxy]
 url = "/apps/skyra-booking"
 prefix = "apps"
@@ -21,6 +21,9 @@ uri = "/webhooks/app/uninstalled"
 [[webhooks.subscriptions]]
 topics = ["app/scopes_update"]
 uri = "/webhooks/app/scopes_update"
+[[webhooks.subscriptions]]
+topics = ["orders/paid"]
+uri = "/webhooks/orders/paid"
 [product.metafields.app.booking_owner_id]
 name = "Booking owner ID"
 description = "Stable Booking Service or PassPlan UUID; managed by Skyra Booking."
