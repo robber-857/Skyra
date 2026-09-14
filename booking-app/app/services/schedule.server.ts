@@ -23,7 +23,7 @@ export async function addSessions(actor: Actor, raw: unknown) {
           id: input.serviceId,
           shopId: actor.shopId,
           status: "ACTIVE",
-          kind: "CLASS",
+          kind: { in: ["CLASS", "APPOINTMENT"] },
         },
         include: { location: true },
       });

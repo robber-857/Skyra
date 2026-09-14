@@ -22,7 +22,7 @@
           <a href="{{ routes.cart_url }}" aria-label="View shopping cart">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.8 5.2h2l1.7 9.2h9.2l2-6.6H7"></path><circle cx="9.3" cy="18.5" r="1"></circle><circle cx="16.2" cy="18.5" r="1"></circle></svg>
           </a>
-          <a href="{{ routes.account_url }}" aria-label="Member account">
+          <a href="{% render 'skyra-account-url' %}" aria-label="Member account">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.4"></circle><path d="M5.8 19.2c.8-3.3 3-5 6.2-5s5.4 1.7 6.2 5"></path></svg>
           </a>
         </nav>
@@ -52,7 +52,7 @@
           </div>
           <div class="primary-nav__meta">
             <a href="{{ routes.collections_url }}">Online store</a>
-            <a href="{{ routes.account_url }}">Member account</a>
+            <a href="{% render 'skyra-account-url' %}">Member account</a>
           </div>
         </div>
       </nav>
@@ -336,7 +336,7 @@
           <div class="footer-group">
             <p class="footer-heading">Account</p>
             <a href="{{ routes.collections_url }}">Online store</a>
-            <a href="{{ routes.account_url }}">Member account</a>
+            <a href="{% render 'skyra-account-url' %}">Member account</a>
           </div>
         </nav>
 

@@ -1,3 +1,5 @@
+import { coachToday } from "../services/today-bookings.server";
+import { TodayBookings } from "../components/today-bookings";
 import {
   data,
   redirect,
@@ -26,7 +28,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
       requestCoachToken(request),
       Object.fromEntries(params),
     );
-    return data(result, { headers: headers() });
+    return data(
+      { ...result, today: await coachToday(requestCoachToken(request)) },
+      { headers: headers() },
+    );
   } catch (error) {
     if (error instanceof DomainError && error.status === 401)
       throw redirect("/coach/login", { headers: headers() });
@@ -42,5 +47,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 }
 export default function CoachPortal() {
-  return <CoachScheduleView data={useLoaderData<typeof loader>()} />;
+  const info = useLoaderData<typeof loader>();
+  return (
+    <>
+      <div className="workspace coach-workspace">
+        <TodayBookings data={info.today} coach />
+      </div>
+      <CoachScheduleView data={info} />
+    </>
+  );
 }

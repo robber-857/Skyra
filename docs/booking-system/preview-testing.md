@@ -1,5 +1,31 @@
 # Booking 开发预览与测试
 
+## 2026-09-14：Save draft 400 已修复
+
+Weekly Schedule 的 POST 被 React Router 7.18.3 的来源校验拦在业务 action 之前：公网 HTTPS Origin 与代理后的本机 request URL 不一致。新增 react-router.config.ts，仅允许 SHOPIFY_APP_URL 的精确 host；保留陌生来源拦截和 Shopify/Staff 认证。当前开发进程已加载修复，测试库实际保存草稿与重复提交去重通过。
+
+**25 文件 / 322 项完整测试通过**，类型/lint/生产构建通过，6 项健康检查各 3 次通过。公网可信来源的未认证提交仍为 401，陌生来源为 400；本人 Admin Save draft 重试仍待用户反馈。本轮无 commit/push、正式部署或付款开关变更。
+
+Cloudflare 日志证实曾短暂失联，随后自动重连；本轮未更换隧道。另已核实 dev 店本身免费，不增加第二份正式店基础月租；只能模拟支付，真实收款应在现有正式店完成。详见 [保存草稿修复与费用说明](schedule-save-fix.md)。
+
+
+## 2026-09-14：My account 修复与 Admin 测试入口
+
+My account 原先使用相对 /account，本地预览把 Shopify 认证请求送到 localhost，出现 404/401。现已将 Booking 区块与 Skyra 页面头部/底部统一指向 Shopify 托管账户地址；实际浏览器已到达 Shopify “Sign in - Skyra Booking Dev”，未代用户提交邮箱或验证码。Admin 使用独立的店主/员工入口，顾客登录不授予后台权限。
+
+新增验证：24 文件 / **314 项测试通过**，TypeScript、ESLint、生产构建、Shopify app build、8 个 Liquid 文件官方验证与 16 组浏览器回归通过。真实账号登录/退出/返回仍未验收，30 组真实 UAT 仍待签收。修复只同步开发预览，未正式发布或开通云服务器，未再次提交 GitHub。
+
+后台链接、添加课程/排期步骤、登录边界及 Railway/Render/Vercel 成本见 [账户入口与低成本部署](account-access-and-hosting.md)。以便宜为主，优先评估 Railway 测试环境；US$5 是最低用量，整套 App/Worker/DB/Redis 费用需按实测核算。
+
+
+## 当前状态（2026-09-14，优先于以下旧日期记录）
+
+Home/Programs、App host、课表代理、Shopify upstream、公网 App health 均已连续 3 次通过。旧 Cloudflare 临时隧道失效导致的代理 500 已通过独立 HTTP2/IPv4 隧道恢复；原因、启动参数和日志见 [最新交接](handoff-2026-09-14.md)。当前未来 7 天无已发布课程，请在 Admin Weekly Schedule 配置未来测试场次；不要复用 9 月 12 日的过期课程。
+
+Appointment 固定时段直接确认、逐次留言、Today、Customer Account、取消改期、Coach 到课、paid Worker 已完成本地实现。旧段落的“未实现”属于历史记录。当前公开三个交易开关仍关闭，Checkout 前端真实跳转/真实订阅/账号页面配置与测试网关仍待接通，因此不能进行完整付款测试。不要把本机临时隧道称为正式发布。
+
+开发脚本新增 -TunnelUrl（HTTPS origin 加经核实的本地代理端口），健康检查新增 --app-url（公网 HTTPS origin）。当前六项检查证据在 output/booking-next/proxy-http2-health.log。优先使用下方本机 Home/Programs 链接；临时 tunnel 不是永久测试入口。
+
 更新日期：2026-09-12。Home 和 Programs 开发主题已配置；本轮单次 HTTP 检查双页面及课表接口均 200，两个测试商品的真实可售检查已通过。仍避免连续刷新；完整页面稳定性与真实顾客登录/Review 尚待验收。
 
 ## 打开入口

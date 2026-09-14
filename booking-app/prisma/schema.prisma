@@ -255,6 +255,7 @@ model CustomerProfile {
 }
 
 model BookingAttempt {
+  customerComment String @default("")
   id         String           @id @default(uuid()) @db.Uuid
   shopId     String           @db.Uuid
   tokenHash  String           @unique
@@ -325,6 +326,7 @@ model BookingCheckout {
 
 // Confirmed occupancy, linked to its immutable checkout and order source.
 model Booking {
+  customerComment String @default("")
   id                       String                   @id @default(uuid()) @db.Uuid
   shopId                   String                   @db.Uuid
   sessionId                String                   @db.Uuid

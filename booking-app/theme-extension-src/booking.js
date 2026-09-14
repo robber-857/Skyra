@@ -127,7 +127,7 @@
       const heading = element("div");
       heading.append(element("h2", "", copy.title), element("p", "", copy.subtitle));
       const account = element("a", "skyra-booking__account", copy.account);
-      account.href = "/account";
+      account.href = attempt.accountUrl();
       header.append(heading, account);
       if (state.view === "browse" && content.querySelector(".skyra-booking__toolbar")) {
         const actions = element("div", "skyra-booking__header-actions");
@@ -234,6 +234,7 @@
             element("h3", "", session.service.name),
             element("p", "", session.coach.name)
           );
+          if(session.service.kind === "APPOINTMENT") sessionCopy.append(element("p","","Private appointment · 1 customer"));
           const availability = element(
             "span",
             "skyra-booking__availability" + (spots <= 0 ? " is-full" : ""),

@@ -36,7 +36,7 @@ try {
   browser = await chromium.launch({ headless: true, channel: "chrome" });
   const results = [];
   for (const width of [390,1440]) {
-    const f = await paidFixture(); await processPaidBookingEvent((await queuePaid(f)).id);
+    const f = await paidFixture(); await db.bookingAttempt.update({where:{id:f.attempt.id},data:{customerComment:"Core strength <script>unsafe()</script>"}}); await processPaidBookingEvent((await queuePaid(f)).id);
     const context = await browser.newContext({ viewport: { width, height: 1000 } });
     const page = await context.newPage();
     const pageErrors=[];
@@ -57,6 +57,7 @@ try {
     assert.equal(overflow, false);
     await page.getByRole("link", {name:"View roster"}).click();
     await page.getByRole("heading", {name:"Class roster"}).waitFor();
+    await page.getByText("Core strength <script>unsafe()</script>",{exact:true}).waitFor();assert.equal(await page.locator("script").filter({hasText:"unsafe()"}).count(),0);
     assert.equal(await page.getByRole("button", {name:"Apply booking action"}).count(),0);
     const startsAt=new Date(Date.now()-60000), endsAt=new Date(Date.now()+3540000);
     await db.classSession.update({where:{id:f.session.id},data:{startsAt,endsAt,busyStartsAt:startsAt,busyEndsAt:endsAt}});

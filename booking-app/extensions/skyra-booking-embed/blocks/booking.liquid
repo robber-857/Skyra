@@ -5,6 +5,7 @@
 <script type="application/json" data-skyra-booking-config>
 {
   "shopDomain": {{ shop.permanent_domain | json }},
+  "accountUrl": {{ routes.account_url | json }},
   "copy": {
     "book": {{ 'booking.book' | t | json }},
     "loginClose": {{ 'booking.login_close' | t | json }},

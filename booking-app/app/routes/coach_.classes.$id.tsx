@@ -67,9 +67,9 @@ export default function Roster() {
       <section className="panel">
         <h2>{s.service.name}</h2>
         <p>
-          {DateTime.fromJSDate(new Date(s.startsAt), { zone: s.timezone }).toFormat(
-            "d LLL yyyy · h:mm a",
-          )}{" "}
+          {DateTime.fromJSDate(new Date(s.startsAt), {
+            zone: s.timezone,
+          }).toFormat("d LLL yyyy · h:mm a")}{" "}
           · {s.timezone}
         </p>
         <p>
@@ -94,6 +94,12 @@ export default function Roster() {
             <h3>Customer {b.customerId.slice(-8)}</h3>
             <p className="muted">Booking {b.id}</p>
             <Status>{b.status}</Status>
+            {b.customerComment && (
+              <div className="booking-comment">
+                <h4>Customer note for this booking</h4>
+                <p>{b.customerComment}</p>
+              </div>
+            )}
             {b.checkedInAt && <p>Checked in</p>}
             {s.status !== "CANCELLED" && (
               <BookingActions

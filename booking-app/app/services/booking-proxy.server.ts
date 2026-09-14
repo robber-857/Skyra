@@ -43,6 +43,7 @@ export async function proxyBookingActor(
 export async function bookingRequest(
   request: Request,
   run: (actor: BookingActor, input: unknown) => Promise<unknown>,
+  maxBodyLength = 2048,
 ) {
   try {
     const actor = await proxyBookingActor(request);
@@ -63,7 +64,7 @@ export async function bookingRequest(
       );
     }
     const body = await request.text();
-    if (body.length > 2048)
+    if (body.length > maxBodyLength)
       return bookingJson({ code: "INVALID_REQUEST" }, 413);
     return bookingJson(await run(actor, JSON.parse(body)));
   } catch (error) {

@@ -12,6 +12,7 @@ import {
   renderBookingEmail,
 } from "../app/services/booking-notifications.server";
 import {
+  databaseNow,
   expireBookingWork,
   resumeAttempt,
 } from "../app/services/booking.server";
@@ -456,4 +457,26 @@ test("email definite rejections retry to a bounded terminal state", async () => 
   expect(
     await db.bookingNotification.findUnique({ where: { id: n.id } }),
   ).toMatchObject({ status: "FAILED", attempts: 5 });
+});
+
+test("notification due times and retry delays use database time despite worker clock skew", async () => {
+  const f=await paidFixture();
+  await processPaidBookingEvent((await queuePaid(f)).id);
+  const n=await db.bookingNotification.findFirstOrThrow({where:{shopId:f.shop.id}});
+  const send=vi.fn(async()=>({status:'RETRY' as const}));
+  vi.useFakeTimers({toFake:['Date']});
+  try {
+    vi.setSystemTime(new Date('2000-01-01T00:00:00Z'));
+    const before=await databaseNow(db);
+    await deliverBookingNotification(n.id,send);
+    expect(send).toHaveBeenCalledTimes(1);
+    const after=await databaseNow(db);
+    const retry=await db.bookingNotification.findUniqueOrThrow({where:{id:n.id}});
+    expect(retry).toMatchObject({status:'PENDING',attempts:1});
+    expect(retry.availableAt.getTime()).toBeGreaterThanOrEqual(before.getTime()+120000);
+    expect(retry.availableAt.getTime()).toBeLessThanOrEqual(after.getTime()+120000);
+    vi.setSystemTime(new Date('2099-01-01T00:00:00Z'));
+    await deliverBookingNotification(n.id,send);
+    expect(send).toHaveBeenCalledTimes(1);
+  } finally { vi.useRealTimers(); }
 });

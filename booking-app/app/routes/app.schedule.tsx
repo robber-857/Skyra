@@ -131,7 +131,11 @@ export default function Schedule() {
                 >
                   <option value="">Choose a class</option>
                   {data.services
-                    .filter((x) => x.status === "ACTIVE" && x.kind === "CLASS")
+                    .filter(
+                      (x) =>
+                        x.status === "ACTIVE" &&
+                        ["CLASS", "APPOINTMENT"].includes(x.kind),
+                    )
                     .map((x) => (
                       <option key={x.id} value={x.id}>
                         {x.name}

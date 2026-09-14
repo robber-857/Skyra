@@ -85,7 +85,7 @@ export async function classForBooking(
   if (
     !session ||
     session.service.status !== "ACTIVE" ||
-    session.service.kind !== "CLASS" ||
+    !["CLASS", "APPOINTMENT"].includes(session.service.kind) ||
     session.coach.status !== "ACTIVE"
   )
     return fail("UNAVAILABLE", "This class is no longer available.");
@@ -182,6 +182,7 @@ async function snapshot(
     surface: attempt.surface,
     status: attempt.status,
     requiresLogin,
+    customerComment: requiresLogin ? "" : attempt.customerComment,
     resultAvailable: Boolean(hold) || attempt.status === "CONFIRMED",
     expiresAt: attempt.expiresAt.toISOString(),
     returnPath: attemptReturnPath(attempt.surface, token),
@@ -198,6 +199,7 @@ async function snapshot(
       ),
       service: {
         id: session.service.id,
+        kind: session.service.kind,
         name: session.service.name,
         description: session.service.description,
         durationMin: session.service.durationMin,
@@ -729,6 +731,7 @@ export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
         "This Pass has changed or is no longer available. Choose another Pass.",
       );
     return {
+      customerComment: attempt.customerComment,
       attemptExpiresAt: attempt.expiresAt.toISOString(),
       spotsRemaining: spots,
       passes,

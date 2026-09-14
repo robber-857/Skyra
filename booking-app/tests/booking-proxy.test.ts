@@ -1,11 +1,14 @@
 import { beforeEach, expect, test, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ authenticate: vi.fn(), findShop: vi.fn() }));
+const mocks = vi.hoisted(() => ({ authenticate: vi.fn(), findShop: vi.fn(), saveComment: vi.fn() }));
 vi.mock("../app/shopify.server", () => ({
   authenticate: { public: { appProxy: mocks.authenticate } },
 }));
 vi.mock("../app/db.server", () => ({
   default: { shop: { findUnique: mocks.findShop } },
 }));
+vi.mock("../app/services/booking-comment.server", () => ({ saveBookingComment: mocks.saveComment }));
+import { action as commentAction } from "../app/routes/apps.skyra-booking.comment";
+import type { ActionFunctionArgs } from "react-router";
 import { bookingRequest } from "../app/services/booking-proxy.server";
 const run = vi.fn(async () => ({ ok: true }));
 function request(
@@ -96,4 +99,19 @@ test("malformed JSON is rejected and internal errors do not disclose secrets", a
   const response = await bookingRequest(request(), run);
   expect(response.status).toBe(503);
   expect(await response.text()).not.toContain("private database");
+});
+
+test("maximum length escaped booking comments pass the route without loosening other request limits", async () => {
+  mocks.saveComment.mockResolvedValue({saved:true});
+  const token = "a".repeat(43);
+  for (const body of [JSON.stringify({token,comment:'"'.repeat(1000)}), JSON.stringify({token,comment:'练'.repeat(1000)}).replaceAll('练','\\u7ec3')]) {
+    expect(body.length).toBeGreaterThan(2048);
+    const response = await commentAction({request:request(undefined,{body})} as ActionFunctionArgs);
+    expect(response.status).toBe(200);
+    expect(mocks.saveComment).toHaveBeenLastCalledWith({shopId:'shop-id',customerGid:'gid://shopify/Customer/123'},JSON.parse(body));
+    expect((await bookingRequest(request(undefined,{body}), run)).status).toBe(413);
+  }
+  mocks.saveComment.mockClear();
+  expect((await commentAction({request:request(undefined,{body:' '.repeat(8193)})} as ActionFunctionArgs)).status).toBe(413);
+  expect(mocks.saveComment).not.toHaveBeenCalled();
 });

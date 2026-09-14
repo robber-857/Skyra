@@ -101,6 +101,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       bookingStatus: bookingWindow(shop, session, clock),
       service: {
         id: session.service.id,
+        kind: session.service.kind,
         name: session.service.name,
         description: session.service.description,
         level: session.service.level,

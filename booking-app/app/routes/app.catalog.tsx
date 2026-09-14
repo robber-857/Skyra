@@ -163,6 +163,19 @@ export default function Catalog() {
               </Field>
               {tab === "service" ? (
                 <>
+                  <Field label="Service type">
+                    <select name="kind" defaultValue={service?.kind || "CLASS"}>
+                      <option value="CLASS">Group class</option>
+                      <option value="APPOINTMENT">
+                        Private appointment (one customer)
+                      </option>
+                    </select>
+                  </Field>
+                  <p className="muted">
+                    Private appointments always have one place. Publish
+                    available times in Weekly Schedule. Valid bookings confirm
+                    directly.
+                  </p>
                   <Field label="Duration (minutes)">
                     <input
                       name="durationMin"

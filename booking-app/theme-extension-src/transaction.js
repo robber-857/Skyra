@@ -45,6 +45,7 @@ window.SkyraBookingTransaction = function ({
       new Date(value),
     );
   const host = el("div", "skyra-booking__transaction");
+  let comment = attempt.customerComment || "", commentLoaded = false;
   let payload,
     selectedId,
     revision = 0;
@@ -255,6 +256,7 @@ window.SkyraBookingTransaction = function ({
     attempt.remember();
     frame("Confirming your booking").append(el("p", "skyra-booking__notice", "Reserving your place with one class credit…"));
     try {
+      await resultRequest("/comment", {comment});
       const result=await resultRequest("/confirm", {entitlementId:pass.id});
       if(version===revision && root.contains(host)) resultView(result);
     } catch(error) {
@@ -272,6 +274,7 @@ window.SkyraBookingTransaction = function ({
       const data = await request();
       if (version !== revision || !root.contains(host)) return;
       payload = data;
+      if(!commentLoaded){comment = data.customerComment ?? comment;commentLoaded=true;}
       if (!options(data).some((p) => key(p) === selectedId)) selectedId = null;
       choices();
     } catch (error) {
@@ -320,6 +323,11 @@ window.SkyraBookingTransaction = function ({
         el("strong", "", money(pass)),
       );
       summary.append(total);
+      const noteLabel=el("label","skyra-booking__note","Note for your coach (optional)");
+      const note=el("textarea");note.maxLength=1000;note.rows=3;note.value=comment;note.placeholder="For this session, I would like to work on…";note.addEventListener("input",()=>{comment=note.value;});noteLabel.append(note);
+      const noteStatus=el("p","skyra-booking__notice");noteStatus.setAttribute("role","status");
+      const saveNote=button("Save note","skyra-booking__back",async()=>{saveNote.disabled=true;try{await resultRequest("/comment",{comment});attempt.customerComment=comment;noteStatus.textContent="Note saved for this booking.";}catch(error){noteStatus.textContent=error.message||"Your note could not be saved. Try again before continuing.";}finally{saveNote.disabled=false;}});
+      summary.append(noteLabel,saveNote,noteStatus);
       main.append(
         summary,
         button(

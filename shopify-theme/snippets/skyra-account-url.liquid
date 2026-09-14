@@ -1,0 +1,11 @@
+{% doc %}
+  Outputs the Shopify customer account URL on its hosted origin, so local theme
+  previews never proxy customer authentication through localhost.
+{% enddoc %}
+{%- assign skyra_account_url = routes.account_url -%}
+{%- assign skyra_account_prefix = skyra_account_url | slice: 0, 1 -%}
+{%- if skyra_account_prefix == '/' -%}
+  https://{{ shop.permanent_domain }}{{ skyra_account_url }}
+{%- else -%}
+  {{ skyra_account_url }}
+{%- endif -%}

@@ -1,5 +1,20 @@
 # Skyra Booking System
 
+## 2026-09-14：My account 修复与 Admin 测试入口
+
+My account 原先使用相对 /account，本地预览把 Shopify 认证请求送到 localhost，出现 404/401。现已将 Booking 区块与 Skyra 页面头部/底部统一指向 Shopify 托管账户地址；实际浏览器已到达 Shopify “Sign in - Skyra Booking Dev”，未代用户提交邮箱或验证码。Admin 使用独立的店主/员工入口，顾客登录不授予后台权限。
+
+新增验证：24 文件 / **314 项测试通过**，TypeScript、ESLint、生产构建、Shopify app build、8 个 Liquid 文件官方验证与 16 组浏览器回归通过。真实账号登录/退出/返回仍未验收，30 组真实 UAT 仍待签收。修复只同步开发预览，未正式发布或开通云服务器，未再次提交 GitHub。
+
+后台链接、添加课程/排期步骤、登录边界及 Railway/Render/Vercel 成本见 [账户入口与低成本部署](account-access-and-hosting.md)。以便宜为主，优先评估 Railway 测试环境；US$5 是最低用量，整套 App/Worker/DB/Redis 费用需按实测核算。
+
+
+## 2026-09-14：接口恢复与测试版准备
+
+课表代理 500 已恢复：旧临时隧道失效，普通重启仍出现 Cloudflare 1033；切换到经核实 Booking 代理的独立 HTTP2/IPv4 隧道后，6 项健康检查各连续 3 次通过。本轮只恢复开发预览，未正式发布或开放交易。当前未来 7 天没有已发布课程，空列表不表示接口故障。
+
+本地尚余 6 组功能工作；第一版真实账号 + Shopify 模拟付款验收先补 4 个关口，不需等全部运营增强完成。原因、证据、清单和当前启动方式见 [2026-09-14 交接](handoff-2026-09-14.md)。旧批次 308 项自动化通过不替代真实 UAT；30 组真实验收仍待执行。
+
 这是当前唯一有效的 Booking System 文档入口。以下文件共同组成已经批准的 V3 开发基线；历史 Mindbody 页面和仓库中的静态排课内容只作为视觉参考，不再作为产品流程或数据来源。
 
 - Shopify：Customer Account、Product/Variant、Cart、Checkout、Order、Payment、Discount、Refund。
@@ -8,7 +23,7 @@
 
 ## 当前开发进度
 
-已创建并绑定 **Skyra Booking**。目前已实现团课预约/付款回调/课次账本的本地闭环、客户个人中心与取消改期、Coach 排期人数/名册/到课操作、Admin 预约管理与基础 Reports。真实 Shopify 登录与 Checkout、联系方式/发信、异常人工处理、私教和生产运行等仍未全部完成。请优先阅读 [2026-09-13 交接](handoff-2026-09-13.md)、[开发状态](development-status.md) 和 [本轮功能说明](customer-account-and-lifecycle.md)。
+已创建并绑定 **Skyra Booking**。目前已实现团课预约/付款回调/课次账本的本地闭环、客户个人中心与取消改期、Coach 排期人数/名册/到课操作、Admin 预约管理与基础 Reports。本轮新增私教固定时段直接确认、逐次课程留言和 Today 名单；真实 Shopify 登录与 Checkout、联系方式/发信、异常人工处理、动态 availability 和生产运行仍待完成。请优先阅读 [2026-09-13 交接](handoff-2026-09-13.md)、[开发状态](development-status.md) 和 [本轮功能说明](appointment-and-comments.md)。
 
 ## 推荐阅读顺序
 
@@ -38,7 +53,7 @@
 6. 课程容量、Seat Hold 和 Pass 扣次必须在 PostgreSQL 事务中处理。
 7. Shopify 与 Booking DB 之间使用 Webhook、Outbox 和定期 reconciliation 同步。
 8. Admin 保存 Class/Pass 后由 Worker 用 `productSet` 同步稳定的 Shopify Product/Variant；Weekly Session 只存在 Booking DB，不按课次创建商品。
-9. 老师留言属于 Booking DB，并区分 `CUSTOMER_VISIBLE` 与 `INTERNAL`；只有前者显示在 Shopify Customer Account。
+9. 留言仅由客户在每次 Booking 填写并保存于 Booking DB；本人、对应 Coach 和获授权 Admin 可看。不开发老师回复或其他留言系统。
 10. Home 与 Programs 不复制两套 Booking 代码：两个主题占位节点由同一个 Theme App Extension app embed 挂载。
 11. 浏览、课程详情、Pass 选择、已有 Pass 确认和结果状态都在当前 Booking section 内切换；登录和付款分别使用 Shopify Customer Account 与 Shopify Checkout，完成后返回原 section 并恢复 Booking attempt。
 12. Book 必须即时验证 Shopify Customer Account 登录；未登录弹出 Skyra 登录提示，桌面打开 Shopify 登录窗口，手机/受限浏览器同页登录，返回原课程并重新验证。当前已接服务端 opaque Attempt、不可换绑的 Shopify 客户身份和固定返回路径；真实开发店客户登录联调尚未完成。

@@ -12,6 +12,8 @@ type Target = {
   locationName: string;
 };
 type Booking = {
+  customerComment?: string;
+  serviceKind?: string;
   canReschedule: boolean;
   rescheduledTo?: string | null;
   id: string;
@@ -406,6 +408,14 @@ function AccountPage() {
                     : labels[b.status] || b.status}
                 </s-badge>
                 <s-text>Booking {b.id.slice(-8).toUpperCase()}</s-text>
+                {b.serviceKind === "APPOINTMENT" && (
+                  <s-badge>Private appointment</s-badge>
+                )}
+                {b.customerComment && (
+                  <s-text>
+                    Your note for this booking: {b.customerComment}
+                  </s-text>
+                )}
                 {b.rescheduledTo && (
                   <s-text>
                     Moved to booking {b.rescheduledTo.slice(-8).toUpperCase()}.

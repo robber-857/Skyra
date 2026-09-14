@@ -118,6 +118,12 @@ export default function BookingDetail() {
         <p className="muted">Booking {b.id}</p>
         <p className="muted">Customer reference {b.customerId}</p>
         <Status>{b.status}</Status>
+        {b.customerComment && (
+          <div className="booking-comment">
+            <h3>Customer note for this booking</h3>
+            <p>{b.customerComment}</p>
+          </div>
+        )}
         {b.checkedInAt && (
           <p>
             Checked in at{" "}

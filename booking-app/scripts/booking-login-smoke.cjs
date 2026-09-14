@@ -223,11 +223,13 @@ const server = http.createServer((req, res) => {
         await context.close();
       }
     }
+    const privateSession={...session,spotsRemaining:1,capacity:1,service:{...session.service,kind:"APPOINTMENT"}};
     // Owned Pass confirmation and lost-response recovery remain in the same section.
     for (const surface of ["home", "programs"]) for (const width of [390, 1440]) {
       const context=await browser.newContext({viewport:{width,height:900}});
       const page=await context.newPage(), errors=[]; page.on("pageerror",e=>errors.push(e.message));
       let state="NOT_CONFIRMED", confirmCalls=0, lostResponse=true, resultOffline=false, resultAvailable=false;
+      const session = privateSession;
       const token="d".repeat(43), reference="11111111-2222-4333-8444-555555555555";
       const url=base+(surface==="home" ? "/" : "/pages/programs");
       await context.route("**/apps/skyra-booking/sessions?*",route=>route.fulfill({json:{timezone:"Australia/Sydney",sessions:[session]}}));
@@ -239,12 +241,15 @@ const server = http.createServer((req, res) => {
         if(input.purchaseKind) {assert.equal(input.purchaseKind,"OWNED_PASS");assert.equal(input.entitlementId,pass.id);assert.equal(input.passPlanId,undefined);}
         return route.fulfill({json:{passes:[],ownedPasses:[pass],selected:input.entitlementId?pass:null,ownedPassesAvailable:true,checkoutAvailable:false}});
       });
+      await context.route("**/apps/skyra-booking/comment",route=>{assert.equal(route.request().postDataJSON().comment,"Core strength and balance");return route.fulfill({json:{saved:true}});});
       await context.route("**/apps/skyra-booking/confirm",route=>{
         confirmCalls++;assert.deepEqual(route.request().postDataJSON(),{token,entitlementId:"owned-pass"});state="CONFIRMED";resultAvailable=true;
         return lostResponse ? route.abort("failed") : route.fulfill({json:{status:state,bookingReference:reference}});
       });
-      await page.goto(url);await page.locator("[data-booking-book]").click();await page.getByRole("radio").check();
+      await page.goto(url);await page.getByText("Private appointment · 1 customer",{exact:true}).waitFor();await page.locator("[data-booking-book]").click();await page.getByRole("radio").check();
       await page.locator("[data-pass-continue]").click();await page.getByRole("heading",{name:"Review your booking"}).waitFor();
+      await page.getByLabel("Note for your coach (optional)").fill("Core strength and balance");
+      await page.getByRole("button",{name:"Save note",exact:true}).click();await page.getByText("Note saved for this booking.",{exact:true}).waitFor();
       assert.equal(await page.getByRole("button",{name:"Continue to Shopify Checkout"}).count(),0);
       assert.equal(await page.getByText("1 class credit",{exact:true}).count(),1);
       await page.screenshot({path:path.join(output,surface+"-"+width+"-owned-review.png"),fullPage:true});
@@ -318,6 +323,7 @@ const server = http.createServer((req, res) => {
       const loginUrl = new URL(login);
       assert.equal(loginUrl.origin, "https://skyra-booking-dev.myshopify.com");
       assert.equal(loginUrl.pathname, "/customer_authentication/login");
+      assert.equal(await page.locator(".skyra-booking__account").getAttribute("href"), "https://skyra-booking-dev.myshopify.com/account");
       const returnTo = new URL(loginUrl.searchParams.get("return_to"), loginUrl.origin);
       assert.equal(returnTo.pathname, "/pages/programs");
       assert.equal(returnTo.searchParams.get("preview_theme_id"), "192227082532");

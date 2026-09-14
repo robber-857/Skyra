@@ -8,7 +8,7 @@ window.SkyraBookingAttempt = function (root) {
       const config = JSON.parse(node?.textContent || "{}");
       const shopDomain = typeof config.shopDomain === "string" && /^[a-z0-9][a-z0-9.-]*\.myshopify\.com$/i.test(config.shopDomain) ? config.shopDomain : "";
       const themeId = /^\d+$/.test(String(config.themeId || "")) ? String(config.themeId) : "";
-      return { shopDomain, themeId };
+      return { shopDomain, themeId, accountUrl: typeof config.accountUrl === "string" ? config.accountUrl : "/account" };
     } catch { return { shopDomain: "", themeId: "" }; }
   })();
   let current, sessionId, generation = 0;
@@ -62,6 +62,14 @@ window.SkyraBookingAttempt = function (root) {
         throw error;
       }
       return !data.requiresLogin;
+    },
+    accountUrl() {
+      const base = storefront.shopDomain ? 'https://' + storefront.shopDomain : window.location.origin;
+      const fallback = new URL('/account', base);
+      try {
+        const url = new URL(storefront.accountUrl || '/account', base);
+        return url.protocol === 'https:' && !url.username && !url.password ? url.href : fallback.href;
+      } catch { return fallback.href; }
     },
     loginUrl() {
       if (!current) return "";

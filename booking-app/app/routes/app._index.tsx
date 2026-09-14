@@ -1,3 +1,5 @@
+import { adminToday } from "../services/today-bookings.server";
+import { TodayBookings } from "../components/today-bookings";
 import { useLoaderData, Link, type LoaderFunctionArgs } from "react-router";
 import db from "../db.server";
 import { adminContext } from "../services/context.server";
@@ -12,6 +14,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }),
   ]);
   return {
+    today: await adminToday(actor),
     classes,
     passes,
     drafts,
@@ -46,6 +49,7 @@ export default function Overview() {
           <strong>{data.errors}</strong>Sync errors
         </div>
       </section>
+      <TodayBookings data={data.today} />
       {!data.rulesApproved && (
         <p className="feedback">
           Online bookings are closed while booking and cancellation rules are

@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import db from "../db.server";
+import { databaseNow } from "./booking.server";
 import { DateTime } from "luxon";
 import { DomainError } from "../lib/errors.server";
 
@@ -178,11 +179,12 @@ export async function deliverBookingNotification(
   id: string,
   adapter: BookingMailAdapter,
 ) {
+  const now = await databaseNow(db);
   const claimed = await db.bookingNotification.updateMany({
-    where: { id, status: "PENDING", availableAt: { lte: new Date() } },
+    where: { id, status: "PENDING", availableAt: { lte: now } },
     data: {
       status: "SENDING",
-      claimedAt: new Date(),
+      claimedAt: now,
       attempts: { increment: 1 },
     },
   });
@@ -204,13 +206,14 @@ export async function deliverBookingNotification(
       idempotencyKey: `skyra-booking-email:${id}`,
       ...email,
     });
+    const finishedAt = await databaseNow(db);
     await db.bookingNotification.update({
       where: { id },
       data:
         result.status === "ACCEPTED"
           ? {
               status: "ACCEPTED",
-              acceptedAt: new Date(),
+              acceptedAt: finishedAt,
               providerMessageId: result.messageId,
               lastError: null,
             }
@@ -220,7 +223,7 @@ export async function deliverBookingNotification(
                   ? "PENDING"
                   : "FAILED",
               availableAt: new Date(
-                Date.now() + 60000 * 2 ** notification.attempts,
+                finishedAt.getTime() + 60000 * 2 ** notification.attempts,
               ),
               lastError: "DELIVERY_REJECTED",
             },
@@ -241,10 +244,11 @@ export async function deliverBookingNotification(
 }
 
 export async function markStaleNotificationsUnknown() {
+  const now = await databaseNow(db);
   return db.bookingNotification.updateMany({
     where: {
       status: "SENDING",
-      claimedAt: { lt: new Date(Date.now() - 10 * 60000) },
+      claimedAt: { lt: new Date(now.getTime() - 10 * 60000) },
     },
     data: { status: "UNKNOWN", lastError: "DELIVERY_OUTCOME_UNKNOWN" },
   });

@@ -5,6 +5,7 @@ import { receiveOrderPaidWebhook } from "../app/services/order-paid-webhook.serv
 export async function paidFixture(
   kind: "NEW_PASS" | "DROP_IN" = "NEW_PASS",
   expiredHold = false,
+  serviceKind: "CLASS" | "APPOINTMENT" = "CLASS",
 ) {
   const shop = await db.shop.create({
     data: {
@@ -29,8 +30,9 @@ export async function paidFixture(
       shopId: shop.id,
       locationId: location.id,
       name: "Aerial Foundations",
+      kind: serviceKind,
       durationMin: 60,
-      capacity: 8,
+      capacity: serviceKind === "APPOINTMENT" ? 1 : 8,
       requestedPriceCents: 4900,
       status: "ACTIVE",
     },
@@ -70,7 +72,7 @@ export async function paidFixture(
       busyStartsAt: start,
       busyEndsAt: end,
       timezone: "Australia/Sydney",
-      capacity: 8,
+      capacity: serviceKind === "APPOINTMENT" ? 1 : 8,
       status: "PUBLISHED",
       dedupeKey: randomUUID(),
     },

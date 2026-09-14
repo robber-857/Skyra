@@ -37,7 +37,9 @@ export const purchaseTerms = z.object({
 
 // No Shopify network call runs inside this transaction. Input comes exclusively
 // from the authenticated, validated inbox. Public checkout remains disabled.
-export async function processPaidBookingEvent(eventId: string): Promise<{ status: string; reason?: string }> {
+export async function processPaidBookingEvent(
+  eventId: string,
+): Promise<{ status: string; reason?: string }> {
   return db.$transaction(
     async (tx) => {
       await tx.$queryRaw`SELECT id FROM "OutboxEvent" WHERE id = ${eventId}::uuid FOR UPDATE`;
@@ -327,6 +329,7 @@ export async function processPaidBookingEvent(eventId: string): Promise<{ status
             sessionId: session.id,
             customerId: hold.customerId,
             checkoutId: current.id,
+            customerComment: attempt.customerComment,
             sourceOrderGid: input.orderGid,
             sourceLineItemGid: input.lineItemGid,
           },

@@ -59,7 +59,7 @@ export async function customerAccountData(actor: BookingActor, raw: unknown) {
             services: { select: { service: { select: { name: true } } } },
           },
         },
-        service: { select: { name: true } },
+        service: { select: { name: true, kind: true } },
         ledgerEntries: {
           orderBy: { createdAt: "desc" },
           select: {
@@ -138,7 +138,7 @@ export async function customerAccountData(actor: BookingActor, raw: unknown) {
     include: {
       session: {
         include: {
-          service: { select: { name: true } },
+          service: { select: { name: true, kind: true } },
           coach: { select: { name: true } },
           location: { select: { name: true } },
         },
@@ -153,7 +153,10 @@ export async function customerAccountData(actor: BookingActor, raw: unknown) {
     ...empty,
     bookings: rows.slice(0, 25).map((b) => ({
       id: b.id,
-      rescheduledTo: moves.find(m=>m.oldBookingId===b.id)?.newBookingId||null,
+      customerComment: b.customerComment,
+      serviceKind: b.session.service.kind,
+      rescheduledTo:
+        moves.find((m) => m.oldBookingId === b.id)?.newBookingId || null,
       cancellationKey: randomUUID(),
       canReschedule:
         b.status === "CONFIRMED" &&

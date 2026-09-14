@@ -1,14 +1,22 @@
 # 开发店 Commerce 配置与归属恢复
 
-## 最新功能批次：Customer Account、取消改期、Coach 到课与 Reports（2026-09-13）
+## 2026-09-14：接口恢复与测试版准备
 
-本轮已实现客户 Upcoming/History/My Passes、本人取消与原子改期；Admin 预约详情、账本、操作历史、取消豁免和改期；Coach 名册、签到、出席/No-show；真实数据 Reports。银行、商户认证与邮箱配置按用户决定留给实际经营者，支付继续全部使用 Shopify 原生模块，自动资金退款不做。
+课表代理 500 已恢复：旧临时隧道失效，普通重启仍出现 Cloudflare 1033；切换到经核实 Booking 代理的独立 HTTP2/IPv4 隧道后，6 项健康检查各连续 3 次通过。本轮只恢复开发预览，未正式发布或开放交易。当前未来 7 天没有已发布课程，空列表不表示接口故障。
 
-实现规则和接通步骤见 [客户账号与预约生命周期](customer-account-and-lifecycle.md)。数据库已有 11 条迁移，开发库和测试库均已应用。Customer Account 扩展尚未在真实客户账号页面完成安装/配置/登录验收，Coach 名册的真实客户姓名解析和真实邮件也未接通。所有公开新购买开关仍关闭。
+本地尚余 6 组功能工作；第一版真实账号 + Shopify 模拟付款验收先补 4 个关口，不需等全部运营增强完成。原因、证据、清单和当前启动方式见 [2026-09-14 交接](handoff-2026-09-14.md)。旧批次 308 项自动化通过不替代真实 UAT；30 组真实验收仍待执行。
 
-本轮验证：22 个测试文件 / 300 项测试；应用与客户扩展 TypeScript、ESLint、生产构建、Prisma validate、Shopify app build 均通过。Coach 390/1440px 实际页面操作与 Customer 390/1440px 本地交互夹具通过；真实 UAT 尚未签收。
+## 最新功能批次：Appointment 直接确认、逐次留言与 Today（2026-09-13）
 
-此节优先于下面旧日期快照。最新测试证据和未完成列表以 [交接文档](handoff-2026-09-13.md) 为准；此批次尚未再次 commit/push。
+按用户最新决定，Appointment 无需 Admin/Coach 审批。Admin 发布容量为 1 的私教时段，用户使用有效 Pass 或经 Shopify 付款验证后直接确认。用户在每次 Booking Review 填写可选留言，老师在对应课程名册查看；不开发聊天、老师回复或课前/课后消息系统。Admin/Coach 首页新增 Today 课程与预约名单，目前使用内部客户引用，真实姓名仍待 Shopify 客户资料接通。
+
+已先将上一批提交并推送至 bookingdev：`75ccf976d2946790a4a0d5ce3f2e2849cc09b9ea`，远程 SHA 一致，[CI 34742951745](https://github.com/robber-857/Skyra/actions/runs/34742951745) success。本轮 Appointment/留言/Today 代码仍在本地，尚未再次提交。
+
+验证：23 个测试文件 / **308 项测试通过**；TypeScript、ESLint、生产构建、Prisma、Shopify app build 和 Customer UI validator revision 5 通过。开发/测试库均已应用 **12 条迁移**。Home/Programs 16 组浏览器场景，以及 Coach/Customer 390/1440px 检查通过；这些不是 Shopify 真实账号、支付或邮件验收。
+
+当前边界：使用 Admin 预发布的固定私教时段；Coach recurring availability/time off、动态时段和独立资源管理未完成。确认会生成 Customer/Coach 邮件任务，但 provider 与真实收件人未接通。Checkout/online bookings/owned Pass 三个公开开关仍关闭。银行、商户身份和邮箱由经营者之后配置；支付只使用 Shopify，资金退款由 Admin 线下处理。
+
+详见 [Appointment 与课程留言](appointment-and-comments.md)、[最新交接](handoff-2026-09-13.md)、[真实 UAT](launch-readiness-and-uat.md)。以下旧日期段落为历史记录，旧“未提交/未实现”以本节为准。
 
 ## 当前进度：已有 Pass 确认与结果恢复（2026-09-13）
 

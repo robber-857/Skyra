@@ -389,7 +389,7 @@ Do not send the confirmation directly inside the Shopify webhook request. Use a 
 
 - Active Pass balance and nearest expiry
 - Next Class and next Appointment
-- Latest `CUSTOMER_VISIBLE` coach message
+- The customer’s own per-booking note in booking details
 - Quick actions to book a Class or Appointment
 - Link back to Shopify profile and orders
 
@@ -415,11 +415,11 @@ Do not send the confirmation directly inside the Shopify webhook request. Use a 
 
 ### Appointments
 
-- Service, coach/Any available, date and calculated available times
+- Current scope: Service, assigned coach and Admin-published capacity-one times. Eligible Pass / verified Shopify payment confirms directly without approval; dynamic availability is future work.
 - Existing eligible Pass or Shopify Checkout hand-off
 - Upcoming and historical private sessions
 - Reschedule/cancel within policy
-- Customer-visible pre-session and post-session coach messages
+- Customer writes an optional note during Booking; the assigned Coach sees it in that session’s roster. No separate message or reply flow.
 
 Customer Account extension requests include a session token obtained close to the API call. The backend verifies signature, expiry, audience and destination, then maps the token customer subject to `customer_profiles.shopify_customer_gid`. The browser never supplies a trusted customer ID by itself.
 

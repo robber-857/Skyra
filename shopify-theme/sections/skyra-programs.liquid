@@ -32,7 +32,7 @@
           </div>
           <div class="primary-nav__meta">
             <a href="{{ routes.collections_url }}">Online store</a>
-            <a href="{{ routes.account_url }}">Member account</a>
+            <a href="{% render 'skyra-account-url' %}">Member account</a>
           </div>
         </div>
       </nav>
@@ -127,7 +127,7 @@
           <div class="footer-group">
             <p class="footer-heading">Account</p>
             <a href="{{ routes.collections_url }}">Online store</a>
-            <a href="{{ routes.account_url }}">Member account</a>
+            <a href="{% render 'skyra-account-url' %}">Member account</a>
           </div>
         </nav>
 

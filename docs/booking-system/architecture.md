@@ -99,15 +99,17 @@ The “stay in the section” rule covers BROWSE, DETAILS, PASS_SELECTION, CONFI
 ```mermaid
 flowchart TD
   A[Shopify Book Appointment] --> S[Choose service]
-  S --> C[Choose coach or Any coach]
-  C --> T[Show computed available slots]
+  S --> C[Choose published service and assigned coach]
+  C --> T[Show published one-person slots]
   T --> H[Create slot hold]
   H --> E{Eligible pass exists?}
-  E -- Yes --> CF[Confirm appointment and consume credit]
+  E -- Yes --> CF[Confirm appointment and reserve credit]
   E -- No --> CH[Shopify cart + Checkout]
   CH --> WH[Paid webhook grants pass]
   WH --> CF
 ```
+
+The current appointment implementation uses Admin-published capacity-one sessions and confirms directly once payment or an eligible Pass is verified. No approval step. Recurring coach availability, time-off and dynamic slots remain future work. Attendance settles the reserved credit later.
 
 ### 2.3 Admin creates a class type and publishes a weekly schedule
 
@@ -140,7 +142,7 @@ If either Shopify or PostgreSQL write fails, keep the service in `sync_error` or
 | Customer Account extension | My Overview | Remaining credits, expiring Passes, next class/appointment, quick actions and latest customer-visible coach message |
 | Customer Account extension | My Passes | Credit balance, expiry, eligible services, immutable usage history and Shopify order link |
 | Customer Account extension | Bookings & History | Upcoming, attended, cancelled, late-cancel and no-show activity; open Class Details and coach messages |
-| Customer Account extension | Appointments | New private-session request, upcoming/history, reschedule and customer-visible coach messages |
+| Customer Account extension | Appointments | Published private sessions, direct confirmation, upcoming/history, reschedule and the customer’s own booking note |
 | Native Shopify | Customer Account sign-in | Top-level authentication hand-off; return to the original page and restore the opaque Booking attempt |
 | Native Shopify | Cart and Checkout | Only for a new Pass/drop-in purchase; discounts, gift cards, tax, payment methods and order receipt; return to the original Booking section |
 
@@ -281,7 +283,7 @@ Do not create a Shopify Product for every dated class. One Class/service definit
 
 - Shopify Customer is the identity and profile authority. Store only `shopify_customer_gid` plus the minimum booking projection; do not copy Shopify passwords or maintain duplicate registration.
 - Shopify customer create/update/delete and data-request webhooks update the local projection and retention workflow. Admin directory screens fetch current protected fields only when authorised.
-- Coach messages are Booking data linked to a Session or Booking. Every message has a visibility value: `CUSTOMER_VISIBLE` is shown in Customer Account; `INTERNAL` remains limited to authorised staff.
+- Customers can leave one optional note per Booking. The assigned Coach reads it in that session’s roster, authorised Admin reads booking details, and the customer sees their own note. No coach replies or separate message system. Notes never enter Shopify, the outbox or email.
 - Customer Account calls carry a verified session token. Never trust a customer ID sent as ordinary browser JSON.
 
 ### Paid order processing

@@ -163,7 +163,12 @@ async function change(identity: Identity, raw: unknown) {
         idempotencyKey: "booking-settle:" + booking.id,
       });
       const next = await tx.booking.create({
-        data: { shopId, sessionId: target.id, customerId: booking.customerId },
+        data: {
+          shopId,
+          sessionId: target.id,
+          customerId: booking.customerId,
+          customerComment: booking.customerComment,
+        },
       });
       await reserveEntitlementCredit(tx, {
         shopId,

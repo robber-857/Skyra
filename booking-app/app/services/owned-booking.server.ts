@@ -107,6 +107,7 @@ export async function confirmOwnedBooking(actor: BookingActor, raw: unknown) {
         sessionId: session.id,
         customerId: attempt.customerId,
         ownedAttemptId: attempt.id,
+        customerComment: attempt.customerComment,
       },
     });
     // The ledger service locks the entitlement and rechecks its latest balance.

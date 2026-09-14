@@ -317,6 +317,7 @@ export async function coachRoster(token: string, id: string) {
         select: {
           id: true,
           customerId: true,
+          customerComment: true,
           status: true,
           version: true,
           checkedInAt: true,

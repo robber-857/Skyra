@@ -1,12 +1,10 @@
 # Booking 邮件与 Coach 课程报名
 
-## 最新功能批次：Customer Account、取消改期、Coach 到课与 Reports（2026-09-13）
+## 本轮状态：Appointment、留言与 Today（2026-09-13）
 
-本轮已实现客户 Upcoming/History/My Passes、本人取消与原子改期；Admin 预约详情、账本、操作历史、取消豁免和改期；Coach 名册、签到、出席/No-show；真实数据 Reports。银行、商户认证与邮箱配置按用户决定留给实际经营者，支付继续全部使用 Shopify 原生模块，自动资金退款不做。
+Appointment 直接确认复用 Customer/Coach 通知任务，Admin/Coach Today 和每节课客户留言已实现。留言只在该 Booking 详情/名册显示，不进入邮件或独立消息系统。真实发信 provider、客户地址解析与 Coach 验证邮箱仍待经营者配置，没有实际发送。
 
-实现规则和接通步骤见 [客户账号与预约生命周期](customer-account-and-lifecycle.md)。数据库已有 11 条迁移，开发库和测试库均已应用。Customer Account 扩展尚未在真实客户账号页面完成安装/配置/登录验收，Coach 名册的真实客户姓名解析和真实邮件也未接通。所有公开新购买开关仍关闭。
-
-此节优先于下面旧日期快照。最新测试证据和未完成列表以 [交接文档](handoff-2026-09-13.md) 为准；此批次尚未再次 commit/push。
+通知领取、重试延迟、接受时间与过期判断现统一使用数据库时钟，修复主机/数据库时钟差造成的领取延迟；主机过快/过慢回归通过。最终完整测试 308 项、12 条迁移。上一批已提交 75ccf97 并通过 CI，本轮新代码未再次提交。详见 [交接](handoff-2026-09-13.md) 和 [本轮说明](appointment-and-comments.md)。
 
 ## 最新配置与状态（2026-09-13）
 

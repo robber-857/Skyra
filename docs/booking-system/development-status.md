@@ -1,14 +1,40 @@
 # Booking V3 — 开发状态
 
-## 最新功能批次：Customer Account、取消改期、Coach 到课与 Reports（2026-09-13）
+## 2026-09-14：Save draft 400 已修复
 
-本轮已实现客户 Upcoming/History/My Passes、本人取消与原子改期；Admin 预约详情、账本、操作历史、取消豁免和改期；Coach 名册、签到、出席/No-show；真实数据 Reports。银行、商户认证与邮箱配置按用户决定留给实际经营者，支付继续全部使用 Shopify 原生模块，自动资金退款不做。
+Weekly Schedule 的 POST 被 React Router 7.18.3 的来源校验拦在业务 action 之前：公网 HTTPS Origin 与代理后的本机 request URL 不一致。新增 react-router.config.ts，仅允许 SHOPIFY_APP_URL 的精确 host；保留陌生来源拦截和 Shopify/Staff 认证。当前开发进程已加载修复，测试库实际保存草稿与重复提交去重通过。
 
-实现规则和接通步骤见 [客户账号与预约生命周期](customer-account-and-lifecycle.md)。数据库已有 11 条迁移，开发库和测试库均已应用。Customer Account 扩展尚未在真实客户账号页面完成安装/配置/登录验收，Coach 名册的真实客户姓名解析和真实邮件也未接通。所有公开新购买开关仍关闭。
+**25 文件 / 322 项完整测试通过**，类型/lint/生产构建通过，6 项健康检查各 3 次通过。公网可信来源的未认证提交仍为 401，陌生来源为 400；本人 Admin Save draft 重试仍待用户反馈。本轮无 commit/push、正式部署或付款开关变更。
 
-本轮验证：22 个测试文件 / 300 项测试；应用与客户扩展 TypeScript、ESLint、生产构建、Prisma validate、Shopify app build 均通过。Coach 390/1440px 实际页面操作与 Customer 390/1440px 本地交互夹具通过；真实 UAT 尚未签收。
+Cloudflare 日志证实曾短暂失联，随后自动重连；本轮未更换隧道。另已核实 dev 店本身免费，不增加第二份正式店基础月租；只能模拟支付，真实收款应在现有正式店完成。详见 [保存草稿修复与费用说明](schedule-save-fix.md)。
 
-此节优先于下面旧日期快照。最新测试证据和未完成列表以 [交接文档](handoff-2026-09-13.md) 为准；此批次尚未再次 commit/push。
+
+## 2026-09-14：My account 修复与 Admin 测试入口
+
+My account 原先使用相对 /account，本地预览把 Shopify 认证请求送到 localhost，出现 404/401。现已将 Booking 区块与 Skyra 页面头部/底部统一指向 Shopify 托管账户地址；实际浏览器已到达 Shopify “Sign in - Skyra Booking Dev”，未代用户提交邮箱或验证码。Admin 使用独立的店主/员工入口，顾客登录不授予后台权限。
+
+新增验证：24 文件 / **314 项测试通过**，TypeScript、ESLint、生产构建、Shopify app build、8 个 Liquid 文件官方验证与 16 组浏览器回归通过。真实账号登录/退出/返回仍未验收，30 组真实 UAT 仍待签收。修复只同步开发预览，未正式发布或开通云服务器，未再次提交 GitHub。
+
+后台链接、添加课程/排期步骤、登录边界及 Railway/Render/Vercel 成本见 [账户入口与低成本部署](account-access-and-hosting.md)。以便宜为主，优先评估 Railway 测试环境；US$5 是最低用量，整套 App/Worker/DB/Redis 费用需按实测核算。
+
+
+## 2026-09-14：接口恢复与测试版准备
+
+课表代理 500 已恢复：旧临时隧道失效，普通重启仍出现 Cloudflare 1033；切换到经核实 Booking 代理的独立 HTTP2/IPv4 隧道后，6 项健康检查各连续 3 次通过。本轮只恢复开发预览，未正式发布或开放交易。当前未来 7 天没有已发布课程，空列表不表示接口故障。
+
+本地尚余 6 组功能工作；第一版真实账号 + Shopify 模拟付款验收先补 4 个关口，不需等全部运营增强完成。原因、证据、清单和当前启动方式见 [2026-09-14 交接](handoff-2026-09-14.md)。旧批次 308 项自动化通过不替代真实 UAT；30 组真实验收仍待执行。
+
+## 最新功能批次：Appointment 直接确认、逐次留言与 Today（2026-09-13）
+
+按用户最新决定，Appointment 无需 Admin/Coach 审批。Admin 发布容量为 1 的私教时段，用户使用有效 Pass 或经 Shopify 付款验证后直接确认。用户在每次 Booking Review 填写可选留言，老师在对应课程名册查看；不开发聊天、老师回复或课前/课后消息系统。Admin/Coach 首页新增 Today 课程与预约名单，目前使用内部客户引用，真实姓名仍待 Shopify 客户资料接通。
+
+已先将上一批提交并推送至 bookingdev：`75ccf976d2946790a4a0d5ce3f2e2849cc09b9ea`，远程 SHA 一致，[CI 34742951745](https://github.com/robber-857/Skyra/actions/runs/34742951745) success。本轮 Appointment/留言/Today 代码仍在本地，尚未再次提交。
+
+验证：23 个测试文件 / **308 项测试通过**；TypeScript、ESLint、生产构建、Prisma、Shopify app build 和 Customer UI validator revision 5 通过。开发/测试库均已应用 **12 条迁移**。Home/Programs 16 组浏览器场景，以及 Coach/Customer 390/1440px 检查通过；这些不是 Shopify 真实账号、支付或邮件验收。
+
+当前边界：使用 Admin 预发布的固定私教时段；Coach recurring availability/time off、动态时段和独立资源管理未完成。确认会生成 Customer/Coach 邮件任务，但 provider 与真实收件人未接通。Checkout/online bookings/owned Pass 三个公开开关仍关闭。银行、商户身份和邮箱由经营者之后配置；支付只使用 Shopify，资金退款由 Admin 线下处理。
+
+详见 [Appointment 与课程留言](appointment-and-comments.md)、[最新交接](handoff-2026-09-13.md)、[真实 UAT](launch-readiness-and-uat.md)。以下旧日期段落为历史记录，旧“未提交/未实现”以本节为准。
 
 ## 当前进度：已有 Pass 确认与结果恢复（2026-09-13）
 
@@ -120,7 +146,7 @@ Class Booking 开发基线已于 2026-09-09 确认：
 6. 付款完成但 Hold 已失效时禁止超卖；有空位则安全确认，满员则进入 Needs Attention。
 7. 确认预约时 reserve；完成、Late Cancel 或 No-show 时 consume；免费取消时 release。
 
-Appointment 审批方式、Any available coach、通知时间与初始 Service ↔ Pass 商品范围将在相应模块开始前确认；这些项目不阻塞 Class Booking Engine 开发。
+Appointment 已按 2026-09-13 决定直接确认；Any available coach、通知时间与初始 Service ↔ Pass 商品范围仍按相应模块确认；这些项目不阻塞 Class Booking Engine 开发。
 
 ## 本轮确认的前端范围
 
@@ -157,8 +183,8 @@ Appointment 审批方式、Any available coach、通知时间与初始 Service �
 
 ## 后续独立范围
 
-- Customer Account full-page：My Overview、My Passes、Bookings & History、取消/改期和老师留言。
-- Coach Portal、签到和老师留言。
+- Customer Account full-page：My Overview、My Passes、Bookings & History、取消/改期与逐次客户留言（当前已实现，见顶部状态）。
+- Coach Portal、签到和查看本节客户留言（当前已实现，见顶部状态）。
 - 完整 People/Bookings/Reports、通知、旧系统迁移、托管部署与上线。
 上一轮 Theme App Extension 的开发预览曾用 storefront password 启动（本轮未运行）。开发店已批准 `write_app_proxy`，Shopify API 权限检查返回 200，App Proxy 与 app embed 已在 `Development (4a1680-elton)` 主题联调通过。Home/Programs 本地主题代码已替换；正式店未部署，现有未提交的 `shopify-theme/assets/skyra.css` 未修改。没有 Git commit 或 push。
 ## 2026-09-11 开发交接

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { beforeAll, afterAll, expect, test, vi } from "vitest";
 import db from "../app/db.server";
 import {
+  databaseNow,
   startAttempt,
   releaseSeatHold,
   createSeatHold,
@@ -508,14 +509,16 @@ test.each(["expiry", "cancel", "price", "disable"] as const)(
     const original = f.cartCreate.getMockImplementation()!;
     f.cartCreate.mockImplementation(async (...args) => {
       const result = await original(...args);
-      if (mode === "expiry")
+      if (mode === "expiry") {
+        const expiredAt = new Date((await databaseNow(db)).getTime() - 60000);
         await db.bookingHold.updateMany({
           where: { shopId: f.shop.id },
           data: {
-            createdAt: new Date(Date.now() - 960000),
-            expiresAt: new Date(Date.now() - 60000),
+            createdAt: new Date(expiredAt.getTime() - 900000),
+            expiresAt: expiredAt,
           },
         });
+      }
       if (mode === "cancel")
         await db.classSession.update({
           where: { id: f.session.id },

@@ -55,6 +55,7 @@ export async function audit(
 export async function saveService(actor: Actor, raw: unknown) {
   requireOperations(actor);
   const { coachIds, id, version, ...input } = serviceInput.parse(raw);
+  if (input.kind === "APPOINTMENT") input.capacity = 1;
   return db.$transaction(async (tx) => {
     await lockShop(tx, actor.shopId);
     const old = id
@@ -66,6 +67,17 @@ export async function saveService(actor: Actor, raw: unknown) {
         "CONFLICT",
         "This class changed. Refresh before saving.",
         409,
+      );
+    if (
+      old &&
+      old.kind !== input.kind &&
+      (await tx.classSession.count({
+        where: { shopId: actor.shopId, serviceId: old.id },
+      }))
+    )
+      throw new DomainError(
+        "SERVICE_KIND_LOCKED",
+        "Create a new service to change the type of a scheduled service.",
       );
     const ids = [...new Set(coachIds)];
     const [location, coaches] = await Promise.all([

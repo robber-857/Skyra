@@ -1,12 +1,16 @@
 # Skyra Booking System — 数据模型与 ERD
 
-## 最新功能批次：Customer Account、取消改期、Coach 到课与 Reports（2026-09-13）
+## 最新功能批次：Appointment 直接确认、逐次留言与 Today（2026-09-13）
 
-本轮已实现客户 Upcoming/History/My Passes、本人取消与原子改期；Admin 预约详情、账本、操作历史、取消豁免和改期；Coach 名册、签到、出席/No-show；真实数据 Reports。银行、商户认证与邮箱配置按用户决定留给实际经营者，支付继续全部使用 Shopify 原生模块，自动资金退款不做。
+按用户最新决定，Appointment 无需 Admin/Coach 审批。Admin 发布容量为 1 的私教时段，用户使用有效 Pass 或经 Shopify 付款验证后直接确认。用户在每次 Booking Review 填写可选留言，老师在对应课程名册查看；不开发聊天、老师回复或课前/课后消息系统。Admin/Coach 首页新增 Today 课程与预约名单，目前使用内部客户引用，真实姓名仍待 Shopify 客户资料接通。
 
-实现规则和接通步骤见 [客户账号与预约生命周期](customer-account-and-lifecycle.md)。数据库已有 11 条迁移，开发库和测试库均已应用。Customer Account 扩展尚未在真实客户账号页面完成安装/配置/登录验收，Coach 名册的真实客户姓名解析和真实邮件也未接通。所有公开新购买开关仍关闭。
+已先将上一批提交并推送至 bookingdev：`75ccf976d2946790a4a0d5ce3f2e2849cc09b9ea`，远程 SHA 一致，[CI 34742951745](https://github.com/robber-857/Skyra/actions/runs/34742951745) success。本轮 Appointment/留言/Today 代码仍在本地，尚未再次提交。
 
-此节优先于下面旧日期快照。最新测试证据和未完成列表以 [交接文档](handoff-2026-09-13.md) 为准；此批次尚未再次 commit/push。
+验证：23 个测试文件 / **308 项测试通过**；TypeScript、ESLint、生产构建、Prisma、Shopify app build 和 Customer UI validator revision 5 通过。开发/测试库均已应用 **12 条迁移**。Home/Programs 16 组浏览器场景，以及 Coach/Customer 390/1440px 检查通过；这些不是 Shopify 真实账号、支付或邮件验收。
+
+当前边界：使用 Admin 预发布的固定私教时段；Coach recurring availability/time off、动态时段和独立资源管理未完成。确认会生成 Customer/Coach 邮件任务，但 provider 与真实收件人未接通。Checkout/online bookings/owned Pass 三个公开开关仍关闭。银行、商户身份和邮箱由经营者之后配置；支付只使用 Shopify，资金退款由 Admin 线下处理。
+
+详见 [Appointment 与课程留言](appointment-and-comments.md)、[最新交接](handoff-2026-09-13.md)、[真实 UAT](launch-readiness-and-uat.md)。以下旧日期段落为历史记录，旧“未提交/未实现”以本节为准。
 
 ## 2026-09-13 已有 Pass 确认增量
 
@@ -199,7 +203,7 @@ erDiagram
 | status | enum | SCHEDULED / CANCELLED / COMPLETED |
 | version | integer | 乐观锁版本号 |
 
-Appointment 在客户成功 Hold 时创建临时 Session，或在确认后持久化；Class/Course Session 由 Series 提前生成。
+当前 Appointment 使用 Admin 提前创建并发布的 ClassSession，Service.kind=APPOINTMENT，容量固定为 1；不在客户 Hold 时动态创建 Session。动态 availability、time off 和独立 Resource 分配仍待实现。
 
 ### 2026-09-12 已落库的 Class Booking 与 Entitlement 基础
 
@@ -300,25 +304,16 @@ Appointment 在客户成功 Hold 时创建临时 Session，或在确认后持久
 
 Booking 当前状态是投影，事件记录用于追溯谁在何时执行了改期、取消、退款或签到。
 
-### `coach_messages`
+### 每次 Booking 的客户留言
 
-老师留言属于 Booking 业务数据，不写入 Shopify Customer metafield：
+按 2026-09-13 用户确认范围，原 coach_messages / PRE_CLASS / POST_CLASS / visibility 模型取消，不创建消息表。
 
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| id | uuid | PK |
-| shop_id | uuid | FK |
-| coach_id | uuid | FK，留言作者 |
-| customer_id | uuid | FK，接收客户 |
-| session_id | uuid | nullable FK，关联课程或 Appointment |
-| booking_id | uuid | nullable FK，关联客户本次预约 |
-| visibility | enum | CUSTOMER_VISIBLE / INTERNAL |
-| kind | enum | PRE_CLASS / POST_CLASS / GENERAL |
-| body | text | 留言正文，限制长度并审计 |
-| published_at | timestamptz | 对客户显示的时间，可空 |
-| created_at / updated_at | timestamptz | UTC |
-
-只有 `CUSTOMER_VISIBLE` 且 `published_at` 不为空的记录能出现在 Customer Account。`INTERNAL` 备注只供获授权员工查看，并与健康/安全敏感信息分权处理。
+- Prisma `BookingAttempt.customerComment`：客户本人当前预约草稿，默认空文本，最多 1000 字符；禁止控制字符（保留换行与 tab）。
+- Prisma `Booking.customerComment`：确认时复制的不可修改快照；改期新 Booking 保留原留言。
+- 保存须 signed App Proxy + 当前登录归属验证；只允许 STARTED、未过期且尚未创建 Hold 的草稿。相同值重试幂等。
+- 老师仅可在自己所带 Session 的名册读对应客户留言；Admin 在预约详情查看；Customer Account 只显示本人留言。
+- 正文不写 Shopify、订单、Outbox、邮件、审计 metadata 或 Today 列表。按纯文本渲染，不解释 HTML。
+- 第 12 条迁移 `202609130011_appointment_comments` 同时约束 Appointment 容量=1、已排期 Service kind 不可变和 Booking 留言快照不可变。
 
 ### `waitlist_entries`
 
