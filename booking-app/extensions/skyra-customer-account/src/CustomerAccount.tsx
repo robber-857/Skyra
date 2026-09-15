@@ -460,27 +460,47 @@ function AccountPage() {
 
   return (
     <s-page heading="My Skyra">
-      <s-stack gap="base">
-        <s-section>
-          <s-grid
-            gap="small"
-            gridTemplateColumns="repeat(auto-fit, minmax(8rem, 1fr))"
-          >
-            {viewLabels.map((item) => (
-              <s-button
-                key={item.id}
-                disabled={busy}
-                variant={view === item.id ? "primary" : "secondary"}
-                onClick={() => setView(item.id)}
+      <s-query-container>
+        <s-stack direction="block" gap="large-100">
+          <s-box padding="base" background="subdued" borderRadius="base">
+            <s-stack direction="block" gap="base">
+              <s-stack direction="block" gap="small-200">
+                <s-heading>Your studio account</s-heading>
+                <s-text color="subdued">
+                  Manage classes, passes, private sessions and your Skyra
+                  profile.
+                </s-text>
+              </s-stack>
+              <s-grid
+                gap="small"
+                gridTemplateColumns="@container (inline-size > 640px) repeat(3, minmax(0, 1fr)), repeat(2, minmax(0, 1fr))"
               >
-                {item.label}
-              </s-button>
-            ))}
-          </s-grid>
-        </s-section>
-        {error && <s-banner tone="critical">{error}</s-banner>}
-        {notice && <s-banner tone="success">{notice}</s-banner>}
-        {busy && <s-text>Loading your Skyra account…</s-text>}
+                {viewLabels.map((item) => (
+                  <s-button
+                    key={item.id}
+                    disabled={busy}
+                    variant={view === item.id ? "primary" : "secondary"}
+                    onClick={() => setView(item.id)}
+                  >
+                    {item.label}
+                  </s-button>
+                ))}
+              </s-grid>
+            </s-stack>
+          </s-box>
+          {error && <s-banner tone="critical">{error}</s-banner>}
+          {notice && <s-banner tone="success">{notice}</s-banner>}
+          {busy && (
+            <s-box padding="base" background="subdued" borderRadius="base">
+              <s-stack direction="inline" gap="small" alignItems="center">
+                <s-spinner
+                  size="small"
+                  accessibilityLabel="Loading account"
+                />
+                <s-text color="subdued">Loading your Skyra account…</s-text>
+              </s-stack>
+            </s-box>
+          )}
         {moving && (
           <s-section heading="Choose another class time">
             <s-stack gap="base">
@@ -690,13 +710,14 @@ function AccountPage() {
               Load more
             </s-button>
           )}
-        {!bookingUrl && view !== "profile" && (
-          <s-banner tone="warning">
-            The studio still needs to configure the Find a class storefront URL
-            for this account page.
-          </s-banner>
-        )}
-      </s-stack>
+          {!bookingUrl && view !== "profile" && (
+            <s-banner tone="warning">
+              The studio still needs to configure the Find a class storefront
+              URL for this account page.
+            </s-banner>
+          )}
+        </s-stack>
+      </s-query-container>
     </s-page>
   );
 }
@@ -750,11 +771,12 @@ function Overview({
           </s-stack>
         </s-stack>
       </s-section>
-      <s-grid
-        gap="base"
-        gridTemplateColumns="repeat(auto-fit, minmax(15rem, 1fr))"
-      >
-        <s-section heading="Active pass">
+      <s-query-container>
+        <s-grid
+          gap="base"
+          gridTemplateColumns="@container (inline-size > 760px) repeat(3, minmax(0, 1fr)), 1fr"
+        >
+          <s-section heading="Active pass">
           {activePass ? (
             <s-stack gap="small">
               <s-badge>{labels[activePass.status]}</s-badge>
@@ -807,8 +829,9 @@ function Overview({
           ) : (
             <s-text>No upcoming appointment.</s-text>
           )}
-        </s-section>
-      </s-grid>
+          </s-section>
+        </s-grid>
+      </s-query-container>
       {profile.trainingGoals && (
         <s-section heading="My training goals">
           <s-text>{profile.trainingGoals}</s-text>
@@ -828,44 +851,54 @@ function Passes({ account }: { account: Account }) {
       </s-section>
     );
   return (
-    <s-stack gap="base">
-      {account.passes.map((pass) => (
-        <s-section key={pass.id} heading={pass.name}>
-          <s-stack gap="small">
-            <s-badge>{labels[pass.status] || pass.status}</s-badge>
-            <s-heading>
-              {pass.available} credit{pass.available === 1 ? "" : "s"} available
-            </s-heading>
-            <s-text>
-              {pass.reserved} reserved · {pass.used} used
-            </s-text>
-            <s-text>
-              Valid until {shortDate(pass.expiresAt, account.timezone)}
-            </s-text>
-            <s-text>
-              Eligible: {pass.eligibleClasses.filter(Boolean).join(", ")}
-            </s-text>
-            {pass.history.length > 0 && (
-              <s-heading>Recent credit activity</s-heading>
-            )}
-            {pass.history.map((entry) => (
-              <s-text key={entry.id}>
-                {shortDate(entry.createdAt, account.timezone)} ·{" "}
-                {labels[entry.kind] || entry.kind} · available{" "}
-                {entry.availableDelta > 0 ? "+" : ""}
-                {entry.availableDelta}, reserved{" "}
-                {entry.reservedDelta > 0 ? "+" : ""}
-                {entry.reservedDelta}, used {entry.consumedDelta > 0 ? "+" : ""}
-                {entry.consumedDelta}
+    <s-query-container>
+      <s-grid
+        gap="base"
+        gridTemplateColumns="@container (inline-size > 720px) repeat(2, minmax(0, 1fr)), 1fr"
+      >
+        {account.passes.map((pass) => (
+          <s-section key={pass.id} heading={pass.name}>
+            <s-stack direction="block" gap="small">
+              <s-badge>{labels[pass.status] || pass.status}</s-badge>
+              <s-heading>
+                {pass.available} credit{pass.available === 1 ? "" : "s"}{" "}
+                available
+              </s-heading>
+              <s-text color="subdued">
+                {pass.reserved} reserved · {pass.used} used
               </s-text>
-            ))}
-            {pass.historyTruncated && (
-              <s-text>Showing the 20 most recent credit entries.</s-text>
-            )}
-          </s-stack>
-        </s-section>
-      ))}
-    </s-stack>
+              <s-text>
+                Valid until {shortDate(pass.expiresAt, account.timezone)}
+              </s-text>
+              <s-text>
+                Eligible: {pass.eligibleClasses.filter(Boolean).join(", ")}
+              </s-text>
+              {pass.history.length > 0 && <s-divider />}
+              {pass.history.length > 0 && (
+                <s-heading>Recent credit activity</s-heading>
+              )}
+              {pass.history.map((entry) => (
+                <s-text key={entry.id} color="subdued">
+                  {shortDate(entry.createdAt, account.timezone)} ·{" "}
+                  {labels[entry.kind] || entry.kind} · available{" "}
+                  {entry.availableDelta > 0 ? "+" : ""}
+                  {entry.availableDelta}, reserved{" "}
+                  {entry.reservedDelta > 0 ? "+" : ""}
+                  {entry.reservedDelta}, used{" "}
+                  {entry.consumedDelta > 0 ? "+" : ""}
+                  {entry.consumedDelta}
+                </s-text>
+              ))}
+              {pass.historyTruncated && (
+                <s-text color="subdued">
+                  Showing the 20 most recent credit entries.
+                </s-text>
+              )}
+            </s-stack>
+          </s-section>
+        ))}
+      </s-grid>
+    </s-query-container>
   );
 }
 
@@ -985,50 +1018,65 @@ function Appointments({
     (booking) => !upcoming.some((item) => item.id === booking.id),
   );
   return (
-    <s-stack gap="base">
-      <s-section heading="Appointments">
-        <s-stack gap="small">
+    <s-stack direction="block" gap="large-100">
+      <s-section heading="Private appointments">
+        <s-stack direction="block" gap="base">
           <s-text>
-            View private-session status, change an eligible time, or use the
-            shared storefront booking section to find another appointment.
+            Review private-session details, change an eligible time, or book
+            another appointment from the shared class schedule.
           </s-text>
           <FindClassButton href={bookingUrl} />
         </s-stack>
       </s-section>
-      <s-heading>Upcoming</s-heading>
-      {upcoming.length ? (
-        upcoming.map((booking) => (
-          <BookingCard
-            key={booking.id}
-            booking={booking}
-            busy={busy}
-            uncertain={uncertain}
-            select={select}
-            move={move}
-          />
-        ))
-      ) : (
-        <s-section>
-          <s-text>No upcoming private appointment.</s-text>
-        </s-section>
-      )}
-      <s-heading>Appointment history</s-heading>
-      {history.length ? (
-        history.map((booking) => (
-          <BookingCard
-            key={booking.id}
-            booking={booking}
-            busy={busy}
-            uncertain={uncertain}
-            select={select}
-            move={move}
-          />
-        ))
-      ) : (
-        <s-section>
-          <s-text>No private appointment history yet.</s-text>
-        </s-section>
-      )}
+      <s-query-container>
+        <s-grid
+          gap="base"
+          gridTemplateColumns="@container (inline-size > 720px) repeat(2, minmax(0, 1fr)), 1fr"
+        >
+          <s-stack direction="block" gap="base">
+            <s-heading>Upcoming</s-heading>
+            {upcoming.length ? (
+              upcoming.map((booking) => (
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  busy={busy}
+                  uncertain={uncertain}
+                  select={select}
+                  move={move}
+                />
+              ))
+            ) : (
+              <s-section>
+                <s-text color="subdued">
+                  No upcoming private appointment.
+                </s-text>
+              </s-section>
+            )}
+          </s-stack>
+          <s-stack direction="block" gap="base">
+            <s-heading>Appointment history</s-heading>
+            {history.length ? (
+              history.map((booking) => (
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  busy={busy}
+                  uncertain={uncertain}
+                  select={select}
+                  move={move}
+                />
+              ))
+            ) : (
+              <s-section>
+                <s-text color="subdued">
+                  No private appointment history yet.
+                </s-text>
+              </s-section>
+            )}
+          </s-stack>
+        </s-grid>
+      </s-query-container>
     </s-stack>
   );
 }
