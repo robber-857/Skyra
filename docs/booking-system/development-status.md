@@ -2,13 +2,13 @@
 
 ## 2026-09-16：Customer Account 信息架构与客户语言修正（已发布）
 
-用户对已发布 `skyra-booking-9` 做真实账号验收后确认首轮响应式修复仍不够清晰：六个大按钮造成拥挤，独立 History 含义不明确，App 内 Profile 与 Shopify 原生 Profile 重名，Pass 直接展示 reserved 和 Ledger delta 等内部术语。本轮已重构为四个短入口：Overview、My passes、Bookings、Training；History 收进 Bookings 内的 `Past & cancelled`，私教也统一在 Bookings 中以 badge 区分并保留改期/取消，因此不再需要独立 Appointments 顶层入口。Training profile 只保存头像、preferred name、签名和训练目标；Shopify Profile 继续管理正式姓名、邮箱和地址。
+用户对已发布 `skyra-booking-9` 做真实账号验收后确认首轮响应式修复仍不够清晰：六个大按钮造成拥挤，独立 History 含义不明确，App 内 Profile 与 Shopify 原生 Profile 重名，Pass 直接展示 reserved 和 Ledger delta 等内部术语。本轮已重构为四个短入口：Overview、My passes、Bookings、Training profile；History 收进 Bookings 内的 `Past & cancelled`，私教也统一在 Bookings 中以 badge 区分并保留改期/取消，因此不再需要独立 Appointments 顶层入口。Training profile 只保存头像、preferred name、签名和训练目标；Shopify Profile 继续管理正式姓名、邮箱和地址。
 
 Pass 文案已改成客户语言：available 显示为 ready to book，reserved 显示为“assigned to upcoming bookings”，Recent credit activity 不再显示 available/reserved/used 的内部增减值。含义不变：reserved 是已经分配给未来 Booking 的课次，用来防止同一 credit 重复预约；按时取消会退回 available，完成课程后转为 used。Bookings 空状态也明确说明新预约在 Checkout 处理完成后出现，不再使用容易误解的“Confirmed activity”措辞。
 
 同时补齐错误恢复：取消/改期或读取状态不确定时，错误区现在提供真实 `Refresh` 操作重新读取账户，不要求客户刷新整个 Shopify 页面。完整 `npm.cmd run check` 通过；390px 与 1440px 浏览器回归均通过 navigationNoOverlap、noDuplicateProfile、分页、改期、取消不确定恢复、Past & cancelled、Pass 余额、读取错误恢复及 fresh token 检查，pageErrors=[]。最终分支 SHA `41ded11f59503fa3717fbf6e92f03c46f8958db8` 与远端一致，[GitHub Actions 34982148962](https://github.com/robber-857/Skyra/actions/runs/34982148962) success。
 
-用户明确批准发送本轮源码后，Shopify 官方 Customer Account validator 对 artifact `skyra-customer-ia-0916` revision 1 返回 `VALID`；Shopify CLI 配置校验返回 `valid: true` 且 `issues: []`。随后已发布 `skyra-booking-10`，CLI 复核为 `active`，version ID `1129711894529`，`skyra-booking-9` 已变为 inactive。[Shopify version dashboard](https://dev.shopify.com/dashboard/232832637/apps/420648878081/versions/1129711894529)。发布过程成功构建 38.6 KB Customer Account extension（约 12.1 KB compressed）并验证 Theme extension；本次仅更新 Shopify App extensions，不需要重新部署 Render。
+`skyra-booking-10` 完成四入口与客户语言首发。用户随后要求进一步整理真实页面：导航改为 `s-stack direction="inline"` 横向排列并在窄屏安全换行，入口改为 `Training profile`，Overview 默认说明文字移除，Overview 与 Training profile 的头像统一移至右侧。代码与回归提交已推送至 `bookingdev` SHA `9865ee8e8914bbf35f0af5d16e5a093b86b53677`；完整 `npm.cmd run check` 与 390/1440px 浏览器回归通过，桌面导航保持同一横行、两端无重叠、pageErrors=[]。用户明确授权后，Shopify 官方 validator 对 artifact `skyra-customer-layout-0916` revision 1 返回 `VALID`，CLI 配置校验为 `valid: true`、`issues: []`。`skyra-booking-11` 已发布并复核为 `active`，version ID `1129745678337`，`skyra-booking-10` 已为 inactive。[Shopify version dashboard](https://dev.shopify.com/dashboard/232832637/apps/420648878081/versions/1129745678337)。本次只更新 Shopify App extensions，不需要重新部署 Render。
 
 ## 2026-09-16：真实免单订单、Customer Account 接入与响应式 UI 发布
 
@@ -20,7 +20,7 @@ Customer Account Full-page Extension 已加入开发店当前 Active 的 Checkou
 
 经用户明确批准，Shopify App `skyra-booking-9` 已发布；CLI 复核状态为 `active`，version ID `1129655271425`，`skyra-booking-8` 已变为 inactive。[Shopify version dashboard](https://dev.shopify.com/dashboard/232832637/apps/420648878081/versions/1129655271425)。发布构建成功生成 Customer Account 与 Theme extension；官方独立 Customer Account validator 仍因其隔离环境不能解析项目的 `@shopify/ui-extensions/customer-account.page.render` / `preact/jsx-runtime` 模块而无法完成，最小组件复测得到相同环境错误，本地类型检查、生产构建和 Shopify CLI extension build 均通过。
 
-仍未完成：强制刷新真实 My Skyra 后，对 320/390/430/1440px 做桌面与手机视觉验收；逐项签收 Overview、Pass 到期、Bookings/History、Appointments、Profile 保存及头像上传/移除、Find a class 返回；核对订单 `#1001` 的 Receipt/Outbox/Worker/Entitlement/Hold/Booking 证据；再执行 Group Class、Private、Workshop 的正向交易与跨类型拒绝测试。Customer Account UI extension 的本次更新不要求重新部署 Render。
+仍未完成：强制刷新真实 My Skyra 后，对 320/390/430/1440px 做桌面与手机视觉验收；逐项签收 Overview、Pass 到期、Bookings 内的 Upcoming / Past & cancelled / Private booking、Training profile 保存及头像上传/移除、Find a class 返回；把 Shopify 原生菜单 Label `Profile` 手动改为 `Information`；核对订单 `#1001` 的 Receipt/Outbox/Worker/Entitlement/Hold/Booking 证据；再执行 Group Class、Private、Workshop 的正向交易与跨类型拒绝测试。
 
 ## 2026-09-15：开发店原生 Cart handoff 与免单回调校验
 
