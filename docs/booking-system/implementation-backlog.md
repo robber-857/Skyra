@@ -513,7 +513,7 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 - [ ] 核对订单 `#1001` 的 Webhook Receipt 去重、Outbox/Worker、Entitlement、Hold 转换和 Booking confirmed，记录最终状态或 NEEDS_ATTENTION 原因；未完成前不重复下单冒充闭环。
 - [x] Customer Account Extension 已加入 Active 配置，菜单 `My Skyra` 与 Booking API / Find a class URL 已保存；`skyra-booking-8` 完成首发。
 - [x] 首轮响应式 UI 修复提交 `8c82b44` 已推送并通过 CI；Shopify App `skyra-booking-9` 已发布且 CLI 复核为 active（version ID `1129655271425`）。
-- [x] 真实 UAT 发现首轮仍拥挤后完成第二轮信息架构修正：四个顶层入口，History/Appointment 并入 Bookings，App Profile 改 Training，reserved/Ledger delta 改为客户语言，并补真实 Refresh 恢复。390/1440px 浏览器回归与完整 check 通过，最终 SHA `41ded11`、CI `34982148962` success。
-- [x] 用户已明确授权本轮源码发送至 Shopify 官方 validator；artifact `skyra-customer-ia-0916` revision 1 为 `VALID`。Shopify 配置校验无问题，`skyra-booking-10` 已发布并复核为 active（version ID `1129711894529`）。
+- [x] 真实 UAT 发现首轮仍拥挤后完成第二轮信息架构修正：四个顶层入口，History/Appointment 并入 Bookings，App Profile 改 Training profile，reserved/Ledger delta 改为客户语言，并补真实 Refresh 恢复。
+- [x] 最新视觉整理提交 `9865ee8`：导航使用横向 inline Stack 并在窄屏安全换行，删除 Overview 默认说明，Overview/Training profile 头像移到右侧；390/1440px 回归与完整 check 通过。官方 validator artifact `skyra-customer-layout-0916` revision 1 为 `VALID`；`skyra-booking-11` 已发布并复核为 active（version ID `1129745678337`）。
 - [ ] 使用真实 Shopify Customer Account 做桌面/手机 UAT：320/390/430/1440px 无重叠/横向溢出，空状态、已有数据、头像上传/移除、Training profile 保存、Past & cancelled、到期/私教、取消/改期和 Find a class 返回。
 - [ ] 分别完成 Group Class、Private、Workshop Pass 的正向交易和跨类型负向拒绝；Customer 个人中心当前完成不代表这些支付场景已签收。
