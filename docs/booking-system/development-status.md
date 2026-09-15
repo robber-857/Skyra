@@ -1,5 +1,15 @@
 # Booking V3 — 开发状态
 
+## 2026-09-16：Customer Account 信息架构与客户语言修正（待发布）
+
+用户对已发布 `skyra-booking-9` 做真实账号验收后确认首轮响应式修复仍不够清晰：六个大按钮造成拥挤，独立 History 含义不明确，App 内 Profile 与 Shopify 原生 Profile 重名，Pass 直接展示 reserved 和 Ledger delta 等内部术语。本轮已重构为四个短入口：Overview、My passes、Bookings、Training；History 收进 Bookings 内的 `Past & cancelled`，私教也统一在 Bookings 中以 badge 区分并保留改期/取消，因此不再需要独立 Appointments 顶层入口。Training profile 只保存头像、preferred name、签名和训练目标；Shopify Profile 继续管理正式姓名、邮箱和地址。
+
+Pass 文案已改成客户语言：available 显示为 ready to book，reserved 显示为“assigned to upcoming bookings”，Recent credit activity 不再显示 available/reserved/used 的内部增减值。含义不变：reserved 是已经分配给未来 Booking 的课次，用来防止同一 credit 重复预约；按时取消会退回 available，完成课程后转为 used。Bookings 空状态也明确说明新预约在 Checkout 处理完成后出现，不再使用容易误解的“Confirmed activity”措辞。
+
+同时补齐错误恢复：取消/改期或读取状态不确定时，错误区现在提供真实 `Refresh` 操作重新读取账户，不要求客户刷新整个 Shopify 页面。完整 `npm.cmd run check` 通过；390px 与 1440px 浏览器回归均通过 navigationNoOverlap、noDuplicateProfile、分页、改期、取消不确定恢复、Past & cancelled、Pass 余额、读取错误恢复及 fresh token 检查，pageErrors=[]。最终分支 SHA `41ded11f59503fa3717fbf6e92f03c46f8958db8` 与远端一致，[GitHub Actions 34982148962](https://github.com/robber-857/Skyra/actions/runs/34982148962) success。
+
+当前尚未发布新的 Shopify App version：本轮官方 Customer Account validator 因需要把当前扩展源码发送给 Shopify 校验服务而等待用户对这一版重新明确授权。用户批准后再执行官方校验与 App release；在此之前真实开发店仍运行 `skyra-booking-9`，所以线上还看不到本轮四入口布局。
+
 ## 2026-09-16：真实免单订单、Customer Account 接入与响应式 UI 发布
 
 开发店的原生 Cart handoff 已完成一次真实下单：用户确认订单 `#1001` 成功创建、总额 A$0，并收到 Shopify 订单确认邮件。该结果证明开发店密码解锁后的同源 Cart、原生 Checkout、指定测试折扣 `SKYRAUATFREE915` 与 Shopify 订单/通知链路能够工作；但尚未读取并签收该订单对应的 Webhook Receipt、Outbox/Worker、Entitlement、Hold 转换和 confirmed Booking，因此不能把订单成功等同于 Booking 交易闭环完成。
