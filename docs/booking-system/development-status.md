@@ -1,5 +1,16 @@
 # Booking V3 — 开发状态
 
+
+## 2026-09-16：Coach 个人中心下一阶段交接
+
+Customer Account 最新 UI 已随 `skyra-booking-11` 发布，Customer 代码、自动化、官方 validator 与 CI 证据已经收口；真实账号全尺寸视觉 UAT、订单 `#1001` 后端闭环和 Private/Workshop 交易仍保留为独立未完成项。下一开发会话转入 Coach 个人中心，不把 Customer 未签收项错误标记为完成，也不要求 Coach 使用 Shopify Customer Account。
+
+现有 Coach 基础不是空白：受限登录/登出、一次性 15 分钟测试链接、8 小时 HttpOnly 会话、Today、本人 7/30 天及自定义 Schedule、本人 Session roster、Customer 逐次预约留言、check-in / attended / no-show、权限隔离、ledger 幂等和审计均已实现并有测试。当前缺口集中在正式 Coach 邀请/邮件身份、统一响应式 Portal shell、真实 Customer 最小显示资料、Day/Week 日历、recurring availability、time off、本人 reports 与真实桌面/手机 UAT。
+
+下一阶段顺序已固定为：先复核现有 auth/权限与测试基线；再做 Today / My schedule / Availability / Reports / Account 的统一桌面和手机外壳；随后完善 schedule/roster 的真实显示、availability/time off、reports；最后接正式邀请登录并做真实 Coach UAT。Roster 从具体 Session 进入，不新增重复顶层页面；私教继续由 Customer 使用匹配 Pass 或 Shopify 支付后直接确认，不增加 Coach 审批；Coach 不得看到其他老师、全店销售、Shopify 订单/支付/地址/营销资料。完整接手说明见 [Coach 个人中心交接](handoff-2026-09-16-coach-portal.md)。
+
+本批只更新开发、进度与交接文档，没有修改运行代码、Render 配置或 Shopify App version。开始新会话时必须重新核对 `bookingdev` 工作树、远端 SHA、CI 和实际部署，分别记录本地、CI、Render 与真实账号证据。
+
 ## 2026-09-16：Customer Account 信息架构与客户语言修正（已发布）
 
 用户对已发布 `skyra-booking-9` 做真实账号验收后确认首轮响应式修复仍不够清晰：六个大按钮造成拥挤，独立 History 含义不明确，App 内 Profile 与 Shopify 原生 Profile 重名，Pass 直接展示 reserved 和 Ledger delta 等内部术语。本轮已重构为四个短入口：Overview、My passes、Bookings、Training profile；History 收进 Bookings 内的 `Past & cancelled`，私教也统一在 Bookings 中以 badge 区分并保留改期/取消，因此不再需要独立 Appointments 顶层入口。Training profile 只保存头像、preferred name、签名和训练目标；Shopify Profile 继续管理正式姓名、邮箱和地址。
