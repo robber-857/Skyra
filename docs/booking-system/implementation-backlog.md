@@ -502,8 +502,8 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 
 ## 2026-09-15 Customer 个人中心与交易 UAT 进度
 
-- [x] Customer Account 导航与状态视图：Overview、My passes、Bookings、History、Appointments、Profile。
-- [x] Pass 余额、到期日、资格与 Ledger history；未来/历史/取消预约和私教状态；既有取消/改期操作保持可用。
+- [x] Customer Account 导航与状态视图已收敛为 Overview、My passes、Bookings、Training；Past & cancelled 和私教状态统一在 Bookings 内，Training 与 Shopify 原生 Profile 不重名。
+- [x] Pass 余额、到期日、资格与客户化 activity；不再暴露 reserved/Ledger delta 内部术语；未来/历史/取消预约和私教状态、既有取消/改期操作保持可用。
 - [x] Find a class 复用 storefront Programs 的共享 Booking section，不在 Customer Account 复制第二套排课组件。
 - [x] Profile API/迁移：preferred name、头像、签名、训练目标；同店同 Customer 隔离、格式/大小/文件头/控制字符校验与测试。
 - [x] 安全 Cart 错误诊断；已确认当前阻塞为开发店 `Online Store channel is locked.`，不是 Checkout scope 或 Render 故障。
@@ -514,6 +514,6 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 - [x] Customer Account Extension 已加入 Active 配置，菜单 `My Skyra` 与 Booking API / Find a class URL 已保存；`skyra-booking-8` 完成首发。
 - [x] 首轮响应式 UI 修复提交 `8c82b44` 已推送并通过 CI；Shopify App `skyra-booking-9` 已发布且 CLI 复核为 active（version ID `1129655271425`）。
 - [x] 真实 UAT 发现首轮仍拥挤后完成第二轮信息架构修正：四个顶层入口，History/Appointment 并入 Bookings，App Profile 改 Training，reserved/Ledger delta 改为客户语言，并补真实 Refresh 恢复。390/1440px 浏览器回归与完整 check 通过，最终 SHA `41ded11`、CI `34982148962` success。
-- [ ] 获得本轮源码发送至 Shopify 官方 validator 的明确授权，完成 validator 与新 App version 发布；当前开发店仍运行 `skyra-booking-9`。
+- [x] 用户已明确授权本轮源码发送至 Shopify 官方 validator；artifact `skyra-customer-ia-0916` revision 1 为 `VALID`。Shopify 配置校验无问题，`skyra-booking-10` 已发布并复核为 active（version ID `1129711894529`）。
 - [ ] 使用真实 Shopify Customer Account 做桌面/手机 UAT：320/390/430/1440px 无重叠/横向溢出，空状态、已有数据、头像上传/移除、Training profile 保存、Past & cancelled、到期/私教、取消/改期和 Find a class 返回。
 - [ ] 分别完成 Group Class、Private、Workshop Pass 的正向交易和跨类型负向拒绝；Customer 个人中心当前完成不代表这些支付场景已签收。
