@@ -1,5 +1,15 @@
 # Booking V3 — 开发状态
 
+## 2026-09-15：开发店原生 Cart handoff 与免单回调校验
+
+已实现仅对 `skyra-booking-dev.myshopify.com` 生效的 Online Store 原生 Cart handoff。服务器仍先完成登录、三重开发门控、课程/价格/商品复核、15 分钟 Hold 和随机 booking reference；浏览器随后使用已通过开发店密码页的同源会话调用 Shopify Ajax Cart API。购物车只允许空状态或完全匹配的单一预约行；如有其他商品、数量、价格、币种或 reference 不一致，流程停止并要求测试者手动清空，不会删除现有购物车。旧 `UNKNOWN` Checkout 仍不可重放。正式店继续使用原服务器端 Storefront Cart API，不会要求正式客户输入店铺密码。
+
+新增迁移 `202609150014_native_cart_handoff`，把不可变 `handoffMode` 固定为 `STOREFRONT_API` 或 `ONLINE_STORE_NATIVE`，并允许后者在不保存 Storefront Cart ID 的情况下进入 `READY`。`orders/paid` 仍严格核对店铺、Customer、Product、Variant、quantity=1、AUD、原价和单一订单行；只有配置的开发店、且唯一折扣码精确为 `SKYRAUATFREE915`、折扣金额等于原价、subtotal/final 都为 0 时，才接受免单 UAT。生产订单没有金额放宽。
+
+验证：专用 `skyra_booking_test` 已应用 15 条迁移；30 个测试文件 / **360 项测试全部通过**。新增覆盖原生 handoff 幂等、空/污染购物车、同源 locale route、开发店域名隔离和指定 100% 折扣。主 TypeScript、Customer Extension TypeScript、ESLint、生产构建通过；Shopify 官方 full-theme validator 对重建后的 `assets/transaction.js` 通过。另修复通知入队使用应用时钟、Worker 领取使用数据库时钟造成的约 90ms 边界竞争，统一使用数据库时钟。
+
+交付：运行实现提交为 `bee92214b170939c0610cd40ce830ed7b7fef11d`，与本进度文档一并推送到 `origin/bookingdev`。Render 部署、Shopify App version release、真实开发店新 Attempt、Checkout 和测试订单仍未执行。正式店密码状态不是此 UAT 的依赖；对外开放前应按正式营业计划关闭正式店密码。
+
 ## 2026-09-15：团课、私教与 Workshop 类型隔离
 
 三个开发店预约开关已由用户在 Render 与 Skyra Booking Settings 依次开启。当前只适用于 `skyra-booking-dev.myshopify.com`；本轮只读复核 Render `/health` 返回 200。开关开启是测试前提，不等于已经完成测试付款或创建 Booking。

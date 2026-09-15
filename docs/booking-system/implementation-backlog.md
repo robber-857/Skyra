@@ -507,7 +507,8 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 - [x] Find a class 复用 storefront Programs 的共享 Booking section，不在 Customer Account 复制第二套排课组件。
 - [x] Profile API/迁移：preferred name、头像、签名、训练目标；同店同 Customer 隔离、格式/大小/文件头/控制字符校验与测试。
 - [x] 安全 Cart 错误诊断；已确认当前阻塞为开发店 `Online Store channel is locked.`，不是 Checkout scope 或 Render 故障。
-- [ ] Dev Store 永久强制密码页；实现仅开发店的原生 Online Store Cart handoff，在用户输入 storefront password 后复用同源会话进入 Cart/Checkout。旧 `UNKNOWN` Attempt 不重试，生产服务器端 Cart API 不降级。
+- [x] Dev Store 原生 Online Store Cart handoff 已实现并提交 `bee9221`：只对精确开发店与三重门控生效，使用密码解锁后的同源会话；严格拒绝污染购物车且不自动清空。旧 `UNKNOWN` Attempt 不重试，生产服务器端 Cart API 不降级。尚待 Render 部署、Shopify release 和真实 UAT。
+- [x] `SKYRAUATFREE915` Webhook 严格例外已实现并提交：仅配置开发店、唯一指定折扣、折扣额等于原价、subtotal/final=0；生产金额校验不放宽。
 - [ ] 到达 Checkout 后使用 `SKYRAUATFREE915`，最终提交零金额订单前取得当次明确确认；随后核对 Order、Receipt、Outbox/Worker、Entitlement、Hold 和 Booking confirmed。
 - [ ] 发布包含 Customer Account Extension 的新 Shopify App version，并把 `Find a class URL` 配为开发店 Programs 地址。
 - [ ] 使用真实 Shopify Customer Account 做桌面/手机 UAT：空状态、已有数据、头像上传/移除、Profile 保存、历史/到期/Appointment、取消/改期和 Find a class 返回。
