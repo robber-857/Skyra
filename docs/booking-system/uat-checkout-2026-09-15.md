@@ -31,15 +31,13 @@ The earlier missing `unauthenticated_write_checkouts` scope was fixed, released 
 
 This is not evidence of a Render outage, missing checkout scope, or a frontend selection error.
 
-## Manual unblock
+## Development-store constraint and safe path
 
-1. Open Shopify Admin.
-2. Go to **Online Store → Preferences**.
-3. Find **Password protection** or **Restrict store access**.
-4. Disable the restriction and Save.
-5. Return to Programs and start a brand-new booking attempt. Do not reuse the `UNKNOWN`/recovery-blocked attempt.
+Shopify's current Dev Store documentation states that Dev Stores are always password protected and the password page can't be removed. The merchant therefore has no Admin switch that can complete the previous “disable password protection” step.
 
-If Shopify shows different wording, the required result is that the Online Store sales channel is no longer password protected. The storefront preview bar should no longer say `Password protected`.
+Do not enable password protection on the live production store as a workaround: password protection also prevents Storefront/Headless checkout. Keep this UAT on the Dev Store and add a development-store-only native cart handoff that runs after the tester enters the storefront password. It must preserve the server-created Hold/reference and strict paid-order verification; the existing server-side Storefront Cart API remains the production path.
+
+A separate paid staging store with password protection off is an alternative for exact server-side Cart API testing, but it adds recurring cost and another installation/configuration surface. It is not required before implementing the Dev Store handoff.
 
 ## Deployment and verification
 
@@ -49,8 +47,8 @@ If Shopify shows different wording, the required result is that the Online Store
 
 ## Next steps, in order
 
-1. Unlock the development Online Store channel.
-2. Start a fresh Group Class Drop-in attempt and reach Shopify Checkout.
+1. Implement and validate the development-store-only native cart handoff behind the existing exact-shop and three-gate checks.
+2. Enter the Dev Store storefront password, then start a fresh Group Class Drop-in attempt and reach Shopify Checkout.
 3. Apply `SKYRAUATFREE915`.
 4. Stop before the final zero-total order submission and obtain explicit user confirmation for that action.
 5. Submit once, then verify `orders/paid` deduplication, Outbox/Worker, entitlement creation, Hold conversion and confirmed Booking.

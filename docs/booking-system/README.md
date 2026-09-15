@@ -2,7 +2,7 @@
 
 ## 最新交接入口（2026-09-15）
 
-请先阅读 [交易 UAT 阻塞定位与 Customer 个人中心](handoff-2026-09-15.md)。用户已开启开发店三个预约开关；课程类型隔离、Pass 单一类型双层约束和安全 Cart 失败诊断已推送，`skyra-booking-7` 的 Checkout scope 已 release/批准。真实 Drop-in 仍被开发店 `Online Store channel is locked` 阻塞。Customer Account 的 Overview、passes 到期、Bookings/History、Appointments 与头像/签名/训练目标 Profile 已完成代码和本地验证；仍需提交部署、发布新版 UI extension、配置 Find a class URL 并做真实账号 UAT。
+请先阅读 [交易 UAT 阻塞定位与 Customer 个人中心](handoff-2026-09-15.md)。用户已开启开发店三个预约开关；课程类型隔离、Pass 单一类型双层约束和安全 Cart 失败诊断已推送，`skyra-booking-7` 的 Checkout scope 已 release/批准。真实 Drop-in 仍被开发店强制密码页对应的 `Online Store channel is locked` 阻塞；官方确认 Dev Store 不能移除密码页，不能把“去掉密码”继续列为待操作。Customer Account 的 Overview、passes 到期、Bookings/History、Appointments 与头像/签名/训练目标 Profile 已推送且后端迁移已部署；仍需发布新版 UI extension、配置 Find a class URL、实现仅开发店的原生 Cart handoff 并做真实账号 UAT。
 
 ## 2026-09-14：Git 交付与 Coach 测试入口
 

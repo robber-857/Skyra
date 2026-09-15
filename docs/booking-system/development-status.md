@@ -357,5 +357,5 @@ App/Worker 已恢复，Theme dev 保持运行。preview:check 对 Home、Program
 - 新增 `202609150013_customer_profile` 迁移和数据库 bytes/MIME/类型/大小约束；Profile 设计已同步到可点击线框。
 - 最终独立全量数据库测试为 29 文件 / 355 项全部通过；Customer Extension typecheck、主 TypeScript、ESLint、production build、Prisma generate/format 与 `shopify app build` 通过。Shopify 官方组件校验器重试 3 次均因其隔离环境缺少 `customer-account.page.render` 类型模块而失败；本地 `2026.7.0` 包解析与 typecheck 正常，仍需真实 extension 发布/UAT。
 - Cart 失败根因已确认：Checkout scope 已 release/批准且线上运行时具备所需权限，但开发店返回 `Online Store channel is locked.`。安全日志只记录 `ACCESS_DENIED` 等分类字段，不输出 token、Cart secret、PII 或完整响应。
-- 尚未完成：解除开发店 Online Store 密码保护、全新 Attempt 的零金额测试订单、paid Webhook/Worker/Entitlement/Booking 签收、Customer Extension 新版本发布、`booking_url` 配置和真实 Customer Account 桌面/手机验收。
-- Git 状态：Customer 代码与首轮文档已创建本地提交 `0dc6ef64d75cdef8d419d556d04cc951198ac866`；尚未获得对 `https://github.com/robber-857/Skyra.git` / `bookingdev` 的明确推送确认，因此 GitHub CI、Render migration/deploy 和远端 SHA 均未更新。
+- 尚未完成：开发店原生 Cart handoff、全新 Attempt 的零金额测试订单、paid Webhook/Worker/Entitlement/Booking 签收、Customer Extension 新版本发布、`booking_url` 配置和真实 Customer Account 桌面/手机验收。Shopify 官方确认 Dev Store 密码页不能移除；不再把关闭密码列为用户待操作。
+- Git/部署状态：Customer 实现 `0dc6ef6` 与状态文档 `1d31dc6` 已推送，远端 SHA 精确为 `1d31dc611cbc25376f727172cda86accd21b717b`；GitHub Actions run `34965029824` success。Render deploy `dep-dakivp942hec73cpbpr0` 已在相同 SHA live，pre-deploy migration 完成且 `/health` 为 200。
