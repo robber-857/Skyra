@@ -80,6 +80,65 @@ function requestError(mutation: boolean) {
   );
 }
 
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function cartRequestDiagnostic(error: unknown) {
+  const source = record(error);
+  const response = record(source?.response);
+  const body = record(source?.body) || record(response?.body);
+  const errors = record(body?.errors);
+  const graphQLErrors = Array.isArray(errors?.graphQLErrors)
+    ? errors.graphQLErrors
+    : [];
+  const graphqlCodes = graphQLErrors
+    .map((item) => record(record(item)?.extensions)?.code)
+    .filter((code): code is string => typeof code === "string")
+    .slice(0, 5);
+  const constructorName =
+    source?.constructor && typeof source.constructor === "function"
+      ? source.constructor.name
+      : undefined;
+  const responseStatus =
+    typeof response?.status === "number"
+      ? response.status
+      : typeof response?.code === "number"
+        ? response.code
+        : undefined;
+  const kind =
+    error instanceof DomainError && error.code === "CART_REQUEST_UNKNOWN"
+      ? "DEADLINE_OR_TRANSPORT"
+      : constructorName === "GraphqlQueryError"
+        ? "SHOPIFY_GRAPHQL"
+        : constructorName?.startsWith("Http")
+          ? "SHOPIFY_HTTP"
+          : "CLIENT_EXCEPTION";
+  return {
+    kind,
+    ...(constructorName ? { constructorName } : {}),
+    ...(responseStatus ? { responseStatus } : {}),
+    ...(graphqlCodes.length ? { graphqlCodes } : {}),
+  };
+}
+
+function logCartEvent(
+  event: string,
+  mutation: boolean,
+  details: Record<string, unknown>,
+) {
+  // Never log Cart IDs, checkout URLs, request bodies, tokens or upstream text.
+  console.error(
+    JSON.stringify({
+      event,
+      operation: mutation ? "create" : "read",
+      ...details,
+    }),
+  );
+}
+
 async function request(
   client: GraphQL,
   query: string,
@@ -98,8 +157,14 @@ async function request(
           signal: controller.signal,
         });
         const payload = await response.json();
-        if (!response.ok || payload.errors?.length || !payload.data)
+        if (!response.ok || payload.errors?.length || !payload.data) {
+          logCartEvent("BOOKING_CART_RESPONSE_REJECTED", mutation, {
+            responseStatus: response.status,
+            hasData: Boolean(payload.data),
+            hasErrors: Boolean(payload.errors),
+          });
           throw new Error();
+        }
         return payload.data;
       })(),
       new Promise<never>((_, reject) => {
@@ -109,7 +174,12 @@ async function request(
         }, 6000);
       }),
     ]);
-  } catch {
+  } catch (error) {
+    logCartEvent(
+      "BOOKING_CART_REQUEST_FAILED",
+      mutation,
+      cartRequestDiagnostic(error),
+    );
     throw requestError(mutation);
   } finally {
     if (timer) clearTimeout(timer);
@@ -145,7 +215,14 @@ export async function createBookingCart(client: GraphQL, target: CartTarget) {
       warnings: z.array(z.object({ message: z.string() })),
     })
     .safeParse(data.cartCreate);
-  if (!result.success) throw requestError(true);
+  if (!result.success) {
+    logCartEvent("BOOKING_CART_RESPONSE_INVALID", true, {
+      issuePaths: [
+        ...new Set(result.error.issues.map((issue) => issue.path.join("."))),
+      ].slice(0, 10),
+    });
+    throw requestError(true);
+  }
   if (!result.data.cart) {
     if (result.data.userErrors.length)
       throw new DomainError(

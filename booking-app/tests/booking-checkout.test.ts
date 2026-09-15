@@ -686,6 +686,7 @@ test("catalog changes during availability checks cannot create a Hold or Cart", 
 });
 
 test("cartCreate has a deadline covering a stalled response body and disables SDK retries", async () => {
+  const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
   const graphql = vi.fn<GraphQL>(
     async () =>
       ({
@@ -704,4 +705,38 @@ test("cartCreate has a deadline covering a stalled response body and disables SD
   expect(graphql).toHaveBeenCalledTimes(1);
   expect(graphql.mock.calls[0][1].tries).toBe(1);
   expect(graphql.mock.calls[0][1].signal?.aborted).toBe(true);
+  expect(errorLog).toHaveBeenCalledWith(
+    expect.stringContaining('"kind":"DEADLINE_OR_TRANSPORT"'),
+  );
+  errorLog.mockRestore();
 }, 10000);
+
+test("invalid cart responses log schema paths without Cart data", async () => {
+  const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+  const graphql = vi.fn<GraphQL>(async () =>
+    Response.json({
+      data: {
+        cartCreate: {
+          cart: { id: "cart-secret-must-not-be-logged" },
+          userErrors: [],
+          warnings: [],
+        },
+      },
+    }),
+  );
+
+  await expect(
+    createBookingCart(graphql, {
+      reference: "r".repeat(43),
+      productGid: "gid://shopify/Product/1",
+      variantGid: "gid://shopify/ProductVariant/1",
+      priceCents: 100,
+    }),
+  ).rejects.toMatchObject({ code: "CART_REQUEST_UNKNOWN" });
+
+  const logged = errorLog.mock.calls.flat().join("\n");
+  expect(logged).toContain("BOOKING_CART_RESPONSE_INVALID");
+  expect(logged).toContain("cart.checkoutUrl");
+  expect(logged).not.toContain("cart-secret-must-not-be-logged");
+  errorLog.mockRestore();
+});
