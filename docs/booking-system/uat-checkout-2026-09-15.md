@@ -4,7 +4,7 @@
 
 The development-store Drop-in flow reached signed-in Review, but Shopify did not create a Cart. The final safe diagnostic result was Storefront GraphQL `ACCESS_DENIED`, and a tokenless minimal `cartCreate` returned `Online Store channel is locked.` No order, payment, entitlement, or confirmed booking was created.
 
-Update: a development-store-only native Cart handoff has now been implemented in commit `bee92214b170939c0610cd40ce830ed7b7fef11d` and pushed with the updated handoff documents. It uses the password-unlocked same-origin Online Store session while preserving the server-created Hold/reference. It has passed automated tests but is not yet deployed by Render, released to Shopify, or validated with a real order, so the outcome above remains the latest live UAT result.
+Update: a development-store-only native Cart handoff has now been implemented in commit `bee92214b170939c0610cd40ce830ed7b7fef11d`. Render deploy `5c18d6e` is Live and applied migration `202609150014_native_cart_handoff`; Shopify App `skyra-booking-8` is active with the updated Theme and Customer Account extensions. The path still has not been validated with a fresh real order, so the outcome above remains the last completed transaction attempt.
 
 ## Test setup
 
@@ -49,11 +49,10 @@ A separate paid staging store with password protection off is an alternative for
 
 ## Next steps, in order
 
-1. Push/deploy the native Cart handoff and release the updated Theme extension; do not test against local-only code.
-2. Enter the Dev Store storefront password, ensure the Shopify Cart is empty, then start a fresh Group Class Drop-in attempt and reach Shopify Checkout.
-3. Apply `SKYRAUATFREE915`; the webhook accepts this only for the configured development shop with one exact 100% discount and zero subtotal/final amount.
-4. Stop before the final zero-total order submission and obtain explicit user confirmation for that action.
-5. Submit once, then verify `orders/paid` deduplication, Outbox/Worker, entitlement creation, Hold conversion and confirmed Booking.
-6. Verify the result in Customer Account, then repeat the planned Group Pass, Private and Workshop eligibility cases.
+1. Enter the Dev Store storefront password, hard-refresh Programs, ensure the Shopify Cart is empty, then start a fresh Group Class Drop-in attempt and reach Shopify Checkout. Do not retry the old `UNKNOWN` attempt.
+2. Apply `SKYRAUATFREE915`; the webhook accepts this only for the configured development shop with one exact 100% discount and zero subtotal/final amount.
+3. Stop before the final zero-total order submission and obtain explicit user confirmation for that action.
+4. Submit once, then verify `orders/paid` deduplication, Outbox/Worker, entitlement creation, Hold conversion and confirmed Booking.
+5. Verify the result in Customer Account, then repeat the planned Group Pass, Private and Workshop eligibility cases.
 
 Checkout and public booking gates must remain development-only until the paid transaction loop is verified end to end.

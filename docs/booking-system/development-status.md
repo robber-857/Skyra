@@ -8,7 +8,7 @@
 
 验证：专用 `skyra_booking_test` 已应用 15 条迁移；30 个测试文件 / **360 项测试全部通过**。新增覆盖原生 handoff 幂等、空/污染购物车、同源 locale route、开发店域名隔离和指定 100% 折扣。主 TypeScript、Customer Extension TypeScript、ESLint、生产构建通过；Shopify 官方 full-theme validator 对重建后的 `assets/transaction.js` 通过。另修复通知入队使用应用时钟、Worker 领取使用数据库时钟造成的约 90ms 边界竞争，统一使用数据库时钟。
 
-交付：运行实现提交为 `bee92214b170939c0610cd40ce830ed7b7fef11d`，进度文档提交为 `5c18d6e861ee8788cb701ee3ab7e7599c6c40102`，均已推送到 `origin/bookingdev` 且远程 SHA 一致；[GitHub Actions 34968368453](https://github.com/robber-857/Skyra/actions/runs/34968368453) success。Render 公共 `/health` 当前返回 200，但本轮无法读取已登录控制台确认新 deploy 的 commit/deploy ID，因此不能把健康响应视为新版本已部署证据。Shopify App version release、真实开发店新 Attempt、Checkout 和测试订单仍未执行。正式店密码状态不是此 UAT 的依赖；对外开放前应按正式营业计划关闭正式店密码。
+交付：运行实现提交为 `bee92214b170939c0610cd40ce830ed7b7fef11d`，进度文档提交为 `5c18d6e861ee8788cb701ee3ab7e7599c6c40102`，均已推送到 `origin/bookingdev` 且远程 SHA 一致；[GitHub Actions 34968368453](https://github.com/robber-857/Skyra/actions/runs/34968368453) success。用户已确认 Render deploy `5c18d6e` 为 Live，Pre-deploy 成功应用 `202609150014_native_cart_handoff`。经用户明确批准，Shopify App `skyra-booking-8` 已发布并核对为 active，包含 Theme 与 Customer Account Extension。真实开发店新 Attempt、Checkout 和测试订单仍未执行。正式店密码状态不是此 UAT 的依赖；对外开放前应按正式营业计划关闭正式店密码。
 
 ## 2026-09-15：团课、私教与 Workshop 类型隔离
 
