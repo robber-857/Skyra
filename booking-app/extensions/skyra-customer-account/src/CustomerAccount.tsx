@@ -92,7 +92,7 @@ const viewLabels: { id: View; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "passes", label: "My passes" },
   { id: "upcoming", label: "Bookings" },
-  { id: "profile", label: "Training" },
+  { id: "profile", label: "Training profile" },
 ];
 
 export default async () => {
@@ -460,9 +460,11 @@ function AccountPage() {
     <s-page heading="My Skyra">
       <s-query-container>
         <s-stack direction="block" gap="large-100">
-          <s-grid
+          <s-stack
+            id="account-navigation"
+            direction="inline"
             gap="small"
-            gridTemplateColumns="@container (inline-size > 720px) repeat(4, minmax(0, 1fr)), repeat(2, minmax(0, 1fr))"
+            alignItems="center"
           >
             {viewLabels.map((item) => (
               <s-button
@@ -480,7 +482,7 @@ function AccountPage() {
                 {item.label}
               </s-button>
             ))}
-          </s-grid>
+          </s-stack>
           <s-divider />
           {error && (
             <s-stack direction="block" gap="small">
@@ -608,25 +610,31 @@ function AccountPage() {
           <s-stack gap="base">
             <s-banner>
               Shopify continues to manage your account name, email and
-              addresses. Training stores only your Skyra photo, preferred name,
-              signature and training goals.
+              addresses. Training profile stores only your Skyra photo,
+              preferred name, signature and training goals.
             </s-banner>
             <s-section heading="Training profile">
               <s-stack gap="base">
-                <s-stack direction="inline" gap="base">
-                  <s-avatar
-                    size="large-200"
-                    initials={initials}
-                    src={draft.avatarDataUrl || undefined}
-                    alt="Your Skyra profile avatar"
-                  />
+                <s-stack
+                  direction="inline"
+                  gap="base"
+                  justifyContent="space-between"
+                  alignItems="center"
+                >
                   <s-stack gap="small">
                     <s-heading>
                       {draft.preferredName || "Skyra member"}
                     </s-heading>
                     {draft.signature && <s-text>{draft.signature}</s-text>}
                   </s-stack>
+                  <s-avatar
+                    size="large-200"
+                    initials={initials}
+                    src={draft.avatarDataUrl || undefined}
+                    alt="Your Skyra profile avatar"
+                  />
                 </s-stack>
+                <s-divider />
                 <s-drop-zone
                   label="Upload profile photo"
                   accessibilityLabel="Upload a PNG, JPEG or WebP profile photo"
@@ -753,20 +761,22 @@ function Overview({
             : "My overview"
         }
       >
-        <s-stack direction="inline" gap="base">
+        <s-stack
+          direction="inline"
+          gap="base"
+          justifyContent="space-between"
+          alignItems="center"
+        >
+          <s-stack gap="small">
+            {profile.signature && <s-text>{profile.signature}</s-text>}
+            <FindClassButton href={bookingUrl} />
+          </s-stack>
           <s-avatar
-            size="large"
+            size="large-200"
             initials={(profile.preferredName || "SM").slice(0, 2).toUpperCase()}
             src={profile.avatarDataUrl || undefined}
             alt="Your Skyra profile avatar"
           />
-          <s-stack gap="small">
-            <s-text>
-              {profile.signature ||
-                "Your classes, passes and appointments in one place."}
-            </s-text>
-            <FindClassButton href={bookingUrl} />
-          </s-stack>
         </s-stack>
       </s-section>
       <s-query-container>
