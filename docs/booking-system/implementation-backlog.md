@@ -1,5 +1,23 @@
 # Skyra Booking System — V3 开发规划与 MVP 任务清单
 
+
+## 2026-09-16：Coach 个人中心接手队列
+
+下一会话以 [Coach 个人中心交接](handoff-2026-09-16-coach-portal.md) 为唯一接手入口。先复用已有 Coach auth、Today、Schedule、Roster、Attendance、留言与审计，不从零重建。
+
+- [x] 受限 Coach 登录/登出、15 分钟一次性开发测试链接、8 小时会话、停用/撤销与未授权拒绝。
+- [x] Today、本人的未来 7/30 天与自定义日期范围 Schedule、本人 Session roster。
+- [x] Customer 逐次预约留言读取、check-in / attended / no-show、ledger 幂等/并发保护和关键审计。
+- [ ] 统一 Coach Portal 响应式 shell：Today、My schedule、Availability、Reports、Account；Roster 从 Session detail 进入，避免重复顶层入口。
+- [ ] 在最小披露原则下接入真实 Customer 姓名与必要联系方式；不得暴露 Shopify 订单、支付、地址或营销资料。
+- [ ] 将 Schedule 范围列表升级为真正 Day / Week 视图，完成 390px 与 1440px 无重叠/无横向溢出验证。
+- [ ] 实现 recurring availability，再实现单日 exception / time off；保留 Admin 排课为运营真相。
+- [ ] 完成 Coach 本人课程、出勤和 No-show reports。
+- [ ] 接入真实 Coach 邮箱维护、邀请 provider、自助重发、失效/撤销与真实身份 UAT。
+- [ ] 完成跨 Coach/跨店拒绝、会话过期、手机/桌面、真实 Coach 登录与通知投递 UAT。
+
+约束：私教由 Customer 使用匹配 Private Pass 或 Shopify 付款后直接确认，不增加 Coach/Admin 审批；Customer 留言按 Booking 展示，不开发聊天或 Coach 回复。Customer 真实视觉 UAT、订单 `#1001` 后端闭环以及 Private/Workshop 交易仍是并行未完成项，不能因转入 Coach 开发而关闭。
+
 ## 2026-09-15：课程类型与 Pass 隔离
 
 - [x] `CLASS` 团课、`APPOINTMENT` 私教、`COURSE` Workshop 均可在 Classes & Passes 创建，并在 Weekly Schedule 排为 dated Session。
