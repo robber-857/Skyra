@@ -1,6 +1,6 @@
 # Booking V3 — 开发状态
 
-## 2026-09-16：Customer Account 信息架构与客户语言修正（待发布）
+## 2026-09-16：Customer Account 信息架构与客户语言修正（已发布）
 
 用户对已发布 `skyra-booking-9` 做真实账号验收后确认首轮响应式修复仍不够清晰：六个大按钮造成拥挤，独立 History 含义不明确，App 内 Profile 与 Shopify 原生 Profile 重名，Pass 直接展示 reserved 和 Ledger delta 等内部术语。本轮已重构为四个短入口：Overview、My passes、Bookings、Training；History 收进 Bookings 内的 `Past & cancelled`，私教也统一在 Bookings 中以 badge 区分并保留改期/取消，因此不再需要独立 Appointments 顶层入口。Training profile 只保存头像、preferred name、签名和训练目标；Shopify Profile 继续管理正式姓名、邮箱和地址。
 
@@ -8,7 +8,7 @@ Pass 文案已改成客户语言：available 显示为 ready to book，reserved 
 
 同时补齐错误恢复：取消/改期或读取状态不确定时，错误区现在提供真实 `Refresh` 操作重新读取账户，不要求客户刷新整个 Shopify 页面。完整 `npm.cmd run check` 通过；390px 与 1440px 浏览器回归均通过 navigationNoOverlap、noDuplicateProfile、分页、改期、取消不确定恢复、Past & cancelled、Pass 余额、读取错误恢复及 fresh token 检查，pageErrors=[]。最终分支 SHA `41ded11f59503fa3717fbf6e92f03c46f8958db8` 与远端一致，[GitHub Actions 34982148962](https://github.com/robber-857/Skyra/actions/runs/34982148962) success。
 
-当前尚未发布新的 Shopify App version：本轮官方 Customer Account validator 因需要把当前扩展源码发送给 Shopify 校验服务而等待用户对这一版重新明确授权。用户批准后再执行官方校验与 App release；在此之前真实开发店仍运行 `skyra-booking-9`，所以线上还看不到本轮四入口布局。
+用户明确批准发送本轮源码后，Shopify 官方 Customer Account validator 对 artifact `skyra-customer-ia-0916` revision 1 返回 `VALID`；Shopify CLI 配置校验返回 `valid: true` 且 `issues: []`。随后已发布 `skyra-booking-10`，CLI 复核为 `active`，version ID `1129711894529`，`skyra-booking-9` 已变为 inactive。[Shopify version dashboard](https://dev.shopify.com/dashboard/232832637/apps/420648878081/versions/1129711894529)。发布过程成功构建 38.6 KB Customer Account extension（约 12.1 KB compressed）并验证 Theme extension；本次仅更新 Shopify App extensions，不需要重新部署 Render。
 
 ## 2026-09-16：真实免单订单、Customer Account 接入与响应式 UI 发布
 
