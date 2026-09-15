@@ -45,13 +45,19 @@ Local changes now:
 
 ## Deployment status
 
-The fix and this UAT record are local only. They have not been pushed, deployed to Render, or released as a new Shopify app version. The development store has therefore not approved the added Storefront checkout permission yet.
+- Checkout scope fix and this UAT record were committed as `9b355267de5aa496c3b149e626bfc3e1828e165c`; the remote `origin/bookingdev` ref matched exactly.
+- GitHub Actions run `34918665617` completed successfully for that commit.
+- The missing Render Blueprint scope was corrected in `4ce2015ab8feadd4df2a708f638b2a16f8ecfc2e` and pushed to `origin/bookingdev`.
+- Render deploy `dep-dakaij5g1s2s73bkofpg` is live on commit `4ce2015ab8feadd4df2a708f638b2a16f8ecfc2e`; `/health` returns `status=ok`.
+- A post-deploy one-off Job verified `hasProduct=true`, `hasCheckout=true`, and `hasOrders=true` in the live runtime.
+- Shopify app version `skyra-booking-7` was released successfully with `unauthenticated_write_checkouts`.
+- The development store still needs the merchant to approve the new permission once. The OAuth approval page has been opened; no session scope or token was edited manually.
 
 ## Next steps, in order
 
-1. Push the scoped commit to `origin/bookingdev` so Render can deploy it.
-2. Add the new scope to the Render runtime environment if its `SCOPES` value is managed separately.
-3. Deploy a new Shopify app version and approve `unauthenticated_write_checkouts` for the development store.
+1. Approve `unauthenticated_write_checkouts` on the development-store OAuth page.
+2. Reopen Skyra Booking once so Shopify refreshes the app's offline installation session.
+3. Verify the stored offline session contains the exact checkout scope.
 4. Start a fresh booking attempt after the old Hold expires; do not reuse the recovery-blocked attempt.
 5. Reach Shopify Checkout, apply `SKYRAUATFREE915`, and submit the zero-total test order.
 6. Verify `orders/paid` receipt and deduplication, Worker/Outbox processing, entitlement creation, Hold conversion, and confirmed Booking.
