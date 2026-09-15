@@ -482,7 +482,14 @@ function AccountPage() {
             ))}
           </s-grid>
           <s-divider />
-          {error && <s-banner tone="critical">{error}</s-banner>}
+          {error && (
+            <s-stack direction="block" gap="small">
+              <s-banner tone="critical">{error}</s-banner>
+              <s-button disabled={busy} onClick={() => void load(view)}>
+                Refresh
+              </s-button>
+            </s-stack>
+          )}
           {notice && <s-banner tone="success">{notice}</s-banner>}
           {busy && (
             <s-box padding="base" background="subdued" borderRadius="base">
