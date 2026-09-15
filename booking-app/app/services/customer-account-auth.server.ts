@@ -74,6 +74,7 @@ export function customerTokenContext(
 export async function customerAccountRequest(
   request: Request,
   run: (actor: BookingActor, input: unknown) => Promise<unknown>,
+  options: { maxBodyBytes?: number } = {},
 ) {
   // Shopify verifies the HMAC signature and temporal claims. Its public extension
   // helper skips audience validation; require our exact client ID here as well.
@@ -104,7 +105,7 @@ export async function customerAccountRequest(
       if (!request.headers.get("content-type")?.startsWith("application/json"))
         return cors(bookingJson({ code: "INVALID_REQUEST" }, 415));
       const body = await request.text();
-      if (body.length > 2048)
+      if (body.length > (options.maxBodyBytes ?? 2048))
         return cors(bookingJson({ code: "INVALID_REQUEST" }, 413));
       input = JSON.parse(body);
     }

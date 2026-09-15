@@ -3,7 +3,9 @@ import "@shopify/ui-extensions/preact";
 import { render } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 
-type View = "upcoming" | "history" | "passes";
+type View =
+  "overview" | "upcoming" | "history" | "passes" | "appointments" | "profile";
+type DataView = "upcoming" | "history" | "passes";
 type Target = {
   id: string;
   startsAt: string;
@@ -50,15 +52,24 @@ type Pass = {
   historyTruncated: boolean;
 };
 type Account = {
-  view: View;
+  view: DataView;
   timezone: string;
   bookings: Booking[];
   passes: Pass[];
   nextCursor: string | null;
 };
+type Profile = {
+  preferredName: string;
+  avatarDataUrl: string | null;
+  signature: string;
+  trainingGoals: string;
+};
 
-export default async () => {
-  render(<AccountPage />, document.body);
+const emptyProfile: Profile = {
+  preferredName: "",
+  avatarDataUrl: null,
+  signature: "",
+  trainingGoals: "",
 };
 const labels: Record<string, string> = {
   CONFIRMED: "Confirmed",
@@ -77,22 +88,25 @@ const labels: Record<string, string> = {
   EXPIRE: "Credits expired",
   REVOKE: "Credits revoked",
 };
-function date(value: string, timezone: string) {
-  return new Intl.DateTimeFormat("en-AU", {
-    timeZone: timezone,
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+const viewLabels: { id: View; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "passes", label: "My passes" },
+  { id: "upcoming", label: "Bookings" },
+  { id: "history", label: "History" },
+  { id: "appointments", label: "Appointments" },
+  { id: "profile", label: "Profile" },
+];
+
+export default async () => {
+  render(<AccountPage />, document.body);
+};
+
+function extensionApi() {
+  return shopify as unknown as Api;
 }
-async function api(
-  view: View,
-  cursor?: string,
-  body?: unknown,
-  rescheduleBookingId?: string,
-): Promise<Account & { options?: Target[] }> {
-  // Bind the host global to this extension target; the SDK also exports legacy globals.
-  const accountApi = shopify as unknown as Api;
-  const configured = accountApi.settings.value.api_url;
+
+function apiBase() {
+  const configured = extensionApi().settings.value.api_url;
   if (typeof configured !== "string" || !configured)
     throw Error(
       "Your booking account is temporarily unavailable. Please contact the studio.",
@@ -108,25 +122,38 @@ async function api(
     throw Error(
       "Your booking account is temporarily unavailable. Please contact the studio.",
     );
-  const url = new URL(
-    rescheduleBookingId ? "/api/customer-reschedule" : "/api/customer-bookings",
-    base,
-  );
-  if (rescheduleBookingId)
-    url.searchParams.set("bookingId", rescheduleBookingId);
-  else url.searchParams.set("view", view);
-  if (cursor) url.searchParams.set("cursor", cursor);
-  const token = await accountApi.sessionToken.get();
+  return base;
+}
+
+function findClassUrl() {
+  const configured = extensionApi().settings.value.booking_url;
+  if (typeof configured !== "string" || !configured) return "";
+  try {
+    const url = new URL(configured);
+    if (url.protocol !== "https:" || url.username || url.password) return "";
+    url.hash = "skyra-booking-programs";
+    return url.href;
+  } catch {
+    return "";
+  }
+}
+
+async function request<T>(
+  path: string,
+  options: { method?: "POST"; body?: unknown } = {},
+): Promise<T> {
+  const url = new URL(path, apiBase());
+  const token = await extensionApi().sessionToken.get();
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), 15000);
   try {
     const response = await fetch(url, {
-      method: body ? "POST" : "GET",
+      method: options.method || "GET",
       headers: {
         Authorization: `Bearer ${token}`,
-        ...(body ? { "Content-Type": "application/json" } : {}),
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
       },
-      ...(body ? { body: JSON.stringify(body) } : {}),
+      ...(options.body ? { body: JSON.stringify(options.body) } : {}),
       signal: abort.signal,
     });
     if (!response.ok) {
@@ -143,18 +170,73 @@ async function api(
     clearTimeout(timer);
   }
 }
+
+function accountData(view: DataView, cursor?: string) {
+  const path = new URL("/api/customer-bookings", apiBase());
+  path.searchParams.set("view", view);
+  if (cursor) path.searchParams.set("cursor", cursor);
+  return request<Account>(path.href);
+}
+
+function profileData(body?: Profile) {
+  return request<Profile>("/api/customer-profile", {
+    ...(body ? { method: "POST" as const, body } : {}),
+  });
+}
+
+function rescheduleOptions(bookingId: string) {
+  const path = new URL("/api/customer-reschedule", apiBase());
+  path.searchParams.set("bookingId", bookingId);
+  return request<Account & { options?: Target[] }>(path.href);
+}
+
+function changeBooking(body: unknown, reschedule = false) {
+  return request<Account>(
+    reschedule ? "/api/customer-reschedule" : "/api/customer-bookings",
+    { method: "POST", body },
+  );
+}
+
+function date(value: string, timezone: string) {
+  return new Intl.DateTimeFormat("en-AU", {
+    timeZone: timezone,
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function shortDate(value: string, timezone: string) {
+  return new Intl.DateTimeFormat("en-AU", {
+    timeZone: timezone,
+    dateStyle: "medium",
+  }).format(new Date(value));
+}
+
+function isAppointment(booking: Booking) {
+  return booking.serviceKind === "APPOINTMENT";
+}
+
+function fieldValue(event: Event) {
+  return (event.currentTarget as unknown as { value: string }).value;
+}
+
 function AccountPage() {
-  const [view, setView] = useState<View>("upcoming");
+  const [view, setView] = useState<View>("overview");
   const [data, setData] = useState<Account | null>(null);
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [notice, setNotice] = useState("");
+  const [profile, setProfile] = useState<Profile>(emptyProfile);
+  const [draft, setDraft] = useState<Profile>(emptyProfile);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [avatarError, setAvatarError] = useState("");
   const [selected, setSelected] = useState<Booking | null>(null);
   const [uncertain, setUncertain] = useState(false);
-  const [moving, setMoving] = useState<Booking | null>(null),
-    [targets, setTargets] = useState<Target[]>([]),
-    [target, setTarget] = useState<Target | null>(null);
+  const [moving, setMoving] = useState<Booking | null>(null);
+  const [targets, setTargets] = useState<Target[]>([]);
+  const [target, setTarget] = useState<Target | null>(null);
   const generation = useRef(0);
+  const bookingUrl = findClassUrl();
+
   async function load(nextView: View, cursor?: string) {
     const run = ++generation.current;
     setBusy(true);
@@ -163,31 +245,67 @@ function AccountPage() {
     setMoving(null);
     setTarget(null);
     try {
-      const next = await api(nextView, cursor);
-      if (run === generation.current) {
-        setData((prev) =>
-          cursor && prev?.view === nextView
-            ? {
-                ...next,
-                bookings: [...prev.bookings, ...next.bookings],
-                passes: [...prev.passes, ...next.passes],
-              }
-            : next,
-        );
-        setUncertain(false);
+      if (nextView === "profile") {
+        const nextProfile = await profileData();
+        if (run === generation.current) {
+          setProfile(nextProfile);
+          setDraft(nextProfile);
+          setData(null);
+        }
+      } else if (nextView === "overview") {
+        const [upcoming, passes, nextProfile] = await Promise.all([
+          accountData("upcoming"),
+          accountData("passes"),
+          profileData(),
+        ]);
+        if (run === generation.current) {
+          setData({ ...upcoming, passes: passes.passes, nextCursor: null });
+          setProfile(nextProfile);
+          setDraft(nextProfile);
+        }
+      } else if (nextView === "appointments") {
+        const [upcoming, history] = await Promise.all([
+          accountData("upcoming"),
+          accountData("history"),
+        ]);
+        if (run === generation.current)
+          setData({
+            ...upcoming,
+            bookings: [...upcoming.bookings, ...history.bookings].filter(
+              isAppointment,
+            ),
+            nextCursor: null,
+          });
+      } else {
+        const next = await accountData(nextView, cursor);
+        if (run === generation.current)
+          setData((previous) =>
+            cursor && previous?.view === nextView
+              ? {
+                  ...next,
+                  bookings: [...previous.bookings, ...next.bookings],
+                  passes: [...previous.passes, ...next.passes],
+                }
+              : next,
+          );
       }
-    } catch (e) {
+      if (run === generation.current) setUncertain(false);
+    } catch (caught) {
       if (run === generation.current)
         setError(
-          e instanceof Error ? e.message : "Unable to load your account.",
+          caught instanceof Error
+            ? caught.message
+            : "Unable to load your account.",
         );
     } finally {
       if (run === generation.current) setBusy(false);
     }
   }
+
   useEffect(() => {
     setData(null);
     setNotice("");
+    setAvatarError("");
     void load(view);
     return () => {
       // This is a request generation counter, not a DOM ref.
@@ -195,12 +313,13 @@ function AccountPage() {
       generation.current++;
     };
   }, [view]);
+
   async function cancel() {
     if (!selected || busy || uncertain) return;
     setBusy(true);
     setError("");
     try {
-      await api(view, undefined, {
+      await changeBooking({
         bookingId: selected.id,
         expectedVersion: selected.version,
         action: "CANCEL",
@@ -212,16 +331,21 @@ function AccountPage() {
         "Your booking has been cancelled. You can find it in booking history.",
       );
       await load(view);
-    } catch (e) {
+    } catch (caught) {
       setUncertain(true);
       setError(
-        `${e instanceof Error ? e.message : "The cancellation could not be confirmed."} Refresh your account to check the booking before trying again.`,
+        `${
+          caught instanceof Error
+            ? caught.message
+            : "The cancellation could not be confirmed."
+        } Refresh your account to check the booking before trying again.`,
       );
     } finally {
       setSelected(null);
       setBusy(false);
     }
   }
+
   async function chooseTime(booking: Booking) {
     setSelected(null);
     setMoving(null);
@@ -229,23 +353,26 @@ function AccountPage() {
     setBusy(true);
     setError("");
     try {
-      const response = await api(view, undefined, undefined, booking.id);
+      const response = await rescheduleOptions(booking.id);
       setTargets(response.options || []);
       setMoving(booking);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to load class times.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to load class times.",
+      );
     } finally {
       setBusy(false);
     }
   }
+
   async function moveBooking() {
     if (!moving || !target || busy || uncertain) return;
     setBusy(true);
     setError("");
     try {
-      await api(
-        view,
-        undefined,
+      await changeBooking(
         {
           action: "RESCHEDULE",
           bookingId: moving.id,
@@ -254,15 +381,17 @@ function AccountPage() {
           idempotencyKey: moving.cancellationKey,
           reason: "Customer requested another class time",
         },
-        moving.id,
+        true,
       );
       setUncertain(true);
       setNotice("Your booking has moved to the new class time.");
       await load(view);
-    } catch (e) {
+    } catch (caught) {
       setUncertain(true);
       setError(
-        (e instanceof Error ? e.message : "Unable to confirm the change.") +
+        (caught instanceof Error
+          ? caught.message
+          : "Unable to confirm the change.") +
           " Refresh your account to check the booking before trying again.",
       );
     } finally {
@@ -271,61 +400,108 @@ function AccountPage() {
       setBusy(false);
     }
   }
+
+  async function chooseAvatar(event: Event) {
+    const files = (
+      event.currentTarget as unknown as { files?: readonly File[] }
+    ).files;
+    const file = files?.[0];
+    if (!file) return;
+    setAvatarError("");
+    if (
+      !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
+      file.size > 524288
+    ) {
+      setAvatarError("Choose a PNG, JPEG or WebP image no larger than 512 KB.");
+      return;
+    }
+    try {
+      const result = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () =>
+          typeof reader.result === "string"
+            ? resolve(reader.result)
+            : reject(new Error());
+        reader.onerror = () => reject(reader.error || new Error());
+        reader.readAsDataURL(file);
+      });
+      setDraft((current) => ({ ...current, avatarDataUrl: result }));
+    } catch {
+      setAvatarError("We could not read that image. Choose another file.");
+    }
+  }
+
+  async function saveProfile() {
+    if (busy || avatarError) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const saved = await profileData(draft);
+      setProfile(saved);
+      setDraft(saved);
+      setNotice("Profile saved.");
+      extensionApi().toast.show("Profile saved");
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to save profile.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const initials = (draft.preferredName || "Skyra member")
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+
   return (
-    <s-page heading="My bookings and passes">
+    <s-page heading="My Skyra">
       <s-stack gap="base">
-        <s-stack direction="inline" gap="small">
-          <s-button
-            disabled={busy}
-            variant={view === "upcoming" ? "primary" : "secondary"}
-            onClick={() => setView("upcoming")}
+        <s-section>
+          <s-grid
+            gap="small"
+            gridTemplateColumns="repeat(auto-fit, minmax(8rem, 1fr))"
           >
-            Upcoming bookings
-          </s-button>
-          <s-button
-            disabled={busy}
-            variant={view === "history" ? "primary" : "secondary"}
-            onClick={() => setView("history")}
-          >
-            Booking history
-          </s-button>
-          <s-button
-            disabled={busy}
-            variant={view === "passes" ? "primary" : "secondary"}
-            onClick={() => setView("passes")}
-          >
-            My passes
-          </s-button>
-          <s-button disabled={busy} onClick={() => void load(view)}>
-            Refresh
-          </s-button>
-        </s-stack>
+            {viewLabels.map((item) => (
+              <s-button
+                key={item.id}
+                disabled={busy}
+                variant={view === item.id ? "primary" : "secondary"}
+                onClick={() => setView(item.id)}
+              >
+                {item.label}
+              </s-button>
+            ))}
+          </s-grid>
+        </s-section>
         {error && <s-banner tone="critical">{error}</s-banner>}
         {notice && <s-banner tone="success">{notice}</s-banner>}
-        {busy && <s-text>Loading your account…</s-text>}
+        {busy && <s-text>Loading your Skyra account…</s-text>}
         {moving && (
           <s-section heading="Choose another class time">
             <s-stack gap="base">
               <s-text>
                 Changes are available at least 12 hours before your current
-                class. Your credit keeps its original expiry date. If the new
-                class cannot be reserved, your current booking stays in place.
+                booking. Your credit keeps its original expiry date.
               </s-text>
               {targets.length === 0 && (
                 <s-text>
-                  No other eligible class times are currently available. Your
-                  booking is unchanged.
+                  No other eligible times are available. Your booking is
+                  unchanged.
                 </s-text>
               )}
-              {targets.map((t) => (
+              {targets.map((option) => (
                 <s-button
-                  key={t.id}
+                  key={option.id}
                   disabled={busy || uncertain}
-                  variant={target?.id === t.id ? "primary" : "secondary"}
-                  onClick={() => setTarget(t)}
+                  variant={target?.id === option.id ? "primary" : "secondary"}
+                  onClick={() => setTarget(option)}
                 >
-                  {date(t.startsAt, t.timezone)} · {t.coachName} ·{" "}
-                  {t.locationName}
+                  {date(option.startsAt, option.timezone)} · {option.coachName}
                 </s-button>
               ))}
               {target && (
@@ -334,7 +510,7 @@ function AccountPage() {
                   disabled={busy || uncertain}
                   onClick={() => void moveBooking()}
                 >
-                  Confirm new class time
+                  Confirm new time
                 </s-button>
               )}
               <s-button
@@ -344,7 +520,7 @@ function AccountPage() {
                   setTarget(null);
                 }}
               >
-                Keep current class
+                Keep current booking
               </s-button>
             </s-stack>
           </s-section>
@@ -358,10 +534,9 @@ function AccountPage() {
               </s-text>
               <s-text>
                 {selected.cancellationOutcome === "CANCELLED"
-                  ? "Cancelling at least 12 hours before class releases your reserved credit. Its original expiry date stays the same."
-                  : "This is within 12 hours of class. Cancelling uses your reserved class credit."}{" "}
-                No payment refund is issued here. The policy is checked again
-                when you confirm.
+                  ? "Cancelling at least 12 hours before the start releases the reserved credit."
+                  : "This is within 12 hours of the start. Cancelling uses the reserved credit."}{" "}
+                No payment refund is issued here.
               </s-text>
               <s-stack direction="inline" gap="small">
                 <s-button
@@ -378,125 +553,482 @@ function AccountPage() {
             </s-stack>
           </s-section>
         )}
-        {data && view !== "passes" && data.bookings.length === 0 && (
-          <s-section
-            heading={
+        {view === "overview" && data && (
+          <Overview
+            account={data}
+            profile={profile}
+            bookingUrl={bookingUrl}
+            open={setView}
+          />
+        )}
+        {view === "passes" && data && <Passes account={data} />}
+        {(view === "upcoming" || view === "history") && data && (
+          <Bookings
+            account={data}
+            empty={
               view === "upcoming"
                 ? "No upcoming bookings"
                 : "No booking history yet"
             }
-          >
-            <s-text>
-              Your bookings will appear here once they are confirmed.
-            </s-text>
-          </s-section>
+            busy={busy}
+            uncertain={uncertain}
+            select={setSelected}
+            move={chooseTime}
+          />
         )}
-        {data &&
-          view !== "passes" &&
-          data.bookings.map((b) => (
-            <s-section key={b.id} heading={b.className}>
-              <s-stack gap="small">
-                <s-text>
-                  {date(b.startsAt, b.timezone)} · {b.timezone}
-                </s-text>
-                <s-text>
-                  {b.coachName} · {b.locationName}
-                </s-text>
-                <s-badge>
-                  {b.rescheduledTo
-                    ? "Rescheduled"
-                    : labels[b.status] || b.status}
-                </s-badge>
-                <s-text>Booking {b.id.slice(-8).toUpperCase()}</s-text>
-                {b.serviceKind === "APPOINTMENT" && (
-                  <s-badge>Private appointment</s-badge>
-                )}
-                {b.customerComment && (
-                  <s-text>
-                    Your note for this booking: {b.customerComment}
-                  </s-text>
-                )}
-                {b.rescheduledTo && (
-                  <s-text>
-                    Moved to booking {b.rescheduledTo.slice(-8).toUpperCase()}.
-                  </s-text>
-                )}
-                {b.canReschedule && (
+        {view === "appointments" && data && (
+          <Appointments
+            account={data}
+            bookingUrl={bookingUrl}
+            busy={busy}
+            uncertain={uncertain}
+            select={setSelected}
+            move={chooseTime}
+          />
+        )}
+        {view === "profile" && (
+          <s-stack gap="base">
+            <s-banner>
+              Shopify continues to manage your account name, email and
+              addresses. This private Skyra profile stores only your studio
+              preferences and training information.
+            </s-banner>
+            <s-section heading="Profile">
+              <s-stack gap="base">
+                <s-stack direction="inline" gap="base">
+                  <s-avatar
+                    size="large-200"
+                    initials={initials}
+                    src={draft.avatarDataUrl || undefined}
+                    alt="Your Skyra profile avatar"
+                  />
+                  <s-stack gap="small">
+                    <s-heading>
+                      {draft.preferredName || "Skyra member"}
+                    </s-heading>
+                    {draft.signature && <s-text>{draft.signature}</s-text>}
+                  </s-stack>
+                </s-stack>
+                <s-drop-zone
+                  label="Upload profile photo"
+                  accessibilityLabel="Upload a PNG, JPEG or WebP profile photo"
+                  accept="image/png,image/jpeg,image/webp"
+                  error={avatarError || undefined}
+                  disabled={busy}
+                  onChange={(event) => void chooseAvatar(event)}
+                />
+                {draft.avatarDataUrl && (
                   <s-button
-                    disabled={busy || uncertain}
-                    onClick={() => void chooseTime(b)}
+                    disabled={busy}
+                    onClick={() =>
+                      setDraft((current) => ({
+                        ...current,
+                        avatarDataUrl: null,
+                      }))
+                    }
                   >
-                    Change class time
+                    Remove photo
                   </s-button>
                 )}
-                {b.canCancel && (
-                  <s-button
-                    disabled={busy || uncertain}
-                    onClick={() => {
-                      setMoving(null);
-                      setSelected(b);
-                    }}
-                  >
-                    Cancel booking
-                  </s-button>
-                )}
+                <s-text>Maximum 512 KB. PNG, JPEG or WebP only.</s-text>
+                <s-text-field
+                  label="Preferred name"
+                  value={draft.preferredName}
+                  maxLength={80}
+                  disabled={busy}
+                  onInput={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      preferredName: fieldValue(event),
+                    }))
+                  }
+                />
+                <s-text-area
+                  label="Signature"
+                  value={draft.signature}
+                  maxLength={160}
+                  rows={3}
+                  disabled={busy}
+                  onInput={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      signature: fieldValue(event),
+                    }))
+                  }
+                />
+                <s-text-area
+                  label="Training goals"
+                  value={draft.trainingGoals}
+                  maxLength={1000}
+                  rows={6}
+                  disabled={busy}
+                  onInput={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      trainingGoals: fieldValue(event),
+                    }))
+                  }
+                />
+                <s-button
+                  variant="primary"
+                  loading={busy}
+                  disabled={busy || !!avatarError}
+                  onClick={() => void saveProfile()}
+                >
+                  Save profile
+                </s-button>
               </s-stack>
             </s-section>
-          ))}
-        {data && view === "passes" && data.passes.length === 0 && (
-          <s-section heading="No passes yet">
-            <s-text>
-              Your class passes and credits will appear here after purchase.
-            </s-text>
-          </s-section>
+          </s-stack>
         )}
-        {data &&
-          view === "passes" &&
-          data.passes.map((p) => (
-            <s-section key={p.id} heading={p.name}>
-              <s-stack gap="small">
-                <s-badge>{labels[p.status] || p.status}</s-badge>
-                <s-text>
-                  {p.available} available · {p.reserved} reserved · {p.used}{" "}
-                  used
-                </s-text>
-                <s-text>
-                  Valid from {date(p.startsAt, data.timezone)} until{" "}
-                  {date(p.expiresAt, data.timezone)}
-                </s-text>
-                <s-text>
-                  Eligible classes: {p.eligibleClasses.join(", ")}
-                </s-text>
-                <s-heading>Recent activity</s-heading>
-                {p.history.map((h) => (
-                  <s-text key={h.id}>
-                    {date(h.createdAt, data.timezone)} ·{" "}
-                    {labels[h.kind] || h.kind} · available{" "}
-                    {h.availableDelta > 0 ? "+" : ""}
-                    {h.availableDelta}, reserved{" "}
-                    {h.reservedDelta > 0 ? "+" : ""}
-                    {h.reservedDelta}, used {h.consumedDelta > 0 ? "+" : ""}
-                    {h.consumedDelta}
-                  </s-text>
-                ))}
-                {p.historyTruncated && (
-                  <s-text>
-                    Showing the 20 most recent entries. Contact the studio for
-                    older activity.
-                  </s-text>
-                )}
-              </s-stack>
-            </s-section>
-          ))}
-        {data?.nextCursor && (
-          <s-button
-            disabled={busy}
-            onClick={() => void load(view, data.nextCursor!)}
-          >
-            Load more
-          </s-button>
+        {data?.nextCursor &&
+          (view === "upcoming" || view === "history" || view === "passes") && (
+            <s-button
+              disabled={busy}
+              onClick={() => void load(view, data.nextCursor!)}
+            >
+              Load more
+            </s-button>
+          )}
+        {!bookingUrl && view !== "profile" && (
+          <s-banner tone="warning">
+            The studio still needs to configure the Find a class storefront URL
+            for this account page.
+          </s-banner>
         )}
       </s-stack>
     </s-page>
+  );
+}
+
+function FindClassButton({ href }: { href: string }) {
+  return href ? (
+    <s-button variant="primary" href={href} target="_blank">
+      Find a class
+    </s-button>
+  ) : (
+    <s-button disabled>Find a class</s-button>
+  );
+}
+
+function Overview({
+  account,
+  profile,
+  bookingUrl,
+  open,
+}: {
+  account: Account;
+  profile: Profile;
+  bookingUrl: string;
+  open: (view: View) => void;
+}) {
+  const activePass = account.passes.find((pass) => pass.status === "ACTIVE");
+  const nextClass = account.bookings.find((booking) => !isAppointment(booking));
+  const nextAppointment = account.bookings.find(isAppointment);
+  return (
+    <s-stack gap="base">
+      <s-section
+        heading={
+          profile.preferredName
+            ? `Welcome, ${profile.preferredName}`
+            : "My overview"
+        }
+      >
+        <s-stack direction="inline" gap="base">
+          <s-avatar
+            size="large"
+            initials={(profile.preferredName || "SM").slice(0, 2).toUpperCase()}
+            src={profile.avatarDataUrl || undefined}
+            alt="Your Skyra profile avatar"
+          />
+          <s-stack gap="small">
+            <s-text>
+              {profile.signature ||
+                "Your classes, passes and appointments in one place."}
+            </s-text>
+            <FindClassButton href={bookingUrl} />
+          </s-stack>
+        </s-stack>
+      </s-section>
+      <s-grid
+        gap="base"
+        gridTemplateColumns="repeat(auto-fit, minmax(15rem, 1fr))"
+      >
+        <s-section heading="Active pass">
+          {activePass ? (
+            <s-stack gap="small">
+              <s-badge>{labels[activePass.status]}</s-badge>
+              <s-heading>{activePass.name}</s-heading>
+              <s-text>
+                {activePass.available} available · {activePass.reserved}{" "}
+                reserved
+              </s-text>
+              <s-text>
+                Expires {shortDate(activePass.expiresAt, account.timezone)}
+              </s-text>
+              <s-button onClick={() => open("passes")}>View passes</s-button>
+            </s-stack>
+          ) : (
+            <s-text>No active pass yet.</s-text>
+          )}
+        </s-section>
+        <s-section heading="Next class">
+          {nextClass ? (
+            <s-stack gap="small">
+              <s-badge>{labels[nextClass.status] || nextClass.status}</s-badge>
+              <s-heading>{nextClass.className}</s-heading>
+              <s-text>{date(nextClass.startsAt, nextClass.timezone)}</s-text>
+              <s-text>
+                {nextClass.coachName} · {nextClass.locationName}
+              </s-text>
+              <s-button onClick={() => open("upcoming")}>View booking</s-button>
+            </s-stack>
+          ) : (
+            <s-text>No upcoming class.</s-text>
+          )}
+        </s-section>
+        <s-section heading="Next appointment">
+          {nextAppointment ? (
+            <s-stack gap="small">
+              <s-badge>
+                {labels[nextAppointment.status] || nextAppointment.status}
+              </s-badge>
+              <s-heading>{nextAppointment.className}</s-heading>
+              <s-text>
+                {date(nextAppointment.startsAt, nextAppointment.timezone)}
+              </s-text>
+              <s-text>
+                {nextAppointment.coachName} · {nextAppointment.locationName}
+              </s-text>
+              <s-button onClick={() => open("appointments")}>
+                Manage appointment
+              </s-button>
+            </s-stack>
+          ) : (
+            <s-text>No upcoming appointment.</s-text>
+          )}
+        </s-section>
+      </s-grid>
+      {profile.trainingGoals && (
+        <s-section heading="My training goals">
+          <s-text>{profile.trainingGoals}</s-text>
+        </s-section>
+      )}
+    </s-stack>
+  );
+}
+
+function Passes({ account }: { account: Account }) {
+  if (!account.passes.length)
+    return (
+      <s-section heading="No passes yet">
+        <s-text>
+          Your class passes and credits will appear here after purchase.
+        </s-text>
+      </s-section>
+    );
+  return (
+    <s-stack gap="base">
+      {account.passes.map((pass) => (
+        <s-section key={pass.id} heading={pass.name}>
+          <s-stack gap="small">
+            <s-badge>{labels[pass.status] || pass.status}</s-badge>
+            <s-heading>
+              {pass.available} credit{pass.available === 1 ? "" : "s"} available
+            </s-heading>
+            <s-text>
+              {pass.reserved} reserved · {pass.used} used
+            </s-text>
+            <s-text>
+              Valid until {shortDate(pass.expiresAt, account.timezone)}
+            </s-text>
+            <s-text>
+              Eligible: {pass.eligibleClasses.filter(Boolean).join(", ")}
+            </s-text>
+            {pass.history.length > 0 && (
+              <s-heading>Recent credit activity</s-heading>
+            )}
+            {pass.history.map((entry) => (
+              <s-text key={entry.id}>
+                {shortDate(entry.createdAt, account.timezone)} ·{" "}
+                {labels[entry.kind] || entry.kind} · available{" "}
+                {entry.availableDelta > 0 ? "+" : ""}
+                {entry.availableDelta}, reserved{" "}
+                {entry.reservedDelta > 0 ? "+" : ""}
+                {entry.reservedDelta}, used {entry.consumedDelta > 0 ? "+" : ""}
+                {entry.consumedDelta}
+              </s-text>
+            ))}
+            {pass.historyTruncated && (
+              <s-text>Showing the 20 most recent credit entries.</s-text>
+            )}
+          </s-stack>
+        </s-section>
+      ))}
+    </s-stack>
+  );
+}
+
+function Bookings({
+  account,
+  empty,
+  busy,
+  uncertain,
+  select,
+  move,
+}: {
+  account: Account;
+  empty: string;
+  busy: boolean;
+  uncertain: boolean;
+  select: (booking: Booking) => void;
+  move: (booking: Booking) => Promise<void>;
+}) {
+  if (!account.bookings.length)
+    return (
+      <s-section heading={empty}>
+        <s-text>
+          Confirmed classes and appointment activity will appear here.
+        </s-text>
+      </s-section>
+    );
+  return (
+    <s-stack gap="base">
+      {account.bookings.map((booking) => (
+        <BookingCard
+          key={booking.id}
+          booking={booking}
+          busy={busy}
+          uncertain={uncertain}
+          select={select}
+          move={move}
+        />
+      ))}
+    </s-stack>
+  );
+}
+
+function BookingCard({
+  booking,
+  busy,
+  uncertain,
+  select,
+  move,
+}: {
+  booking: Booking;
+  busy: boolean;
+  uncertain: boolean;
+  select: (booking: Booking) => void;
+  move: (booking: Booking) => Promise<void>;
+}) {
+  return (
+    <s-section heading={booking.className}>
+      <s-stack gap="small">
+        <s-stack direction="inline" gap="small">
+          <s-badge>
+            {booking.rescheduledTo
+              ? "Rescheduled"
+              : labels[booking.status] || booking.status}
+          </s-badge>
+          {isAppointment(booking) && <s-badge>Private appointment</s-badge>}
+        </s-stack>
+        <s-text>{date(booking.startsAt, booking.timezone)}</s-text>
+        <s-text>
+          {booking.coachName} · {booking.locationName}
+        </s-text>
+        <s-text>Booking {booking.id.slice(-8).toUpperCase()}</s-text>
+        {booking.customerComment && (
+          <s-text>Your note: {booking.customerComment}</s-text>
+        )}
+        {booking.canReschedule && (
+          <s-button
+            disabled={busy || uncertain}
+            onClick={() => void move(booking)}
+          >
+            Change time
+          </s-button>
+        )}
+        {booking.canCancel && (
+          <s-button
+            disabled={busy || uncertain}
+            onClick={() => select(booking)}
+          >
+            Cancel booking
+          </s-button>
+        )}
+      </s-stack>
+    </s-section>
+  );
+}
+
+function Appointments({
+  account,
+  bookingUrl,
+  busy,
+  uncertain,
+  select,
+  move,
+}: {
+  account: Account;
+  bookingUrl: string;
+  busy: boolean;
+  uncertain: boolean;
+  select: (booking: Booking) => void;
+  move: (booking: Booking) => Promise<void>;
+}) {
+  const upcoming = account.bookings.filter(
+    (booking) =>
+      booking.status === "CONFIRMED" &&
+      new Date(booking.endsAt).getTime() > Date.now(),
+  );
+  const history = account.bookings.filter(
+    (booking) => !upcoming.some((item) => item.id === booking.id),
+  );
+  return (
+    <s-stack gap="base">
+      <s-section heading="Appointments">
+        <s-stack gap="small">
+          <s-text>
+            View private-session status, change an eligible time, or use the
+            shared storefront booking section to find another appointment.
+          </s-text>
+          <FindClassButton href={bookingUrl} />
+        </s-stack>
+      </s-section>
+      <s-heading>Upcoming</s-heading>
+      {upcoming.length ? (
+        upcoming.map((booking) => (
+          <BookingCard
+            key={booking.id}
+            booking={booking}
+            busy={busy}
+            uncertain={uncertain}
+            select={select}
+            move={move}
+          />
+        ))
+      ) : (
+        <s-section>
+          <s-text>No upcoming private appointment.</s-text>
+        </s-section>
+      )}
+      <s-heading>Appointment history</s-heading>
+      {history.length ? (
+        history.map((booking) => (
+          <BookingCard
+            key={booking.id}
+            booking={booking}
+            busy={busy}
+            uncertain={uncertain}
+            select={select}
+            move={move}
+          />
+        ))
+      ) : (
+        <s-section>
+          <s-text>No private appointment history yet.</s-text>
+        </s-section>
+      )}
+    </s-stack>
   );
 }

@@ -2,65 +2,58 @@
 
 ## Outcome
 
-Development-store booking reached the signed-in Drop-in review step, but the first Checkout hand-off did not create a Shopify cart. The app returned `503`; the guarded retry returned `409 CART_RECOVERY_REQUIRED`. No order, payment, entitlement, or confirmed booking was created.
+The development-store Drop-in flow reached signed-in Review, but Shopify did not create a Cart. The final safe diagnostic result was Storefront GraphQL `ACCESS_DENIED`, and a tokenless minimal `cartCreate` returned `Online Store channel is locked.` No order, payment, entitlement, or confirmed booking was created.
 
 ## Test setup
 
 - Store: `skyra-booking-dev.myshopify.com`
 - Development theme: `preview_theme_id=192227082532`
-- Product path tested: Programs → `[DEV] Aerial Foundations` → Single class (Drop-in), A$49
+- Product path: Programs → `[DEV] Aerial Foundations` → Single class (Drop-in), A$49
 - Test discount: `SKYRAUATFREE915`
   - 100% product discount
   - once per customer
   - usage limit 5
-  - active only in the development store
+  - development store only
   - expires 2026-09-22 UTC
 
-The discount exists for payment-loop UAT only. It has not yet been redeemed because Shopify Checkout did not open.
+The discount exists only for payment-loop UAT. It has not been redeemed because Shopify Checkout did not open.
 
 ## Evidence
 
-- Render logged the initial checkout POST as `503`, followed by a guarded retry as `409`.
-- The durable Checkout record remained `UNKNOWN`, with no `cartId` and no payment URL.
-- The related seat Hold was `ACTIVE` when inspected and was expected to expire normally.
-- No Shopify order and no booking confirmation were produced.
+- The first attempt returned `503`; the guarded retry returned `409 CART_RECOVERY_REQUIRED` and the durable Checkout remained `UNKNOWN` with no `cartId`.
+- After deploying safe failure diagnostics, a new attempt logged `BOOKING_CART_REQUEST_FAILED` with operation `create`, kind `SHOPIFY_GRAPHQL`, response status `200`, and GraphQL code `ACCESS_DENIED`.
+- A minimal Storefront `cartCreate`, using the real development variant while printing no token, Cart ID, customer field, or secret, returned `hasCart=false` and `Online Store channel is locked.`
+- No Checkout URL, Shopify Order, entitlement, ledger reservation, or booking confirmation was produced.
 
-## Root cause and local fix
+## Root cause
 
-The Storefront API client had product-read access only. Shopify `cartCreate` also requires `unauthenticated_write_checkouts`.
+The earlier missing `unauthenticated_write_checkouts` scope was fixed, released in `skyra-booking-7`, approved by the merchant, and verified in the live runtime. The remaining failure is the development store's locked Online Store channel/password protection.
 
-Local changes now:
+This is not evidence of a Render outage, missing checkout scope, or a frontend selection error.
 
-- add `unauthenticated_write_checkouts` to the Shopify app configuration and example environment;
-- require both product-read and checkout-write scopes for the checkout route;
-- keep catalog reads limited to product-read access;
-- fail closed if the required scope set is incomplete;
-- add a regression test for the route-specific scope contract.
+## Manual unblock
 
-## Verification completed locally
+1. Open Shopify Admin.
+2. Go to **Online Store → Preferences**.
+3. Find **Password protection** or **Restrict store access**.
+4. Disable the restriction and Save.
+5. Return to Programs and start a brand-new booking attempt. Do not reuse the `UNKNOWN`/recovery-blocked attempt.
 
-- Database test suite: 28 files, 351 tests passed.
-- Typecheck, Customer Account typecheck, ESLint, and production build passed.
-- Shopify app configuration validation returned `valid: true` with no issues.
+If Shopify shows different wording, the required result is that the Online Store sales channel is no longer password protected. The storefront preview bar should no longer say `Password protected`.
 
-## Deployment status
+## Deployment and verification
 
-- Checkout scope fix and this UAT record were committed as `9b355267de5aa496c3b149e626bfc3e1828e165c`; the remote `origin/bookingdev` ref matched exactly.
-- GitHub Actions run `34918665617` completed successfully for that commit.
-- The missing Render Blueprint scope was corrected in `4ce2015ab8feadd4df2a708f638b2a16f8ecfc2e` and pushed to `origin/bookingdev`.
-- Render deploy `dep-dakaij5g1s2s73bkofpg` is live on commit `4ce2015ab8feadd4df2a708f638b2a16f8ecfc2e`; `/health` returns `status=ok`.
-- A post-deploy one-off Job verified `hasProduct=true`, `hasCheckout=true`, and `hasOrders=true` in the live runtime.
-- Shopify app version `skyra-booking-7` was released successfully with `unauthenticated_write_checkouts`.
-- The development store still needs the merchant to approve the new permission once. The OAuth approval page has been opened; no session scope or token was edited manually.
+- Scope/config fix: `9b355267` and `4ce2015a`; GitHub/Render passed and the live runtime had product, checkout and orders scope.
+- Safe cart diagnostic: `cf46c9304b5dca1bb7978500aa02ccdab0401882`; GitHub Actions `34960109742` succeeded and Render deploy `dep-daki5v6k1f9s738584og` is live.
+- Final pre-Customer change database suite: 28 files / 351 tests passed; typecheck, Customer Account typecheck, ESLint, build and Shopify app config validation passed.
 
 ## Next steps, in order
 
-1. Approve `unauthenticated_write_checkouts` on the development-store OAuth page.
-2. Reopen Skyra Booking once so Shopify refreshes the app's offline installation session.
-3. Verify the stored offline session contains the exact checkout scope.
-4. Start a fresh booking attempt after the old Hold expires; do not reuse the recovery-blocked attempt.
-5. Reach Shopify Checkout, apply `SKYRAUATFREE915`, and submit the zero-total test order.
-6. Verify `orders/paid` receipt and deduplication, Worker/Outbox processing, entitlement creation, Hold conversion, and confirmed Booking.
-7. Verify Customer Account booking visibility and the separate entitlements for Group Class, Private, and Workshop products.
+1. Unlock the development Online Store channel.
+2. Start a fresh Group Class Drop-in attempt and reach Shopify Checkout.
+3. Apply `SKYRAUATFREE915`.
+4. Stop before the final zero-total order submission and obtain explicit user confirmation for that action.
+5. Submit once, then verify `orders/paid` deduplication, Outbox/Worker, entitlement creation, Hold conversion and confirmed Booking.
+6. Verify the result in Customer Account, then repeat the planned Group Pass, Private and Workshop eligibility cases.
 
-Checkout and public booking gates must remain development-only until steps 1–7 are verified end to end.
+Checkout and public booking gates must remain development-only until the paid transaction loop is verified end to end.

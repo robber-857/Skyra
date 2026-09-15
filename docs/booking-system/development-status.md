@@ -348,3 +348,13 @@ App/Worker 已恢复，Theme dev 保持运行。preview:check 对 Home、Program
 ## 2026-09-13 整站验收准备
 
 新增 [上线准备与真实验收清单](launch-readiness-and-uat.md)：8 类未完成工作、30 条待签收验收场景、Shopify 商户/银行/身份/邮箱配置入口。30 条是验收基线，不是剩余自动化测试数量；最近已通过测试仍为 255 项，本次未重新执行测试。
+
+## 最新交付：Customer 个人中心与 Cart 阻塞定位（2026-09-15）
+
+- Customer Account Full-page Extension 已按设计整合 Overview、My passes、Bookings、History、Appointments 与 Profile。顾客可查看 Pass 余额/到期/适用范围、未来预约、历史与状态；私教预约保留取消/改期入口。
+- Find a class 不复制新排课页面，使用扩展设置的 `booking_url` 跳转到 storefront Programs 页的 `#skyra-booking-programs`，继续复用 Home/Programs 同一 Booking section。设置为空时按钮禁用并给商户配置提示。
+- Profile 增加 preferred name、头像、签名和训练目标。头像限制 PNG/JPEG/WebP、文件头校验、512 KiB；文本限制 80/160/1000 字符并拒绝控制字符。API 使用 Customer Account session token，只按店铺 + Shopify Customer GID 读写本人记录；Shopify 继续管理正式姓名、邮箱、电话、地址与认证。
+- 新增 `202609150013_customer_profile` 迁移和数据库 bytes/MIME/类型/大小约束；Profile 设计已同步到可点击线框。
+- 最终独立全量数据库测试为 29 文件 / 355 项全部通过；Customer Extension typecheck、主 TypeScript、ESLint、production build、Prisma generate/format 与 `shopify app build` 通过。Shopify 官方组件校验器重试 3 次均因其隔离环境缺少 `customer-account.page.render` 类型模块而失败；本地 `2026.7.0` 包解析与 typecheck 正常，仍需真实 extension 发布/UAT。
+- Cart 失败根因已确认：Checkout scope 已 release/批准且线上运行时具备所需权限，但开发店返回 `Online Store channel is locked.`。安全日志只记录 `ACCESS_DENIED` 等分类字段，不输出 token、Cart secret、PII 或完整响应。
+- 尚未完成：解除开发店 Online Store 密码保护、全新 Attempt 的零金额测试订单、paid Webhook/Worker/Entitlement/Booking 签收、Customer Extension 新版本发布、`booking_url` 配置和真实 Customer Account 桌面/手机验收。

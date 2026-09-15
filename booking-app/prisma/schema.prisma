@@ -244,11 +244,17 @@ model CustomerProfile {
   id                 String           @id @default(uuid()) @db.Uuid
   shopId             String           @db.Uuid
   shopifyCustomerGid String
+  preferredName      String           @default("")
+  avatarBytes        Bytes?
+  avatarMimeType     String?
+  signature          String           @default("")
+  trainingGoals      String           @default("")
   attempts           BookingAttempt[]
   holds              BookingHold[]
   bookings           Booking[]
   entitlements       Entitlement[]
   createdAt          DateTime         @default(now()) @db.Timestamptz
+  updatedAt          DateTime         @updatedAt @db.Timestamptz
 
   @@unique([shopId, shopifyCustomerGid])
   @@unique([shopId, id])

@@ -211,7 +211,7 @@ erDiagram
 
 当前 Prisma 已包含 `CustomerProfile`、`BookingAttempt`、`BookingHold`、`BookingCheckout`、`Booking`、`Entitlement` 与 `EntitlementLedgerEntry`。下面各表描述仍包含后续订单、完整 Booking 状态与 Customer/Coach 功能的目标字段；不要把这些后续字段当成已实现。
 
-- CustomerProfile：仅保存 shop + Shopify Customer GID 映射，不保存密码。`(shopId, shopifyCustomerGid)` 唯一。
+- CustomerProfile：保存 shop + Shopify Customer GID 映射，不保存密码；`(shopId, shopifyCustomerGid)` 唯一。2026-09-15 增加可选 preferred name、签名、训练目标与头像二进制/MIME。头像只允许 PNG/JPEG/WebP、文件头必须匹配且不超过 512 KiB；数据库约束要求 bytes/MIME 成对存在。Shopify 仍拥有正式姓名、邮箱、电话、地址和认证信息。
 - BookingAttempt：`tokenHash` 唯一、Session、可空 Customer、HOME/PROGRAMS、状态、创建/更新/到期；默认 30 分钟。客户绑定后不可修改，shop/session/surface/tokenHash 同样不可换绑。当前状态为 LOGIN_REQUIRED / STARTED / HOLD_ACTIVE / RECOVERY / EXPIRED。
 - BookingHold：每个 Attempt 最多一条，包含 Customer/Session、purchaseKind、可空 PassPlan、idempotencyKey、15 分钟期限、ACTIVE/CONSUMED/EXPIRED/RELEASED。NEW_PASS 必须指向 PassPlan；DROP_IN 不接受 PassPlan，购买商品从 Session 对应 Service 推导。每店每客户 idempotencyKey 唯一；ACTIVE 的同客户同场次唯一。复合外键保证 Hold 与 Attempt 的店铺/课程/客户完全一致。
 - BookingCheckout：每个 Hold 最多一条。保存服务器生成的随机 reference、已核对的 Product/Variant/价格和 catalog fingerprint，以及 CREATING / READY / UNKNOWN / REJECTED / INVALIDATED 状态。完整 Cart ID（含 secret key）仅保存在服务器，不能进入 API、审计或前端；Cart 创建结果未知时停止自动重建，避免重复 Cart/付款。数据库禁止换绑上下文、改写已知 Cart ID 或删除创建历史。

@@ -19,3 +19,9 @@ key = "api_url"
 type = "single_line_text_field"
 name = "Booking API URL"
 description = "HTTPS URL of the Skyra Booking app backend."
+
+[[extensions.settings.fields]]
+key = "booking_url"
+type = "single_line_text_field"
+name = "Find a class URL"
+description = "HTTPS storefront page containing the shared Skyra Booking section."

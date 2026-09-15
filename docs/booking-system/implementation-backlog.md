@@ -499,3 +499,16 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 - [ ] Coach 真实邮箱维护、邀请发信、自助重发和真实身份登录验收。
 - [ ] 事务邮件 provider、Customer/Coach verified recipient 解析、域名配置、投递回执和真实收信验收。
 - [ ] 取消/订单变更乱序、订单 reconciliation、异常队列可审计人工恢复；自动退款已按用户决定延期。完成真实支付验收前不开放 Checkout。
+
+## 2026-09-15 Customer 个人中心与交易 UAT 进度
+
+- [x] Customer Account 导航与状态视图：Overview、My passes、Bookings、History、Appointments、Profile。
+- [x] Pass 余额、到期日、资格与 Ledger history；未来/历史/取消预约和私教状态；既有取消/改期操作保持可用。
+- [x] Find a class 复用 storefront Programs 的共享 Booking section，不在 Customer Account 复制第二套排课组件。
+- [x] Profile API/迁移：preferred name、头像、签名、训练目标；同店同 Customer 隔离、格式/大小/文件头/控制字符校验与测试。
+- [x] 安全 Cart 错误诊断；已确认当前阻塞为开发店 `Online Store channel is locked.`，不是 Checkout scope 或 Render 故障。
+- [ ] Shopify Admin 解除开发店 Online Store 密码保护，然后从 Programs 新建 Attempt；旧 `UNKNOWN` Attempt 不重试。
+- [ ] 到达 Checkout 后使用 `SKYRAUATFREE915`，最终提交零金额订单前取得当次明确确认；随后核对 Order、Receipt、Outbox/Worker、Entitlement、Hold 和 Booking confirmed。
+- [ ] 发布包含 Customer Account Extension 的新 Shopify App version，并把 `Find a class URL` 配为开发店 Programs 地址。
+- [ ] 使用真实 Shopify Customer Account 做桌面/手机 UAT：空状态、已有数据、头像上传/移除、Profile 保存、历史/到期/Appointment、取消/改期和 Find a class 返回。
+- [ ] 分别完成 Group Class、Private、Workshop Pass 的正向交易和跨类型负向拒绝；Customer 个人中心当前完成不代表这些支付场景已签收。
