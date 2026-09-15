@@ -1,5 +1,17 @@
 # Booking V3 — 开发状态
 
+## 2026-09-16：真实免单订单、Customer Account 接入与响应式 UI 发布
+
+开发店的原生 Cart handoff 已完成一次真实下单：用户确认订单 `#1001` 成功创建、总额 A$0，并收到 Shopify 订单确认邮件。该结果证明开发店密码解锁后的同源 Cart、原生 Checkout、指定测试折扣 `SKYRAUATFREE915` 与 Shopify 订单/通知链路能够工作；但尚未读取并签收该订单对应的 Webhook Receipt、Outbox/Worker、Entitlement、Hold 转换和 confirmed Booking，因此不能把订单成功等同于 Booking 交易闭环完成。
+
+Customer Account Full-page Extension 已加入开发店当前 Active 的 Checkout/Customer Accounts 配置，并在 `customer-account-main-menu` 中新增 `My Skyra` 入口。扩展设置已填写 Booking API `https://skyra-booking-web.onrender.com` 和 Find a class `https://skyra-booking-dev.myshopify.com/pages/programs#skyra-booking-programs`。真实已登录 Customer Account 能打开 My Skyra 并读取 Appointments；编辑器内曾出现的红色 API 提示没有复现在真实账号页面。
+
+真实桌面截图发现六个页签在窄内容区发生 `Appointments` / `Profile` 重叠。提交 `8c82b442536f845e1579f2811c9bbd83a73c9ddf` 已改为 container-query 响应式布局：桌面 3 列、窄屏 2 列，Overview、Passes 与 Private appointments 内容也按容器宽度切换单列/多列并统一卡片层级、留白和空状态。`npm.cmd run typecheck:customer` 与完整 `npm.cmd run check` 通过；[GitHub Actions 34977446726](https://github.com/robber-857/Skyra/actions/runs/34977446726) success。本地与 `origin/bookingdev` SHA 一致。
+
+经用户明确批准，Shopify App `skyra-booking-9` 已发布；CLI 复核状态为 `active`，version ID `1129655271425`，`skyra-booking-8` 已变为 inactive。[Shopify version dashboard](https://dev.shopify.com/dashboard/232832637/apps/420648878081/versions/1129655271425)。发布构建成功生成 Customer Account 与 Theme extension；官方独立 Customer Account validator 仍因其隔离环境不能解析项目的 `@shopify/ui-extensions/customer-account.page.render` / `preact/jsx-runtime` 模块而无法完成，最小组件复测得到相同环境错误，本地类型检查、生产构建和 Shopify CLI extension build 均通过。
+
+仍未完成：强制刷新真实 My Skyra 后，对 320/390/430/1440px 做桌面与手机视觉验收；逐项签收 Overview、Pass 到期、Bookings/History、Appointments、Profile 保存及头像上传/移除、Find a class 返回；核对订单 `#1001` 的 Receipt/Outbox/Worker/Entitlement/Hold/Booking 证据；再执行 Group Class、Private、Workshop 的正向交易与跨类型拒绝测试。Customer Account UI extension 的本次更新不要求重新部署 Render。
+
 ## 2026-09-15：开发店原生 Cart handoff 与免单回调校验
 
 已实现仅对 `skyra-booking-dev.myshopify.com` 生效的 Online Store 原生 Cart handoff。服务器仍先完成登录、三重开发门控、课程/价格/商品复核、15 分钟 Hold 和随机 booking reference；浏览器随后使用已通过开发店密码页的同源会话调用 Shopify Ajax Cart API。购物车只允许空状态或完全匹配的单一预约行；如有其他商品、数量、价格、币种或 reference 不一致，流程停止并要求测试者手动清空，不会删除现有购物车。旧 `UNKNOWN` Checkout 仍不可重放。正式店继续使用原服务器端 Storefront Cart API，不会要求正式客户输入店铺密码。
