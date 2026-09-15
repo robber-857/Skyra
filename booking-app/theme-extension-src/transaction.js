@@ -1,3 +1,8 @@
+import {
+  prepareNativeBookingCart,
+  submitNativeCheckout,
+} from "./native-cart.js";
+
 // Selection and Review stay inside the originating Home/Programs section.
 window.SkyraBookingTransaction = function ({
   root,
@@ -264,6 +269,12 @@ window.SkyraBookingTransaction = function ({
         ...(purchaseKind === "NEW_PASS" ? {passPlanId:pass.id} : {}),
       });
       if(version!==revision || !root.contains(host)) return;
+      if(data.status === "NATIVE_CART_READY") {
+        const checkoutAction = await prepareNativeBookingCart(data);
+        if(version!==revision || !root.contains(host)) return;
+        submitNativeCheckout(checkoutAction);
+        return;
+      }
       if(data.status !== "CHECKOUT_READY" || typeof data.checkoutUrl !== "string")
         throw new Error("Shopify Checkout is not ready. Please try again.");
       const checkoutUrl=new URL(data.checkoutUrl);

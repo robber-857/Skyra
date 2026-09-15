@@ -14,6 +14,7 @@ import {
   type BookingCart,
 } from "../app/services/shopify-cart.server";
 import type { GraphQL } from "../app/services/shopify-catalog.server";
+import { DEVELOPMENT_BOOKING_SHOP } from "../app/services/commerce-capabilities.server";
 
 beforeAll(() => {
   if (new URL(process.env.DATABASE_URL!).pathname !== "/skyra_booking_test")
@@ -22,10 +23,13 @@ beforeAll(() => {
 afterAll(async () => {
   await db.$disconnect();
 });
-async function fixture(kind: "NEW_PASS" | "DROP_IN" = "NEW_PASS") {
+async function fixture(
+  kind: "NEW_PASS" | "DROP_IN" = "NEW_PASS",
+  domain = randomUUID() + ".myshopify.com",
+) {
   const shop = await db.shop.create({
     data: {
-      domain: randomUUID() + ".myshopify.com",
+      domain,
       rulesApprovedAt: new Date(),
       rules: {
         bookingWindowDays: 14,
@@ -98,7 +102,11 @@ async function fixture(kind: "NEW_PASS" | "DROP_IN" = "NEW_PASS") {
       publishedPrice: price,
     },
   });
-  const actor = { shopId, customerGid: "gid://shopify/Customer/123" };
+  const actor = {
+    shopId,
+    shopDomain: shop.domain,
+    customerGid: "gid://shopify/Customer/123",
+  };
   const attempt = await startAttempt(actor, {
     sessionId: session.id,
     surface: "PROGRAMS",
@@ -265,6 +273,58 @@ test.each(["NEW_PASS", "DROP_IN"] as const)(
     expect(JSON.stringify(first)).not.toContain(intent.reference);
   },
 );
+
+test("the configured development shop uses one reusable native Cart handoff", async () => {
+  const prior = process.env.SKYRA_BOOKING_TEST_SHOP;
+  process.env.SKYRA_BOOKING_TEST_SHOP = DEVELOPMENT_BOOKING_SHOP;
+  const f = await fixture();
+  const originalDomain = f.shop.domain;
+  try {
+    await db.shop.updateMany({
+      where: { domain: DEVELOPMENT_BOOKING_SHOP },
+      data: { domain: `released-${randomUUID()}.myshopify.com` },
+    });
+    await db.shop.update({
+      where: { id: f.shop.id },
+      data: { domain: DEVELOPMENT_BOOKING_SHOP },
+    });
+    f.actor.shopDomain = DEVELOPMENT_BOOKING_SHOP;
+    f.adminData.shop.myshopifyDomain = DEVELOPMENT_BOOKING_SHOP;
+    const first = await f.run();
+    const intent = await f.intent();
+    expect(first).toEqual({
+      status: "NATIVE_CART_READY",
+      variantId: 654,
+      bookingReference: intent.reference,
+      priceCents: 22000,
+      currency: "AUD",
+      holdExpiresAt: expect.any(String),
+      returnPath:
+        "/pages/programs?skyra_attempt=" +
+        f.input.token +
+        "#skyra-booking-programs",
+    });
+    expect(intent).toMatchObject({
+      status: "READY",
+      handoffMode: "ONLINE_STORE_NATIVE",
+      cartId: null,
+    });
+    expect(f.cartCreate).not.toHaveBeenCalled();
+    f.input.idempotencyKey = randomUUID();
+    expect(await f.run()).toEqual(first);
+    expect(await db.bookingCheckout.count({ where: { shopId: f.shop.id } })).toBe(
+      1,
+    );
+    expect(await db.bookingHold.count({ where: { shopId: f.shop.id } })).toBe(1);
+  } finally {
+    await db.shop.update({
+      where: { id: f.shop.id },
+      data: { domain: originalDomain },
+    });
+    if (prior === undefined) delete process.env.SKYRA_BOOKING_TEST_SHOP;
+    else process.env.SKYRA_BOOKING_TEST_SHOP = prior;
+  }
+});
 
 test("10 concurrent retries create only one Cart and do not extend the Hold", async () => {
   const f = await fixture();
@@ -585,6 +645,7 @@ test("checkout binding, price and Cart secret cannot be reassigned, including ac
     { reference: "a".repeat(43) },
     { shopId: randomUUID() },
     { priceCents: 1 },
+    { handoffMode: "ONLINE_STORE_NATIVE" },
     { cartId: "gid://shopify/Cart/other?key=other" },
     { holdId: randomUUID() },
   ])

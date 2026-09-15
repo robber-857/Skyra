@@ -261,20 +261,20 @@ model CustomerProfile {
 }
 
 model BookingAttempt {
-  customerComment String @default("")
-  id         String           @id @default(uuid()) @db.Uuid
-  shopId     String           @db.Uuid
-  tokenHash  String           @unique
-  sessionId  String           @db.Uuid
-  customerId String?          @db.Uuid
-  surface    String
-  status     String           @default("LOGIN_REQUIRED")
-  expiresAt  DateTime         @db.Timestamptz
-  createdAt  DateTime         @default(now()) @db.Timestamptz
-  updatedAt  DateTime         @updatedAt @db.Timestamptz
-  session    ClassSession     @relation(fields: [shopId, sessionId], references: [shopId, id])
-  customer   CustomerProfile? @relation(fields: [shopId, customerId], references: [shopId, id])
-  hold       BookingHold?
+  customerComment String           @default("")
+  id              String           @id @default(uuid()) @db.Uuid
+  shopId          String           @db.Uuid
+  tokenHash       String           @unique
+  sessionId       String           @db.Uuid
+  customerId      String?          @db.Uuid
+  surface         String
+  status          String           @default("LOGIN_REQUIRED")
+  expiresAt       DateTime         @db.Timestamptz
+  createdAt       DateTime         @default(now()) @db.Timestamptz
+  updatedAt       DateTime         @updatedAt @db.Timestamptz
+  session         ClassSession     @relation(fields: [shopId, sessionId], references: [shopId, id])
+  customer        CustomerProfile? @relation(fields: [shopId, customerId], references: [shopId, id])
+  hold            BookingHold?
 
   @@unique([shopId, id])
   @@unique([shopId, id, sessionId, customerId])
@@ -318,6 +318,7 @@ model BookingCheckout {
   priceCents         Int
   catalogFingerprint String
   purchaseTerms      Json?
+  handoffMode        String         @default("STOREFRONT_API")
   status             String         @default("CREATING")
   cartId             String?
   createdAt          DateTime       @default(now()) @db.Timestamptz
@@ -332,7 +333,7 @@ model BookingCheckout {
 
 // Confirmed occupancy, linked to its immutable checkout and order source.
 model Booking {
-  customerComment String @default("")
+  customerComment          String                   @default("")
   id                       String                   @id @default(uuid()) @db.Uuid
   shopId                   String                   @db.Uuid
   sessionId                String                   @db.Uuid
@@ -452,29 +453,32 @@ model CoachAccessToken {
 }
 
 model BookingChange {
-  id String @id @default(uuid()) @db.Uuid
-  shopId String @db.Uuid
-  bookingId String @db.Uuid
-  idempotencyKey String @db.Uuid
-  actorKind String
-  actorId String
-  action String
-  reason String
-  fromStatus String
-  toStatus String
-  createdAt DateTime @default(now()) @db.Timestamptz
+  id             String   @id @default(uuid()) @db.Uuid
+  shopId         String   @db.Uuid
+  bookingId      String   @db.Uuid
+  idempotencyKey String   @db.Uuid
+  actorKind      String
+  actorId        String
+  action         String
+  reason         String
+  fromStatus     String
+  toStatus       String
+  createdAt      DateTime @default(now()) @db.Timestamptz
+
   @@unique([shopId, idempotencyKey])
   @@index([shopId, bookingId, createdAt])
 }
+
 model BookingReschedule {
- id String @id @default(uuid()) @db.Uuid
- shopId String @db.Uuid
- oldBookingId String @unique @db.Uuid
- newBookingId String @unique @db.Uuid
- idempotencyKey String @db.Uuid
- actorKind String
- actorId String
- reason String
- createdAt DateTime @default(now()) @db.Timestamptz
- @@unique([shopId,idempotencyKey])
+  id             String   @id @default(uuid()) @db.Uuid
+  shopId         String   @db.Uuid
+  oldBookingId   String   @unique @db.Uuid
+  newBookingId   String   @unique @db.Uuid
+  idempotencyKey String   @db.Uuid
+  actorKind      String
+  actorId        String
+  reason         String
+  createdAt      DateTime @default(now()) @db.Timestamptz
+
+  @@unique([shopId, idempotencyKey])
 }

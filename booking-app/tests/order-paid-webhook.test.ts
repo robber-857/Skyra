@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import db from "../app/db.server";
-import { receiveOrderPaidWebhook } from "../app/services/order-paid-webhook.server";
+import {
+  DEVELOPMENT_FREE_DISCOUNT_CODE,
+  receiveOrderPaidWebhook,
+} from "../app/services/order-paid-webhook.server";
+import { DEVELOPMENT_BOOKING_SHOP } from "../app/services/commerce-capabilities.server";
 import { BOOKING_REFERENCE_KEY } from "../app/services/shopify-cart.server";
 
 beforeAll(() => {
@@ -13,9 +17,9 @@ afterAll(async () => {
   await db.$disconnect();
 });
 
-async function fixture() {
+async function fixture(domain = `orders-${randomUUID()}.myshopify.com`) {
   const shop = await db.shop.create({
-    data: { domain: `orders-${randomUUID()}.myshopify.com` },
+    data: { domain },
   });
   const location = await db.location.create({
     data: { shopId: shop.id, name: "Studio" },
@@ -128,6 +132,8 @@ async function fixture() {
     currency: "AUD",
     current_subtotal_price: "220.00",
     current_total_price: "220.00",
+    total_discounts: "0.00",
+    discount_codes: [] as { code: string; amount: string; type: string }[],
     financial_status: "paid",
     customer: { admin_graphql_api_id: customer.shopifyCustomerGid },
     line_items: [
@@ -179,6 +185,53 @@ test("valid paid booking order is durably queued without raw customer data", asy
     codes: [],
   });
   expect(JSON.stringify(event.payload)).not.toContain("Customer/123");
+});
+
+test("the exact 100% UAT code is accepted only for the configured development shop", async () => {
+  const prior = process.env.SKYRA_BOOKING_TEST_SHOP;
+  process.env.SKYRA_BOOKING_TEST_SHOP = DEVELOPMENT_BOOKING_SHOP;
+  const development = await fixture();
+  const originalDomain = development.shop.domain;
+  try {
+    await db.shop.updateMany({
+      where: { domain: DEVELOPMENT_BOOKING_SHOP },
+      data: { domain: `released-${randomUUID()}.myshopify.com` },
+    });
+    await db.shop.update({
+      where: { id: development.shop.id },
+      data: { domain: DEVELOPMENT_BOOKING_SHOP },
+    });
+    development.shop.domain = DEVELOPMENT_BOOKING_SHOP;
+    development.payload.current_subtotal_price = "0.00";
+    development.payload.current_total_price = "0.00";
+    development.payload.total_discounts = "220.00";
+    development.payload.discount_codes = [
+      {
+        code: DEVELOPMENT_FREE_DISCOUNT_CODE,
+        amount: "220.00",
+        type: "percentage",
+      },
+    ];
+    await expect(receive(development)).resolves.toMatchObject({
+      status: "QUEUED",
+    });
+
+    const other = await fixture();
+    other.payload.current_subtotal_price = "0.00";
+    other.payload.current_total_price = "0.00";
+    other.payload.total_discounts = "220.00";
+    other.payload.discount_codes = development.payload.discount_codes;
+    await expect(receive(other)).resolves.toMatchObject({
+      status: "NEEDS_ATTENTION",
+    });
+  } finally {
+    await db.shop.update({
+      where: { id: development.shop.id },
+      data: { domain: originalDomain },
+    });
+    if (prior === undefined) delete process.env.SKYRA_BOOKING_TEST_SHOP;
+    else process.env.SKYRA_BOOKING_TEST_SHOP = prior;
+  }
 });
 
 test("concurrent Shopify retries create one receipt and one outbox event", async () => {

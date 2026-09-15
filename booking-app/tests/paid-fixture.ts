@@ -141,6 +141,8 @@ export async function paidFixture(
     currency: "AUD",
     current_subtotal_price: price,
     current_total_price: price,
+    total_discounts: "0.00",
+    discount_codes: [] as { code: string; amount: string; type: string }[],
     financial_status: "paid",
     customer: { admin_graphql_api_id: customer.shopifyCustomerGid },
     line_items: [

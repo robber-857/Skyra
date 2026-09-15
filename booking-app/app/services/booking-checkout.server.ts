@@ -14,6 +14,7 @@ import {
   type BookingActor,
 } from "./booking.server";
 import { introOfferEligible } from "./entitlements.server";
+import { isDevelopmentBookingShop } from "./commerce-capabilities.server";
 import { purchaseMappingReady } from "./purchase-mapping.server";
 import {
   inspectCatalogPurchase,
@@ -268,6 +269,9 @@ export async function prepareBookingCheckout(
     async (_tx, context) => context,
   );
   assertReplayable(before);
+  const handoffMode = isDevelopmentBookingShop(before.domain)
+    ? "ONLINE_STORE_NATIVE"
+    : "STOREFRONT_API";
   let clients: CommerceClients;
   try {
     clients = await clientsForShop(before.domain);
@@ -316,6 +320,7 @@ export async function prepareBookingCheckout(
         priceCents: context.priceCents,
         catalogFingerprint: context.fingerprint,
         purchaseTerms: context.purchaseTerms,
+        handoffMode,
       },
     });
     await tx.auditLog.create({
@@ -331,6 +336,47 @@ export async function prepareBookingCheckout(
   });
   const { intent, creating } = claim;
   try {
+    if (intent.handoffMode === "ONLINE_STORE_NATIVE") {
+      const variantId = Number(intent.variantGid.split("/").at(-1));
+      if (!Number.isSafeInteger(variantId) || variantId <= 0)
+        fail("CATALOG_CHANGED", "This purchase option is no longer available.");
+      return await withContext(actor, input, async (tx, context) => {
+        sameCatalog(before, context);
+        if (
+          context.checkout?.id !== intent.id ||
+          context.checkout.handoffMode !== "ONLINE_STORE_NATIVE" ||
+          context.checkout.status !== (creating ? "CREATING" : "READY")
+        )
+          fail("CART_RECOVERY_REQUIRED", "This cart needs recovery.");
+        if (creating) {
+          await tx.bookingCheckout.update({
+            where: { id: intent.id },
+            data: { status: "READY" },
+          });
+          await tx.auditLog.create({
+            data: {
+              shopId: actor.shopId,
+              actorId: actor.customerGid!,
+              action: "CHECKOUT_READY",
+              entityId: intent.id,
+              after: {
+                holdId: intent.holdId,
+                handoffMode: "ONLINE_STORE_NATIVE",
+              },
+            },
+          });
+        }
+        return {
+          status: "NATIVE_CART_READY",
+          variantId,
+          bookingReference: intent.reference,
+          priceCents: intent.priceCents,
+          currency: "AUD",
+          holdExpiresAt: context.hold!.expiresAt.toISOString(),
+          returnPath: attemptReturnPath(context.surface, input.token),
+        };
+      });
+    }
     let cart;
     if (creating) {
       const created = await createBookingCart(clients.storefront, intent);

@@ -22,6 +22,7 @@ export async function enqueueBookingNotifications(
     },
     include: { session: true },
   });
+  const availableAt = await databaseNow(tx);
   for (const recipient of [
     { recipientKind: "CUSTOMER", recipientId: booking.customerId },
     { recipientKind: "COACH", recipientId: booking.session.coachId },
@@ -35,7 +36,7 @@ export async function enqueueBookingNotifications(
           template,
         },
       },
-      create: { shopId, bookingId, ...recipient, template },
+      create: { shopId, bookingId, ...recipient, template, availableAt },
       update: {},
     });
   }

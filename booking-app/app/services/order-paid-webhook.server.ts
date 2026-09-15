@@ -4,6 +4,12 @@ import { z } from "zod";
 import db from "../db.server";
 import { DomainError } from "../lib/errors.server";
 import { BOOKING_REFERENCE_KEY } from "./shopify-cart.server";
+import {
+  DEVELOPMENT_BOOKING_SHOP,
+  isDevelopmentBookingShop,
+} from "./commerce-capabilities.server";
+
+export const DEVELOPMENT_FREE_DISCOUNT_CODE = "SKYRAUATFREE915";
 
 const shopifyGid = (type: "Order" | "LineItem" | "Customer") =>
   z.string().regex(new RegExp(`^gid://shopify/${type}/[1-9]\\d*$`));
@@ -20,12 +26,19 @@ const lineItem = z.object({
   price: z.string(),
   properties: z.array(property).default([]),
 });
+const discountCode = z.object({
+  code: z.string(),
+  amount: z.string(),
+  type: z.string(),
+});
 const orderPaid = z.object({
   admin_graphql_api_id: shopifyGid("Order"),
   cancelled_at: z.string().nullable().optional(),
   currency: z.string(),
   current_subtotal_price: z.string(),
   current_total_price: z.string(),
+  total_discounts: z.string(),
+  discount_codes: z.array(discountCode).default([]),
   financial_status: z.string(),
   processed_at: z.string().optional(),
   customer: z
@@ -50,6 +63,8 @@ type NormalizedOrder = {
   currency: string;
   finalCents: number;
   subtotalCents: number;
+  totalDiscountsCents: number;
+  discountCodes: { code: string; amountCents: number; type: string }[];
   financialStatus: string;
   cancelled: boolean;
   lineCount: number;
@@ -75,7 +90,18 @@ export function normalizeOrderPaidPayload(
   if (!parsed.success) return { ok: false, code: "PAYLOAD_INVALID" };
   const finalCents = cents(parsed.data.current_total_price);
   const subtotalCents = cents(parsed.data.current_subtotal_price);
-  if (finalCents === null || subtotalCents === null)
+  const totalDiscountsCents = cents(parsed.data.total_discounts);
+  const discountCodes = parsed.data.discount_codes.map((discount) => ({
+    code: discount.code,
+    amountCents: cents(discount.amount),
+    type: discount.type.toLowerCase(),
+  }));
+  if (
+    finalCents === null ||
+    subtotalCents === null ||
+    totalDiscountsCents === null ||
+    discountCodes.some((discount) => discount.amountCents === null)
+  )
     return { ok: false, code: "PAYLOAD_INVALID" };
   const bookingLines: NormalizedLine[] = [];
   for (const line of parsed.data.line_items) {
@@ -104,6 +130,12 @@ export function normalizeOrderPaidPayload(
       currency: parsed.data.currency,
       finalCents,
       subtotalCents,
+      totalDiscountsCents,
+      discountCodes: discountCodes as {
+        code: string;
+        amountCents: number;
+        type: string;
+      }[],
       financialStatus: parsed.data.financial_status.toLowerCase(),
       cancelled: Boolean(parsed.data.cancelled_at),
       lineCount: parsed.data.line_items.length,
@@ -135,6 +167,7 @@ function duplicateResult(
 }
 
 function validationCodes(
+  shopDomain: string,
   order: NormalizedOrder,
   line: NormalizedLine,
   checkout: {
@@ -158,11 +191,24 @@ function validationCodes(
   if (order.lineCount !== 1 || line.quantity !== 1)
     codes.push("QUANTITY_MISMATCH");
   if (order.currency !== "AUD") codes.push("CURRENCY_MISMATCH");
-  if (
-    line.priceCents !== checkout?.priceCents ||
-    order.subtotalCents !== checkout?.priceCents ||
-    order.finalCents !== checkout?.priceCents
-  )
+  const expected = checkout?.priceCents;
+  const fullAmount =
+    line.priceCents === expected &&
+    order.subtotalCents === expected &&
+    order.finalCents === expected;
+  const testDiscount = order.discountCodes[0];
+  const exactDevelopmentFreeOrder =
+    isDevelopmentBookingShop(shopDomain) &&
+    shopDomain === DEVELOPMENT_BOOKING_SHOP &&
+    line.priceCents === expected &&
+    order.subtotalCents === 0 &&
+    order.finalCents === 0 &&
+    order.totalDiscountsCents === expected &&
+    order.discountCodes.length === 1 &&
+    testDiscount?.code === DEVELOPMENT_FREE_DISCOUNT_CODE &&
+    testDiscount.amountCents === expected &&
+    testDiscount.type === "percentage";
+  if (!fullAmount && !exactDevelopmentFreeOrder)
     codes.push("AMOUNT_MISMATCH");
   if (order.financialStatus !== "paid") codes.push("NOT_PAID");
   if (order.cancelled) codes.push("ORDER_CANCELLED");
@@ -264,7 +310,7 @@ export async function receiveOrderPaidWebhook(input: {
         where: { shopId: shop.id, reference: line.reference },
         include: { hold: { include: { customer: true } } },
       });
-      const codes = validationCodes(order, line, checkout);
+      const codes = validationCodes(input.shopDomain, order, line, checkout);
       const valid = codes.length === 0;
       await tx.webhookReceipt.update({
         where: { id: receipt.id },
