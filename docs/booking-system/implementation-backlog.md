@@ -512,6 +512,8 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 - [x] 用户明确批准后已完成一次 `SKYRAUATFREE915` 真实零金额下单：开发店订单 `#1001` 创建成功并收到 Shopify 确认邮件。此项只签收 Cart / Checkout / Shopify Order；Receipt、Outbox/Worker、Entitlement、Hold 和 Booking confirmed 仍列为独立未完成项。
 - [ ] 核对订单 `#1001` 的 Webhook Receipt 去重、Outbox/Worker、Entitlement、Hold 转换和 Booking confirmed，记录最终状态或 NEEDS_ATTENTION 原因；未完成前不重复下单冒充闭环。
 - [x] Customer Account Extension 已加入 Active 配置，菜单 `My Skyra` 与 Booking API / Find a class URL 已保存；`skyra-booking-8` 完成首发。
-- [x] 响应式 UI 修复提交 `8c82b44` 已推送并通过 CI；Shopify App `skyra-booking-9` 已发布且 CLI 复核为 active（version ID `1129655271425`）。
-- [ ] 使用真实 Shopify Customer Account 做桌面/手机 UAT：320/390/430/1440px 无重叠/横向溢出，空状态、已有数据、头像上传/移除、Profile 保存、历史/到期/Appointment、取消/改期和 Find a class 返回。
+- [x] 首轮响应式 UI 修复提交 `8c82b44` 已推送并通过 CI；Shopify App `skyra-booking-9` 已发布且 CLI 复核为 active（version ID `1129655271425`）。
+- [x] 真实 UAT 发现首轮仍拥挤后完成第二轮信息架构修正：四个顶层入口，History/Appointment 并入 Bookings，App Profile 改 Training，reserved/Ledger delta 改为客户语言，并补真实 Refresh 恢复。390/1440px 浏览器回归与完整 check 通过，最终 SHA `41ded11`、CI `34982148962` success。
+- [ ] 获得本轮源码发送至 Shopify 官方 validator 的明确授权，完成 validator 与新 App version 发布；当前开发店仍运行 `skyra-booking-9`。
+- [ ] 使用真实 Shopify Customer Account 做桌面/手机 UAT：320/390/430/1440px 无重叠/横向溢出，空状态、已有数据、头像上传/移除、Training profile 保存、Past & cancelled、到期/私教、取消/改期和 Find a class 返回。
 - [ ] 分别完成 Group Class、Private、Workshop Pass 的正向交易和跨类型负向拒绝；Customer 个人中心当前完成不代表这些支付场景已签收。
