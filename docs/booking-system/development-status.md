@@ -10,7 +10,7 @@ Pass 现在只能选择同一种 Service kind 的 Eligible classes；团课 Pass
 
 验证：专用 `skyra_booking_test` 已应用 13 条迁移；28 个测试文件 / **350 项测试全部通过**。TypeScript、Customer Extension、ESLint、生产构建、Prisma schema 与 diff 检查通过。Home/Programs 16 组 320/390/430/1440px 浏览器 fixture 回归通过，包含登录、恢复、Drop-in、已有 Pass 与无横向溢出。fixture 不等于真实 Shopify 顾客登录或测试付款。
 
-交付：提交 `49bb1d9be78edfd2d0da2cfdd4a9be3f4ebc2596` 已推送至 `origin/bookingdev`，远程 SHA 一致；[GitHub CI 34859591792](https://github.com/robber-857/Skyra/actions/runs/34859591792) success。Render 已提供本提交的新 `app.catalog` 资源且 `/health` 为 200。Shopify CLI 配置验证通过，并创建未发布候选版本 `skyra-booking-6`；由于 release 会影响该 App 的所有已安装店铺，尚待用户明确批准后发布，不能把候选版本写成前台已生效。
+交付：提交 `49bb1d9be78edfd2d0da2cfdd4a9be3f4ebc2596` 已推送至 `origin/bookingdev`，远程 SHA 一致；[GitHub CI 34859591792](https://github.com/robber-857/Skyra/actions/runs/34859591792) success。Render 已提供本提交的新 `app.catalog` 资源且 `/health` 为 200。用户随后明确批准 release；Shopify CLI 以 `--allow-updates`、不允许删除的方式成功发布 `skyra-booking-6`。开发店前台仍需通过 storefront password 后完成真实页面与交易验收。
 
 仍未完成：真实开发店 Drop-in → Shopify 测试 Checkout → `orders/paid` → Worker → Entitlement/Booking E2E；随后是新 Pass 测试付款和已有 Pass 预约。Customer Profile 可选个人签名/训练目标尚未实现。
 

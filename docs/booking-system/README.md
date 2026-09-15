@@ -2,7 +2,7 @@
 
 ## 最新交接入口（2026-09-15）
 
-请先阅读 [课程类型隔离 → 开发店交易验收 → Customer Profile](handoff-2026-09-15.md)。用户已按顺序开启开发店三个预约开关；本轮完成团课、私教、Workshop 的后台/排课/公开预约路径和 Pass 单一类型双层约束。提交 `49bb1d9` 已推送，CI 与 Render 健康检查通过；Shopify 候选版本 `skyra-booking-6` 已创建但尚未 release。真实 Drop-in 测试付款、Webhook/Worker/Booking 签收、Customer Profile 签名/训练目标和正式店发布仍未完成。
+请先阅读 [课程类型隔离 → 开发店交易验收 → Customer Profile](handoff-2026-09-15.md)。用户已按顺序开启开发店三个预约开关；本轮完成团课、私教、Workshop 的后台/排课/公开预约路径和 Pass 单一类型双层约束。提交 `49bb1d9` 已推送，CI 与 Render 健康检查通过；用户明确批准后，Shopify App 版本 `skyra-booking-6` 已 release。真实 Drop-in 测试付款、Webhook/Worker/Booking 签收、Customer Profile 签名/训练目标和正式店发布仍未完成。
 
 ## 2026-09-14：Git 交付与 Coach 测试入口
 
