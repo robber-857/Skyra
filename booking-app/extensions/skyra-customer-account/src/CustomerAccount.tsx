@@ -81,8 +81,8 @@ const labels: Record<string, string> = {
   EXPIRED: "Expired",
   REVOKED: "Revoked",
   GRANT: "Credits added",
-  RESERVE: "Reserved for a class",
-  RELEASE: "Reservation released",
+  RESERVE: "Booked an upcoming class",
+  RELEASE: "Booking credit returned",
   CONSUME: "Class credit used",
   ADJUST: "Balance adjustment",
   EXPIRE: "Credits expired",
@@ -92,9 +92,7 @@ const viewLabels: { id: View; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "passes", label: "My passes" },
   { id: "upcoming", label: "Bookings" },
-  { id: "history", label: "History" },
-  { id: "appointments", label: "Appointments" },
-  { id: "profile", label: "Profile" },
+  { id: "profile", label: "Training" },
 ];
 
 export default async () => {
@@ -328,7 +326,7 @@ function AccountPage() {
       });
       setUncertain(true);
       setNotice(
-        "Your booking has been cancelled. You can find it in booking history.",
+        "Your booking has been cancelled. You can find it under Past & cancelled.",
       );
       await load(view);
     } catch (caught) {
@@ -462,32 +460,28 @@ function AccountPage() {
     <s-page heading="My Skyra">
       <s-query-container>
         <s-stack direction="block" gap="large-100">
-          <s-box padding="base" background="subdued" borderRadius="base">
-            <s-stack direction="block" gap="base">
-              <s-stack direction="block" gap="small-200">
-                <s-heading>Your studio account</s-heading>
-                <s-text color="subdued">
-                  Manage classes, passes, private sessions and your Skyra
-                  profile.
-                </s-text>
-              </s-stack>
-              <s-grid
-                gap="small"
-                gridTemplateColumns="@container (inline-size > 640px) repeat(3, minmax(0, 1fr)), repeat(2, minmax(0, 1fr))"
+          <s-grid
+            gap="small"
+            gridTemplateColumns="@container (inline-size > 720px) repeat(4, minmax(0, 1fr)), repeat(2, minmax(0, 1fr))"
+          >
+            {viewLabels.map((item) => (
+              <s-button
+                key={item.id}
+                disabled={busy}
+                variant={
+                  view === item.id ||
+                  (item.id === "upcoming" &&
+                    (view === "history" || view === "appointments"))
+                    ? "primary"
+                    : "secondary"
+                }
+                onClick={() => setView(item.id)}
               >
-                {viewLabels.map((item) => (
-                  <s-button
-                    key={item.id}
-                    disabled={busy}
-                    variant={view === item.id ? "primary" : "secondary"}
-                    onClick={() => setView(item.id)}
-                  >
-                    {item.label}
-                  </s-button>
-                ))}
-              </s-grid>
-            </s-stack>
-          </s-box>
+                {item.label}
+              </s-button>
+            ))}
+          </s-grid>
+          <s-divider />
           {error && <s-banner tone="critical">{error}</s-banner>}
           {notice && <s-banner tone="success">{notice}</s-banner>}
           {busy && (
@@ -554,8 +548,8 @@ function AccountPage() {
               </s-text>
               <s-text>
                 {selected.cancellationOutcome === "CANCELLED"
-                  ? "Cancelling at least 12 hours before the start releases the reserved credit."
-                  : "This is within 12 hours of the start. Cancelling uses the reserved credit."}{" "}
+                  ? "Cancelling at least 12 hours before the start returns the class credit to your pass."
+                  : "This is within 12 hours of the start. Cancelling will use the class credit."}{" "}
                 No payment refund is issued here.
               </s-text>
               <s-stack direction="inline" gap="small">
@@ -585,11 +579,8 @@ function AccountPage() {
         {(view === "upcoming" || view === "history") && data && (
           <Bookings
             account={data}
-            empty={
-              view === "upcoming"
-                ? "No upcoming bookings"
-                : "No booking history yet"
-            }
+            view={view}
+            open={setView}
             busy={busy}
             uncertain={uncertain}
             select={setSelected}
@@ -610,10 +601,10 @@ function AccountPage() {
           <s-stack gap="base">
             <s-banner>
               Shopify continues to manage your account name, email and
-              addresses. This private Skyra profile stores only your studio
-              preferences and training information.
+              addresses. Training stores only your Skyra photo, preferred name,
+              signature and training goals.
             </s-banner>
-            <s-section heading="Profile">
+            <s-section heading="Training profile">
               <s-stack gap="base">
                 <s-stack direction="inline" gap="base">
                   <s-avatar
@@ -695,7 +686,7 @@ function AccountPage() {
                   disabled={busy || !!avatarError}
                   onClick={() => void saveProfile()}
                 >
-                  Save profile
+                  Save training profile
                 </s-button>
               </s-stack>
             </s-section>
@@ -781,10 +772,13 @@ function Overview({
             <s-stack gap="small">
               <s-badge>{labels[activePass.status]}</s-badge>
               <s-heading>{activePass.name}</s-heading>
-              <s-text>
-                {activePass.available} available · {activePass.reserved}{" "}
-                reserved
-              </s-text>
+              <s-text>{activePass.available} ready to book</s-text>
+              {activePass.reserved > 0 && (
+                <s-text color="subdued">
+                  {activePass.reserved} upcoming booking
+                  {activePass.reserved === 1 ? "" : "s"} using this pass
+                </s-text>
+              )}
               <s-text>
                 Expires {shortDate(activePass.expiresAt, account.timezone)}
               </s-text>
@@ -822,8 +816,8 @@ function Overview({
               <s-text>
                 {nextAppointment.coachName} · {nextAppointment.locationName}
               </s-text>
-              <s-button onClick={() => open("appointments")}>
-                Manage appointment
+              <s-button onClick={() => open("upcoming")}>
+                View booking
               </s-button>
             </s-stack>
           ) : (
@@ -864,8 +858,15 @@ function Passes({ account }: { account: Account }) {
                 {pass.available} credit{pass.available === 1 ? "" : "s"}{" "}
                 available
               </s-heading>
+              {pass.reserved > 0 && (
+                <s-text color="subdued">
+                  {pass.reserved} credit{pass.reserved === 1 ? " is" : "s are"}{" "}
+                  assigned to upcoming booking
+                  {pass.reserved === 1 ? "" : "s"}
+                </s-text>
+              )}
               <s-text color="subdued">
-                {pass.reserved} reserved · {pass.used} used
+                {pass.used} credit{pass.used === 1 ? "" : "s"} used
               </s-text>
               <s-text>
                 Valid until {shortDate(pass.expiresAt, account.timezone)}
@@ -880,13 +881,7 @@ function Passes({ account }: { account: Account }) {
               {pass.history.map((entry) => (
                 <s-text key={entry.id} color="subdued">
                   {shortDate(entry.createdAt, account.timezone)} ·{" "}
-                  {labels[entry.kind] || entry.kind} · available{" "}
-                  {entry.availableDelta > 0 ? "+" : ""}
-                  {entry.availableDelta}, reserved{" "}
-                  {entry.reservedDelta > 0 ? "+" : ""}
-                  {entry.reservedDelta}, used{" "}
-                  {entry.consumedDelta > 0 ? "+" : ""}
-                  {entry.consumedDelta}
+                  {labels[entry.kind] || entry.kind}
                 </s-text>
               ))}
               {pass.historyTruncated && (
@@ -904,39 +899,74 @@ function Passes({ account }: { account: Account }) {
 
 function Bookings({
   account,
-  empty,
+  view,
+  open,
   busy,
   uncertain,
   select,
   move,
 }: {
   account: Account;
-  empty: string;
+  view: "upcoming" | "history";
+  open: (view: View) => void;
   busy: boolean;
   uncertain: boolean;
   select: (booking: Booking) => void;
   move: (booking: Booking) => Promise<void>;
 }) {
-  if (!account.bookings.length)
-    return (
-      <s-section heading={empty}>
-        <s-text>
-          Confirmed classes and appointment activity will appear here.
-        </s-text>
-      </s-section>
-    );
+  const upcoming = view === "upcoming";
   return (
-    <s-stack gap="base">
-      {account.bookings.map((booking) => (
-        <BookingCard
-          key={booking.id}
-          booking={booking}
-          busy={busy}
-          uncertain={uncertain}
-          select={select}
-          move={move}
-        />
-      ))}
+    <s-stack direction="block" gap="base">
+      <s-stack direction="block" gap="small">
+        <s-heading>Bookings</s-heading>
+        <s-text color="subdued">
+          Upcoming contains active class and private-session bookings. Past &
+          cancelled keeps completed, cancelled and no-show activity.
+        </s-text>
+        <s-query-container>
+          <s-grid
+            gap="small"
+            gridTemplateColumns="@container (inline-size > 420px) repeat(2, minmax(0, 1fr)), 1fr"
+          >
+            <s-button
+              disabled={busy}
+              variant={upcoming ? "primary" : "secondary"}
+              onClick={() => open("upcoming")}
+            >
+              Upcoming
+            </s-button>
+            <s-button
+              disabled={busy}
+              variant={upcoming ? "secondary" : "primary"}
+              onClick={() => open("history")}
+            >
+              Past & cancelled
+            </s-button>
+          </s-grid>
+        </s-query-container>
+      </s-stack>
+      {account.bookings.length ? (
+        account.bookings.map((booking) => (
+          <BookingCard
+            key={booking.id}
+            booking={booking}
+            busy={busy}
+            uncertain={uncertain}
+            select={select}
+            move={move}
+          />
+        ))
+      ) : (
+        <s-section
+          heading={upcoming ? "No upcoming bookings" : "No past activity"}
+        >
+          <s-text color="subdued">
+            {upcoming
+              ? "New bookings appear here after checkout has finished processing."
+              : "Completed, cancelled and no-show bookings will appear here."}
+          </s-text>
+        </s-section>
+      )}
     </s-stack>
   );
 }
