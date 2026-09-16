@@ -40,23 +40,25 @@ export function BookingActions({
       label: "Cancel and release credit (staff exception)",
       note: "Release the reserved credit regardless of the cancellation deadline. Record the reason for this exception.",
     });
-  if (clock >= start && clock < end && !booking.checkedInAt)
+  if (!coach && clock >= start && clock < end && !booking.checkedInAt)
     actions.push({
       value: "CHECK_IN",
       label: "Check in",
       note: "Record arrival. The credit remains reserved until the class is completed.",
     });
   if (clock >= end) {
-    actions.push({
-      value: "COMPLETE",
-      label: "Mark attended / complete",
-      note: "Settle one reserved class credit as used.",
-    });
+    if (!coach)
+      actions.push({
+        value: "COMPLETE",
+        label: "Mark attended / complete",
+        note: "Settle one reserved class credit as used.",
+      });
     if (!booking.checkedInAt)
       actions.push({
         value: "NO_SHOW",
         label: "Mark no-show",
-        note: "Record a missed class and settle one reserved credit as used.",
+        note:
+          "Record a missed class, return the reserved class credit to the customer’s Pass, and alert Admin for review.",
       });
   }
   const [selected, setSelected] = useState(actions[0]?.value || "");
@@ -72,8 +74,9 @@ export function BookingActions({
   if (!actions.length)
     return (
       <p className="muted">
-        Check-in opens when the class starts. Record attendance or no-show after
-        it ends.
+        {coach
+          ? "This booking is treated as attended by default. A no-show can be recorded after the class ends."
+          : "Check-in opens when the class starts. Record attendance or no-show after it ends."}
       </p>
     );
   const current = actions.find((x) => x.value === selected) || actions[0];

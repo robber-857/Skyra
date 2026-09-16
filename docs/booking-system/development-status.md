@@ -1,5 +1,41 @@
 # Booking V3 — 开发状态
 
+## 最新：发布前收口复核（2026-09-16）
+
+专用测试库全量回归现为 **35 个文件 / 379 项全部通过**；完整 check、Worker build、Coach 与注册/Reports 的 390px / 1440px 浏览器模拟和标准 ZIP 读取均通过。Render Dev 只读诊断已确认 Karen 为 `ACTIVE` Coach，且绑定的 `[DEV] Aerial Foundations` 已 `PUBLISHED`；People 的 Add coach 没有失败。真实事务邮件仍未配置/发送，Karen 真实收件登录、Customer 真实账号和支付闭环仍未签收。最新证据与正式发布前清单见 [Coach、Reports 与正式发布前收口](release-readiness-2026-09-16.md)；下方同日较早数字与 Karen 未核验结论均为历史快照。
+
+## 最新：Coach 自助身份与邮件投递代码（2026-09-16，本地）
+
+本地已实现 Admin 授权独立 loginEmail → Coach 自助申请邮件链接 → 首次验证自动激活/后续无密码登录，邮箱变更撤销旧链接/session；未知邮箱无权限。可选 Resend transport、加密登录 outbox、Worker 登录与 Coach/Admin Booking 邮件投递代码已接，但发信默认关闭，provider/DNS/secrets 和 Customer protected email resolver 未配置，未发送真实邮件。迁移 018 已应用本地开发库/测试库，未应用 Render；33 文件/371 项测试、check、390/1440px fixture smoke 通过。原 Dev/Karen DB 与部署 SHA 未直接核验，用户截图课程是 DRAFT；未发布课程、commit/push/deploy。详见 [最新实施与未完成清单](coach-self-service-and-email-2026-09-16.md)。下方旧身份结论仅为历史快照，以本节为准。
+
+## 2026-09-16：Coach/Admin Booking 通知、Admin Overview 与 Reports（本地）
+
+Booking confirmation 已从 Customer + Coach 扩展为 Customer + 对应 Coach + Admin 三条幂等通知。Coach Portal 与 Admin Overview 新增持久站内通知、未读状态和 Booking 入口；People/Settings 可保存 Coach notification email 与 Admin operations email。地址配置与登录身份分离，正式邮件 provider、Worker 投递和真实收件验收仍未接，当前 PENDING 只表示任务已建立。
+
+Admin Overview 已按运营设计实现今日课程/容量、待处理付款事件、30 天到期 Pass、今日课表、到期明细、站内通知与 No-show credit returned。Reports 已实现日期与 Customer 筛选、validated booking spend、NEW_PASS revenue、逐 Customer 明细、逐 Pass purchased/used/remaining/expiry 及两类 CSV；Refund 和全店 Shopify 财务同步尚未实现，页面明确标记 Not synced。
+
+迁移 015/016/017 已应用本地开发库和专用测试库，未应用 Render。`npm.cmd run check` 通过；专用测试库 32 文件/363 项通过；390px/1440px production-build Coach smoke 覆盖站内通知、周日历、Training profile、No-show credit release、退出与无横向溢出，`pageErrors=[]`。当前本地开发库没有 Karen，只有 Development Coach（3 个 Session），因此不能把 fixture smoke 写成 Karen 的真实 UAT。完整实施/未完成清单见 [Coach/Admin 通知、Overview 与 Reports](coach-admin-notifications-reports-2026-09-16.md)。
+
+## 2026-09-16：身份、登录与主页邮箱边界（已核对）
+
+当前没有一套混合的“Skyra 注册”：Customer、Coach、Admin 和 newsletter 是四条独立链路。Customer 使用 Shopify Customer Accounts 的邮箱一次性验证码；新邮箱首次成功登录时由 Shopify 自动建立 Customer profile，Booking App 只在验证 session token 后按 Customer GID 建立最小投影。主页 `Join community` 使用 Liquid `customer` newsletter form，会建立/更新 Shopify Customer profile 和营销订阅，但不验证登录、不创建 Booking/Pass，也不授予 Coach 权限。
+
+Coach 当前也不是自助注册。Admin 在 People 创建的 `Coach` 只有 public name、状态和 buffer，没有 email；开发店 Admin 可以生成 15 分钟单次测试链接，兑换为最长 8 小时 session。正式 Coach email、邀请/重发/撤销、provider 与真实收件 UAT 尚未实现。正式产品方向应保持 Admin 邀请已存在 Coach、Coach 不自助注册，也不复用 Shopify Customer Account 或 Shopify Admin 权限。
+
+完整现状、代码入口、已完成/未完成及 newsletter 关系见 [身份、登录与主页邮箱关系](identity-login-and-email.md)。本轮只补开发文档，没有修改 live storefront 文案、数据库 schema、Coach 正式认证或部署配置。
+
+## 2026-09-16：Coach 周课表、Training profile 与 No-show（本地）
+
+Coach Portal 已按最新产品范围收敛为两个顶层入口：Today 与 My schedule。`/coach` 和 `/coach/classes/:id` 共用桌面/手机外壳、Coach 身份、退出与服务端本人范围授权；Roster 继续从具体 Session 进入。My schedule 的 Week 视图现在是 Monday–Sunday 七列周日历，支持前后翻周；手机降级为逐日日程。Month 与自定义日期范围保留为列表视图。
+
+Session roster 只读取 Booking App Training profile 所需的 preferred name、头像、签名和训练目标，并保留本次 Booking note；不读取或展示 Shopify Customer GID、订单、支付、地址和营销资料。Coach 不再 Check in 或手工标记 Attended：Booking 默认视为会来，课后只可点击 No-show。No-show 原子地把该 Booking 预留的 1 次课释放回 Customer 的 available Pass，并写 `BOOKING_NO_SHOW` 审计；Admin Overview 仅对存在 `RELEASE` 账本的 No-show 显示提醒。
+
+为避免永远保留 reservation，Worker 采用本轮明确记录的产品假设：课程结束后保留 24 小时 No-show 窗口；窗口结束仍为 `CONFIRMED` 的 Booking 自动改为 `ATTENDED` 并消费原预留课次。该操作使用 Session/Booking 行锁、唯一 settlement key、`SYSTEM / AUTO_COMPLETE` 变更记录和 `BOOKING_AUTO_COMPLETE` 审计，同时抑制已经过时的待发送确认通知。迁移 `202609160015_coach_default_attendance` 只应用于专用 `skyra_booking_test`，未应用开发库或 Render。
+
+本地证据：`npm.cmd run check` 通过；专用 `skyra_booking_test` **30 个文件、361 项测试通过**（其中 Coach / lifecycle 定向 3 个文件、38 项）；更新后的 `scripts/coach-booking-smoke.mjs` 在 390px 与 1440px 覆盖一次性登录、周日历、Month 筛选、Training profile、只显示 No-show、`RELEASE=1 / CONSUME=0`、Admin 审计、空状态、退出、失效后拒绝和无横向溢出，两种宽度均 `pageErrors=[]`。以上仍是本地 fixture / 测试库证据，不是真实 Coach 账号 UAT。
+
+本批未提交、未推送、未部署 Render，也未发布 Shopify App version。尚未完成正式 Coach 邀请/邮件与真实账号 UAT；Availability、time off、Reports / Account 已从当前主流程导航移除，是否继续开发应由产品范围再次确认。
+
 
 ## 2026-09-16：Coach 个人中心下一阶段交接
 
@@ -216,11 +252,11 @@ Class Booking 开发基线已于 2026-09-09 确认：
 
 1. 最早提前 14 天预约，开课前 2 小时停止预约。
 2. 开课前 12 小时可免费取消并恢复预留次数。
-3. Late Cancel / No-show 扣除次数。
+3. Late Cancel 扣除次数；2026-09-16 最新决定覆盖此前规则：No-show 释放预留次数回 available Pass，并提醒 Admin。
 4. Pass 从购买日开始有效，上课日期必须处于有效期内。
 5. 新 Pass Checkout 创建 15 分钟 Seat Hold。
 6. 付款完成但 Hold 已失效时禁止超卖；有空位则安全确认，满员则进入 Needs Attention。
-7. 确认预约时 reserve；完成、Late Cancel 或 No-show 时 consume；免费取消时 release。
+7. 确认预约时 reserve；完成或 Late Cancel 时 consume；免费取消或 No-show 时 release。
 
 Appointment 已按 2026-09-13 决定直接确认；Any available coach、通知时间与初始 Service ↔ Pass 商品范围仍按相应模块确认；这些项目不阻塞 Class Booking Engine 开发。
 

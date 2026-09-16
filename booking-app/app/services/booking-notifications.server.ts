@@ -26,6 +26,7 @@ export async function enqueueBookingNotifications(
   for (const recipient of [
     { recipientKind: "CUSTOMER", recipientId: booking.customerId },
     { recipientKind: "COACH", recipientId: booking.session.coachId },
+    { recipientKind: "ADMIN", recipientId: shopId },
   ]) {
     await tx.bookingNotification.upsert({
       where: {
@@ -52,7 +53,7 @@ const escape = (value: string) =>
   );
 export type BookingEmailDetails = {
   cancellation?: "CANCELLED" | "LATE_CANCEL";
-  recipientKind: "CUSTOMER" | "COACH";
+  recipientKind: "CUSTOMER" | "COACH" | "ADMIN";
   className: string;
   coachName: string;
   locationName: string;
@@ -70,14 +71,17 @@ export function renderBookingEmail(details: BookingEmailDetails) {
   const end = DateTime.fromJSDate(details.endsAt, { zone: details.timezone });
   if (!start.isValid || !end.isValid)
     throw new DomainError("INVALID_TIMEZONE", "Cannot render booking time.");
+  const isOperations = ["COACH", "ADMIN"].includes(details.recipientKind);
   const isCoach = details.recipientKind === "COACH";
   const heading = details.cancellation
     ? "Booking cancelled"
     : isCoach
       ? "A new booking for your class"
-      : "Your booking is confirmed";
+      : details.recipientKind === "ADMIN"
+        ? "A new studio booking"
+        : "Your booking is confirmed";
   const subject =
-    `${details.cancellation ? "Booking cancelled" : isCoach ? "New booking" : "Booking confirmed"}: ${details.className}`.replace(
+    `${details.cancellation ? "Booking cancelled" : isOperations ? "New booking" : "Booking confirmed"}: ${details.className}`.replace(
       /[\r\n]/g,
       " ",
     );
@@ -91,7 +95,7 @@ export function renderBookingEmail(details: BookingEmailDetails) {
     ["Coach", details.coachName],
     ["Location", details.locationName],
     ["Booking reference", details.bookingReference],
-    ...(isCoach
+    ...(isOperations
       ? [
           [
             "Confirmed places",
@@ -104,9 +108,9 @@ export function renderBookingEmail(details: BookingEmailDetails) {
     ? details.cancellation === "CANCELLED"
       ? "This booking has been cancelled and its reserved class credit released. Your Pass retains its original expiry and eligibility. No payment refund has been issued by this system."
       : "This booking was cancelled after the free cancellation deadline. One class credit has been used. No payment refund has been issued by this system."
-    : isCoach
-      ? "This count reflects confirmed bookings when this email was prepared. Check your schedule for the latest roster."
-      : "Your place is reserved. Free cancellation is available until 12 hours before class; late cancellation or a no-show uses one class credit.";
+    : isOperations
+      ? `This count reflects confirmed bookings when this email was prepared. Check ${isCoach ? "your schedule" : "Admin bookings"} for the latest roster.`
+      : "Your place is reserved. Free cancellation is available until 12 hours before class; late cancellation uses one class credit. If your coach records a no-show, the reserved credit is returned to your Pass and the studio Admin is notified. Original Pass expiry and eligibility still apply.";
   return {
     subject,
     text: `${heading}\n\n${rows.map(([label, value]) => `${label}: ${value}`).join("\n")}\n\n${note}\n\nSkyra`,
@@ -133,7 +137,9 @@ export async function previewBookingNotification(
       : booking.status !== "CONFIRMED") ||
     (notification.recipientKind === "COACH"
       ? notification.recipientId !== booking.session.coachId
-      : notification.recipientId !== booking.customerId)
+      : notification.recipientKind === "ADMIN"
+        ? notification.recipientId !== shopId
+        : notification.recipientId !== booking.customerId)
   )
     throw new DomainError(
       "NOTIFICATION_OBSOLETE",
@@ -147,7 +153,10 @@ export async function previewBookingNotification(
       notification.template === "BOOKING_CANCELLED_V1"
         ? (booking.status as "CANCELLED" | "LATE_CANCEL")
         : undefined,
-    recipientKind: notification.recipientKind as "CUSTOMER" | "COACH",
+    recipientKind: notification.recipientKind as
+      | "CUSTOMER"
+      | "COACH"
+      | "ADMIN",
     className: booking.session.service.name,
     coachName: booking.session.coach.name,
     locationName: booking.session.location.name,

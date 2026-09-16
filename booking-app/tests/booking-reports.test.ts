@@ -46,11 +46,25 @@ test("reports isolate shops, count a paid retry once and derive balances from le
   };
   const r = await bookingReports(actor, { range: "month" });
   expect(r.purchases).toMatchObject({ count: 1, valueCents: 22000 });
+  expect(r.spending).toMatchObject({
+    totalSpendCents: 22000,
+    passRevenueCents: 22000,
+    refundsTracked: false,
+  });
+  expect(r.spending.rows).toHaveLength(1);
   expect(r.unused).toMatchObject({
     customers: 1,
     passes: 1,
     available: 4,
     reserved: 1,
+  });
+  expect(r.unusedPasses).toMatchObject({ customers: 1, credits: 5 });
+  expect(r.unusedPasses.rows[0]).toMatchObject({
+    purchased: 5,
+    used: 0,
+    available: 4,
+    reserved: 1,
+    remaining: 5,
   });
   expect(r.sessionCount).toBe(0);
   const day = f.session.startsAt.toISOString().slice(0, 10);

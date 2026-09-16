@@ -9,6 +9,7 @@ import {
   customerChangeBooking,
   coachChangeBooking,
   coachRoster,
+  settleDefaultAttendanceWork,
 } from "../app/services/booking-lifecycle.server";
 import {
   issueCoachLogin,
@@ -100,12 +101,12 @@ test("10 concurrent customer cancellations release once, suppress confirmation a
     where: { bookingId: f.booking.id },
   });
   expect(notifications.filter((n) => n.status === "SUPPRESSED")).toHaveLength(
-    2,
+    3,
   );
   const cancelled = notifications.filter(
     (n) => n.template === "BOOKING_CANCELLED_V1",
   );
-  expect(cancelled).toHaveLength(2);
+  expect(cancelled).toHaveLength(3);
   const email = await previewBookingNotification(f.shop.id, cancelled[0].id);
   expect(email.subject).toContain("Booking cancelled");
   expect(email.text).toContain("reserved class credit released");
@@ -191,33 +192,25 @@ test("normal cancellation closes at class start", async () => {
       .version,
   ).toBe(1);
 });
-test("check-in does not consume credits; completion after class settles the reservation", async () => {
+test("Operations may still record check-in and completion", async () => {
   const f = await fixture();
   await classAt(f, -60000, 3600000);
   const input = { ...f.input, action: "CHECK_IN", reason: "Arrived for class" };
-  const result = await coachChangeBooking(f.coachToken, input);
+  const result = await staffChangeBooking(f.actor, input);
   expect(result.checkedInAt).not.toBeNull();
   expect(result.status).toBe("CONFIRMED");
   expect(
     await entitlementBalance(db, f.shop.id, f.entitlement.id),
   ).toMatchObject({ reservedUnits: 1, consumedUnits: 0 });
   await expect(
-    coachChangeBooking(f.coachToken, {
+    staffChangeBooking(f.actor, {
       ...input,
       idempotencyKey: randomUUID(),
       expectedVersion: 2,
     }),
   ).rejects.toMatchObject({ code: "ALREADY_CHECKED_IN" });
   await classAt(f, -7200000, -3600000);
-  await expect(
-    coachChangeBooking(f.coachToken, {
-      ...input,
-      action: "NO_SHOW",
-      expectedVersion: 2,
-      idempotencyKey: randomUUID(),
-    }),
-  ).rejects.toMatchObject({ code: "ATTENDANCE_CONFLICT" });
-  const completed = await coachChangeBooking(f.coachToken, {
+  const completed = await staffChangeBooking(f.actor, {
     ...input,
     action: "COMPLETE",
     expectedVersion: 2,
@@ -230,19 +223,18 @@ test("check-in does not consume credits; completion after class settles the rese
 });
 test("future attendance cannot prematurely consume credits", async () => {
   const f = await fixture();
-  for (const [action, code] of [
-    ["CHECK_IN", "CHECK_IN_CLOSED"],
-    ["COMPLETE", "CLASS_NOT_ENDED"],
-    ["NO_SHOW", "CLASS_NOT_ENDED"],
-  ])
+  await expect(
+    coachChangeBooking(f.coachToken, { ...f.input, action: "NO_SHOW" }),
+  ).rejects.toMatchObject({ code: "CLASS_NOT_ENDED" });
+  for (const action of ["CHECK_IN", "COMPLETE"])
     await expect(
       coachChangeBooking(f.coachToken, { ...f.input, action }),
-    ).rejects.toMatchObject({ code });
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   expect(
     await db.bookingChange.count({ where: { bookingId: f.booking.id } }),
   ).toBe(0);
 });
-test("no-show after class uses one credit and cannot be changed through a stale form", async () => {
+test("Coach no-show after class returns one credit and alerts Admin", async () => {
   const f = await fixture();
   await classAt(f, -7200000, -3600000);
   expect(
@@ -258,14 +250,51 @@ test("no-show after class uses one credit and cannot be changed through a stale 
   ).rejects.toMatchObject({ code: "STALE_BOOKING" });
   expect(
     await entitlementBalance(db, f.shop.id, f.entitlement.id),
-  ).toMatchObject({ reservedUnits: 0, consumedUnits: 1 });
+  ).toMatchObject({ availableUnits: 5, reservedUnits: 0, consumedUnits: 0 });
+  expect(
+    await db.auditLog.count({
+      where: {
+        shopId: f.shop.id,
+        entityId: f.booking.id,
+        action: "BOOKING_NO_SHOW",
+      },
+    }),
+  ).toBe(1);
+});
+
+test("confirmed bookings auto-settle as attended after the 24-hour no-show window", async () => {
+  const f = await fixture();
+  await classAt(f, -26 * 3600000, -25 * 3600000);
+  const settlement = await settleDefaultAttendanceWork({ shopId: f.shop.id });
+  expect(settlement.errors).toEqual([]);
+  expect(settlement).toMatchObject({ settled: 1, failed: 0 });
+  expect(
+    await db.booking.findUniqueOrThrow({ where: { id: f.booking.id } }),
+  ).toMatchObject({ status: "ATTENDED", version: 2 });
+  expect(
+    await entitlementBalance(db, f.shop.id, f.entitlement.id),
+  ).toMatchObject({ availableUnits: 4, reservedUnits: 0, consumedUnits: 1 });
+  expect(
+    await db.bookingChange.findFirstOrThrow({
+      where: { bookingId: f.booking.id },
+    }),
+  ).toMatchObject({ action: "AUTO_COMPLETE", actorKind: "SYSTEM" });
+  expect(
+    await db.bookingNotification.count({
+      where: {
+        bookingId: f.booking.id,
+        template: "BOOKING_CONFIRMED_V1",
+        status: "SUPPRESSED",
+      },
+    }),
+  ).toBe(3);
 });
 test("cancellation and completion race settles exactly one outcome", async () => {
   const f = await fixture();
   await classAt(f, -7200000, -3600000);
   const results = await Promise.allSettled([
     staffChangeBooking(f.actor, { ...f.input, action: "CANCEL_WAIVE" }),
-    coachChangeBooking(f.coachToken, {
+    staffChangeBooking(f.actor, {
       ...f.input,
       action: "COMPLETE",
       idempotencyKey: randomUUID(),
@@ -283,8 +312,21 @@ test("cancellation and completion race settles exactly one outcome", async () =>
 });
 test("Coach roster is scoped and contains no Shopify identity, order, price or email", async () => {
   const f = await fixture();
+  await db.customerProfile.update({
+    where: { id: f.customer.id },
+    data: {
+      preferredName: "Queenie",
+      signature: "Stronger every class",
+      trainingGoals: "Build core strength",
+    },
+  });
   const roster = await coachRoster(f.coachToken, f.session.id);
   expect(roster.session.bookings).toHaveLength(1);
+  expect(roster.session.bookings[0].customer).toMatchObject({
+    preferredName: "Queenie",
+    signature: "Stronger every class",
+    trainingGoals: "Build core strength",
+  });
   expect(JSON.stringify(roster)).not.toContain("gid://shopify");
   expect(JSON.stringify(roster)).not.toContain("priceCents");
   const other = await fixture();
@@ -301,7 +343,7 @@ test("Coach roster is scoped and contains no Shopify identity, order, price or e
     await issueCoachLogin(f.actor, coach.id),
   );
   await expect(
-    coachChangeBooking(token, { ...f.input, action: "CHECK_IN" }),
+    coachChangeBooking(token, { ...f.input, action: "NO_SHOW" }),
   ).rejects.toMatchObject({ code: "FORBIDDEN" });
   await revokeCoachSession(f.coachToken);
   await expect(coachRoster(f.coachToken, f.session.id)).rejects.toMatchObject({

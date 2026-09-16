@@ -18,6 +18,12 @@ import {
   canTestCoachPortal,
   coachTestLogin,
 } from "../services/coach-test-access.server";
+import {
+  bindCoachLoginEmail,
+  coachSelfServiceReady,
+  requestCoachEmailLogin,
+} from "../services/coach-self-service.server";
+import { reviewCoachAccount } from "../services/coach-account-requests.server";
 const privateHeaders = {
   "Cache-Control": "private, no-store",
   "Referrer-Policy": "no-referrer",
@@ -33,6 +39,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return data(
     {
       testAccessAvailable: canTestCoachPortal(actor, shop.domain),
+      canBindLogin: actor.role === "ADMIN",
+      emailSignInAvailable: coachSelfServiceReady(),
+      accountRequests:
+        actor.role === "ADMIN"
+          ? await db.coachAccountRequest.findMany({
+              where: { shopId: actor.shopId, status: "PENDING" },
+              orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+              take: 100,
+            })
+          : [],
       coaches: await db.coach.findMany({
         where: { shopId: actor.shopId },
         orderBy: { name: "asc" },
@@ -45,6 +61,46 @@ export async function action({ request }: ActionFunctionArgs) {
   const { actor } = await adminContext(request);
   try {
     const form = await request.formData();
+    if (form.get("intent") === "review-coach-account") {
+      const result = await reviewCoachAccount(
+        actor,
+        form.get("decision") === "approve"
+          ? {
+              requestId: form.get("requestId"),
+              decision: "approve",
+              coachId: form.get("coachId"),
+            }
+          : { requestId: form.get("requestId"), decision: "reject" },
+      );
+      let queued = false;
+      if (result.approved && coachSelfServiceReady()) {
+        try {
+          await requestCoachEmailLogin(result.email);
+          queued = true;
+        } catch {
+          /* Approval is durable; coach can request another link. */
+        }
+      }
+      return {
+        message: result.approved
+          ? queued
+            ? "Account approved. Activation email requested; the coach can also request a sign-in link on the login page."
+            : "Account approved. Email delivery is not ready; configure it before the coach can verify and sign in."
+          : "Account request rejected. No coach access was granted.",
+      };
+    }
+    if (form.get("intent") === "coach-login-email") {
+      const coachId = z.string().uuid().parse(form.get("coachId"));
+      await bindCoachLoginEmail(
+        actor,
+        coachId,
+        String(form.get("loginEmail") || ""),
+      );
+      return {
+        message:
+          "Login email authorized. The coach can activate/sign in by email once mail delivery is configured. Changing or clearing this email revokes existing access.",
+      };
+    }
     if (form.get("intent") === "coach-test-login") {
       const coachId = z.string().uuid().parse(form.get("coachId"));
       return data(
@@ -55,9 +111,50 @@ export async function action({ request }: ActionFunctionArgs) {
         { headers: privateHeaders },
       );
     }
+    if (form.get("intent") === "coach-notification-email") {
+      const input = z
+        .object({
+          intent: z.literal("coach-notification-email"),
+          coachId: z.string().uuid(),
+          notificationEmail: z
+            .string()
+            .trim()
+            .toLowerCase()
+            .email()
+            .max(254)
+            .or(z.literal("")),
+        })
+        .parse(Object.fromEntries(form));
+      await db.$transaction(async (tx) => {
+        await lockShop(tx, actor.shopId);
+        const before = await tx.coach.findFirstOrThrow({
+          where: { shopId: actor.shopId, id: input.coachId },
+        });
+        const coach = await tx.coach.update({
+          where: { id: before.id },
+          data: { notificationEmail: input.notificationEmail || null },
+        });
+        await audit(
+          tx,
+          actor,
+          "COACH_NOTIFICATION_EMAIL_UPDATED",
+          coach.id,
+          { notificationEmail: before.notificationEmail },
+          { notificationEmail: coach.notificationEmail },
+        );
+      });
+      return { message: "Coach booking-notification email saved." };
+    }
     const input = z
       .object({
         name: z.string().trim().min(2).max(100),
+        notificationEmail: z
+          .string()
+          .trim()
+          .toLowerCase()
+          .email()
+          .max(254)
+          .or(z.literal("")),
         bufferBeforeMin: z.coerce.number().int().min(0).max(120),
         bufferAfterMin: z.coerce.number().int().min(0).max(120),
       })
@@ -65,7 +162,11 @@ export async function action({ request }: ActionFunctionArgs) {
     await db.$transaction(async (tx) => {
       await lockShop(tx, actor.shopId);
       const coach = await tx.coach.create({
-        data: { shopId: actor.shopId, ...input },
+        data: {
+          shopId: actor.shopId,
+          ...input,
+          notificationEmail: input.notificationEmail || null,
+        },
       });
       await audit(tx, actor, "COACH_CREATED", coach.id, null, coach);
     });
@@ -77,7 +178,13 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 }
 export default function People() {
-  const { coaches, testAccessAvailable } = useLoaderData<typeof loader>();
+  const {
+    coaches,
+    testAccessAvailable,
+    canBindLogin,
+    emailSignInAvailable,
+    accountRequests,
+  } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const busy = useNavigation().state !== "idle";
   return (
@@ -91,6 +198,72 @@ export default function People() {
         </div>
       </header>
       <Feedback result={result} />
+      {canBindLogin && (
+        <section className="panel" id="coach-account-requests">
+          <h2>Coach account requests</h2>
+          <p>
+            <a href="/coach/login" target="_blank" rel="noopener noreferrer">
+              Open coach sign-in / registration page
+            </a>
+          </p>
+          <p className="muted">
+            Coaches submit their own email on the login page. Approve only
+            someone you recognize, and link them to their existing coach record.
+            Approval does not create another coach or change their assigned
+            classes.
+          </p>
+          {!accountRequests.length && (
+            <p className="empty">No account requests awaiting approval.</p>
+          )}
+          {accountRequests.map((account) => (
+            <article className="record" key={account.id}>
+              <div>
+                <h3>{account.name}</h3>
+                <p>{account.email}</p>
+                <span className="status-pill warn">Awaiting approval</span>
+              </div>
+              <Form method="post" className="coach-request-review">
+                <input
+                  type="hidden"
+                  name="intent"
+                  value="review-coach-account"
+                />
+                <input type="hidden" name="requestId" value={account.id} />
+                <label className="field">
+                  Existing coach record
+                  <select
+                    name="coachId"
+                    aria-label={`Link ${account.name} to coach`}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>
+                      Choose a coach
+                    </option>
+                    {coaches
+                      .filter((coach) => coach.status === "ACTIVE")
+                      .map((coach) => (
+                        <option key={coach.id} value={coach.id}>
+                          {coach.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <button
+                  name="decision"
+                  value="approve"
+                  className="primary"
+                  disabled={busy}
+                >
+                  Approve login
+                </button>
+                <button name="decision" value="reject" disabled={busy}>
+                  Reject
+                </button>
+              </Form>
+            </article>
+          ))}
+        </section>
+      )}
       {result && "coachLoginUrl" in result && (
         <p>
           <a
@@ -113,6 +286,14 @@ export default function People() {
           <div className="form-grid">
             <Field label="Public name">
               <input name="name" required minLength={2} maxLength={100} />
+            </Field>
+            <Field label="Booking-notification email">
+              <input
+                name="notificationEmail"
+                type="email"
+                maxLength={254}
+                placeholder="coach@example.com"
+              />
             </Field>
             <Field label="Buffer before (minutes)">
               <input
@@ -144,6 +325,13 @@ export default function People() {
       </section>
       <section className="panel">
         <h2>Coaches</h2>
+        <p className="muted">
+          Login email grants access after verification. Booking-notification
+          email is separate and does not grant access.{" "}
+          {emailSignInAvailable
+            ? "Email sign-in transport is configured."
+            : "Email sign-in transport is not configured yet."}
+        </p>
         {testAccessAvailable && (
           <p className="muted">
             Development testing: create a one-time link to view a coach’s
@@ -159,6 +347,51 @@ export default function People() {
                 {coach.bufferBeforeMin} min before · {coach.bufferAfterMin} min
                 after
               </p>
+              <Form method="post" className="inline-email-form">
+                <input
+                  type="hidden"
+                  name="intent"
+                  value="coach-notification-email"
+                />
+                <input type="hidden" name="coachId" value={coach.id} />
+                <label>
+                  <span className="visually-hidden">
+                    Booking-notification email for {coach.name}
+                  </span>
+                  <input
+                    name="notificationEmail"
+                    type="email"
+                    maxLength={254}
+                    defaultValue={coach.notificationEmail || ""}
+                    placeholder="Not configured"
+                  />
+                </label>
+                <button disabled={busy}>Save email</button>
+              </Form>
+              {canBindLogin && coach.status === "ACTIVE" && (
+                <Form method="post" className="inline-email-form">
+                  <input
+                    type="hidden"
+                    name="intent"
+                    value="coach-login-email"
+                  />
+                  <input type="hidden" name="coachId" value={coach.id} />
+                  <label>
+                    Authorized login email
+                    <input
+                      name="loginEmail"
+                      type="email"
+                      maxLength={254}
+                      defaultValue={coach.loginEmail || ""}
+                      placeholder="Not authorized"
+                    />
+                  </label>
+                  <button disabled={busy}>Authorize login email</button>
+                  <span className="muted">
+                    {coach.loginVerifiedAt ? "Verified" : "Not activated"}
+                  </span>
+                </Form>
+              )}
             </div>
             {testAccessAvailable && coach.status === "ACTIVE" && (
               <Form method="post">

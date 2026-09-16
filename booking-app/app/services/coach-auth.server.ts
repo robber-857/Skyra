@@ -83,6 +83,12 @@ export async function exchangeCoachLogin(token: string) {
         "Coach access is unavailable.",
         401,
       );
+    if (login.loginEmail && coach.loginEmail !== login.loginEmail)
+      throw new DomainError(
+        "COACH_LINK_EXPIRED",
+        "Coach identity changed. Request a new sign-in link.",
+        401,
+      );
     const consumed = await tx.coachAccessToken.updateMany({
       where: { id: login.id, status: "ACTIVE", expiresAt: { gt: now } },
       data: { status: "CONSUMED" },
@@ -93,12 +99,38 @@ export async function exchangeCoachLogin(token: string) {
         "This sign-in link was already used.",
         401,
       );
+    if (login.loginEmail) {
+      const verified = await tx.coach.updateMany({
+        where: {
+          id: coach.id,
+          shopId: shop.id,
+          loginEmail: login.loginEmail,
+          status: "ACTIVE",
+        },
+        data: { loginVerifiedAt: now },
+      });
+      if (!verified.count)
+        throw new DomainError(
+          "COACH_LINK_EXPIRED",
+          "Coach identity changed.",
+          401,
+        );
+      await tx.auditLog.create({
+        data: {
+          shopId: shop.id,
+          actorId: coach.id,
+          action: "COACH_EMAIL_VERIFIED",
+          entityId: coach.id,
+        },
+      });
+    }
     const sessionToken = randomBytes(32).toString("base64url");
     await tx.coachAccessToken.create({
       data: {
         shopId: login.shopId,
         coachId: login.coachId,
         kind: "SESSION",
+        loginEmail: login.loginEmail,
         tokenHash: hash(sessionToken),
         createdAt: now,
         expiresAt: new Date(now.getTime() + 8 * 3600000),
@@ -132,6 +164,12 @@ export async function coachIdentity(token: string): Promise<CoachIdentity> {
     throw new DomainError(
       "COACH_LOGIN_REQUIRED",
       "Coach access is unavailable.",
+      401,
+    );
+  if (session.loginEmail && session.loginEmail !== coach.loginEmail)
+    throw new DomainError(
+      "COACH_LOGIN_REQUIRED",
+      "Coach identity changed. Sign in again.",
       401,
     );
   return {

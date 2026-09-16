@@ -5,12 +5,22 @@ import {
   redirect,
   useLoaderData,
   type LoaderFunctionArgs,
+  type ActionFunctionArgs,
 } from "react-router";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
 import { DomainError } from "../lib/errors.server";
-import { requestCoachToken } from "../services/coach-auth.server";
+import {
+  requestCoachToken,
+  requireCoachFormOrigin,
+} from "../services/coach-auth.server";
 import { coachSchedule } from "../services/coach-schedule.server";
 import { CoachScheduleView } from "../components/coach-schedule";
+import { CoachPortalShell } from "../components/coach-portal-shell";
+import { BookingNotificationList } from "../components/booking-notification-list";
+import {
+  coachNotifications,
+  markCoachNotificationRead,
+} from "../services/in-app-notifications.server";
 import styles from "../styles/admin.css?url";
 import coachStyles from "../styles/coach.css?url";
 export const links = () => [
@@ -24,12 +34,18 @@ export const headers = () => ({
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
     const params = new URL(request.url).searchParams;
+    const token = requestCoachToken(request);
     const result = await coachSchedule(
-      requestCoachToken(request),
+      token,
       Object.fromEntries(params),
     );
+    const inbox = await coachNotifications(token);
     return data(
-      { ...result, today: await coachToday(requestCoachToken(request)) },
+      {
+        ...result,
+        today: await coachToday(token),
+        notifications: inbox.notifications,
+      },
       { headers: headers() },
     );
   } catch (error) {
@@ -46,14 +62,32 @@ export async function loader({ request }: LoaderFunctionArgs) {
     throw error;
   }
 }
+export async function action({ request }: ActionFunctionArgs) {
+  if (request.method !== "POST")
+    throw new Response("Method not allowed", { status: 405 });
+  requireCoachFormOrigin(request);
+  try {
+    const form = await request.formData();
+    z.literal("read-notification").parse(form.get("intent"));
+    const notificationId = z.string().uuid().parse(form.get("notificationId"));
+    await markCoachNotificationRead(requestCoachToken(request), notificationId);
+    return { message: "Notification marked read." };
+  } catch (error) {
+    if (error instanceof DomainError && error.status === 401)
+      throw redirect("/coach/login", { headers: headers() });
+    throw error;
+  }
+}
 export default function CoachPortal() {
   const info = useLoaderData<typeof loader>();
   return (
-    <>
-      <div className="workspace coach-workspace">
-        <TodayBookings data={info.today} coach />
-      </div>
+    <CoachPortalShell coachName={info.coachName} active="today">
+      <TodayBookings data={info.today} coach />
+      <BookingNotificationList
+        notifications={info.notifications}
+        audience="coach"
+      />
       <CoachScheduleView data={info} />
-    </>
+    </CoachPortalShell>
   );
 }

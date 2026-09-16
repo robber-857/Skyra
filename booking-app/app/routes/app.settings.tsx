@@ -44,6 +44,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     checkoutGateOpen: capabilities.checkoutAvailable,
     ownedPassesGateOpen: capabilities.ownedPassesAvailable,
     onlineBookingsEnabled: rules.onlineBookingsEnabled === true,
+    operationsEmail: shop.operationsEmail || "",
   };
 }
 
@@ -51,6 +52,35 @@ export async function action({ request }: ActionFunctionArgs) {
   const { actor, shop } = await adminContext(request);
   try {
     const formData = await request.formData();
+    if (formData.get("intent") === "operations-email") {
+      const operationsEmail = z
+        .string()
+        .trim()
+        .toLowerCase()
+        .email()
+        .max(254)
+        .or(z.literal(""))
+        .parse(formData.get("operationsEmail"));
+      await db.$transaction(async (tx) => {
+        await lockShop(tx, actor.shopId);
+        const before = await tx.shop.findUniqueOrThrow({
+          where: { id: actor.shopId },
+        });
+        const updated = await tx.shop.update({
+          where: { id: actor.shopId },
+          data: { operationsEmail: operationsEmail || null },
+        });
+        await audit(
+          tx,
+          actor,
+          "OPERATIONS_NOTIFICATION_EMAIL_UPDATED",
+          actor.shopId,
+          { operationsEmail: before.operationsEmail },
+          { operationsEmail: updated.operationsEmail },
+        );
+      });
+      return { message: "Admin booking-notification email saved." };
+    }
     if (formData.get("intent") === "development-booking") {
       if (actor.role !== "ADMIN")
         throw new DomainError(
@@ -151,6 +181,33 @@ export default function Settings() {
         </div>
       </header>
       <Feedback result={useActionData<typeof action>()} />
+      <section className="panel">
+        <h2>Booking notifications</h2>
+        <p className="muted">
+          New bookings create Admin and assigned-Coach in-app notifications and
+          email jobs. Saving addresses does not send email until a transactional
+          mail provider is configured in the Worker.
+        </p>
+        <Form method="post">
+          <input type="hidden" name="intent" value="operations-email" />
+          <div className="form-grid">
+            <Field label="Admin operations email">
+              <input
+                name="operationsEmail"
+                type="email"
+                maxLength={254}
+                defaultValue={data.operationsEmail}
+                placeholder="hello@skyrastudio.com.au"
+              />
+            </Field>
+          </div>
+          <div className="actions">
+            <button className="primary" disabled={busy}>
+              Save notification email
+            </button>
+          </div>
+        </Form>
+      </section>
       <p className="feedback">
         {data.rulesApproved
           ? "Class booking rules are approved. Customer reservations stay disabled until the booking engine and checkout recovery are complete."

@@ -154,15 +154,21 @@ test("Coach role cannot issue login links or read Admin payment data", async () 
   expect(coachCookie("a".repeat(43))).toContain("HttpOnly; SameSite=Lax");
 });
 
-test("week and month are 7/30 local calendar days, including Sydney DST", () => {
+test("week is Monday–Sunday and month is 30 local calendar days, including Sydney DST", () => {
   const r = coachDateRange(
     { range: "week" },
     "Australia/Sydney",
     new Date("2026-10-03T12:00:00Z"),
   );
-  expect(r.from).toBe("2026-10-03");
-  expect(r.to).toBe("2026-10-09");
+  expect(r.from).toBe("2026-09-28");
+  expect(r.to).toBe("2026-10-04");
   expect((r.end.getTime() - r.start.getTime()) / 3600000).toBe(167);
+  const selected = coachDateRange(
+    { range: "week", from: "2026-10-14" },
+    "Australia/Sydney",
+  );
+  expect(selected.from).toBe("2026-10-12");
+  expect(selected.to).toBe("2026-10-18");
   const m = coachDateRange(
     { range: "month" },
     "Australia/Sydney",

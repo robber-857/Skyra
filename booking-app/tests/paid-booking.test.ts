@@ -23,7 +23,7 @@ beforeAll(() => {
 afterAll(() => db.$disconnect());
 
 for (const kind of ["NEW_PASS", "DROP_IN"] as const)
-  test(`${kind}: payment atomically grants, reserves, confirms and enqueues two emails`, async () => {
+  test(`${kind}: payment atomically grants, reserves, confirms and enqueues three notifications`, async () => {
     const f = await paidFixture(kind);
     const event = await queuePaid(f);
     expect(await processPaidBookingEvent(event.id)).toMatchObject({
@@ -44,7 +44,7 @@ for (const kind of ["NEW_PASS", "DROP_IN"] as const)
     ).toBe(1);
     expect(
       await db.bookingNotification.count({ where: { shopId: f.shop.id } }),
-    ).toBe(2);
+    ).toBe(3);
     expect(
       (await db.bookingHold.findUniqueOrThrow({ where: { id: f.hold.id } }))
         .status,
@@ -68,7 +68,7 @@ test("10 worker executions and different delivery IDs do not duplicate any side 
   expect(await db.booking.count({ where: { shopId: f.shop.id } })).toBe(1);
   expect(
     await db.bookingNotification.count({ where: { shopId: f.shop.id } }),
-  ).toBe(2);
+  ).toBe(3);
   expect(
     await db.webhookReceipt.count({
       where: { shopId: f.shop.id, status: "PROCESSED" },
@@ -424,7 +424,7 @@ test("two expired paid holds race for the last seat without overselling", async 
   expect(await db.entitlement.count({ where: { shopId: f.shop.id } })).toBe(2);
   expect(
     await db.bookingNotification.count({ where: { shopId: f.shop.id } }),
-  ).toBe(2);
+  ).toBe(3);
 });
 
 test("confirmed recovery does not become unconfirmed when the class closes", async () => {

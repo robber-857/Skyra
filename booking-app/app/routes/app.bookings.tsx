@@ -68,7 +68,9 @@ export default function Bookings() {
                 <h3>
                   {item.recipientKind === "COACH"
                     ? "Coach notification"
-                    : "Customer confirmation"}
+                    : item.recipientKind === "ADMIN"
+                      ? "Admin notification"
+                      : "Customer confirmation"}
                 </h3>
                 <p className="muted">
                   {item.status} · {item.attempts} attempt(s)

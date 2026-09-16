@@ -1,4 +1,6 @@
 import "dotenv/config";
+import { sweepCoachLoginMail } from "../app/services/coach-self-service.server";
+import { sweepInternalBookingMail } from "../app/services/internal-booking-mail.server";
 import { markStaleNotificationsUnknown } from "../app/services/booking-notifications.server";
 import {
   processPaidBookingEvent,
@@ -13,6 +15,7 @@ import {
 } from "../app/services/shopify-catalog.server";
 import { log } from "../app/lib/log.server";
 import { expireBookingWork } from "../app/services/booking.server";
+import { settleDefaultAttendanceWork } from "../app/services/booking-lifecycle.server";
 const connection = {
   url: process.env.REDIS_URL || "redis://127.0.0.1:56379",
   maxRetriesPerRequest: null,
@@ -86,7 +89,15 @@ async function sweepBookings() {
   sweeping = true;
   try {
     await expireBookingWork();
+    const attendance = await settleDefaultAttendanceWork();
+    if (attendance.failed)
+      log.warn(
+        { failed: attendance.failed },
+        "Default attendance settlement needs review",
+      );
     await markStaleNotificationsUnknown();
+    await sweepCoachLoginMail();
+    await sweepInternalBookingMail();
   } catch {
     log.error("Booking expiry sweep failed");
   } finally {

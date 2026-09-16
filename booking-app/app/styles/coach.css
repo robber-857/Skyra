@@ -1,60 +1,792 @@
+.coach-portal {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top right, rgba(175, 211, 194, 0.22), transparent 32rem),
+    #f5f3ee;
+}
+
+.coach-portal-header {
+  border-bottom: 1px solid #d9ddd8;
+  background: rgba(253, 252, 249, 0.96);
+}
+
+.coach-portal-bar,
+.coach-nav {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding-inline: 24px;
+}
+
+.coach-portal-bar {
+  min-height: 82px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.coach-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  color: #172c24;
+  text-decoration: none;
+}
+
+.coach-brand-mark,
+.coach-avatar {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.coach-brand-mark {
+  width: 38px;
+  height: 38px;
+  background: #173f32;
+  color: white;
+  font-family: Georgia, serif;
+  font-size: 22px;
+}
+
+.coach-brand strong,
+.coach-brand small,
+.coach-account-name strong,
+.coach-account-name small {
+  display: block;
+}
+
+.coach-brand strong {
+  font-family: Georgia, serif;
+  font-size: 20px;
+  letter-spacing: 0.01em;
+}
+
+.coach-brand small,
+.coach-account-name small {
+  color: #66716c;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.coach-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.coach-account form {
+  margin: 0 0 0 8px;
+}
+
+.coach-avatar {
+  width: 34px;
+  height: 34px;
+  background: #dcebe4;
+  color: #174b3a;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.coach-account-name strong {
+  max-width: 180px;
+  overflow: hidden;
+  color: #27312d;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.coach-sign-out {
+  min-height: 40px;
+  border-color: transparent;
+  background: transparent;
+  color: #315c4c;
+}
+
+.coach-nav {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  padding-bottom: 10px;
+}
+
+.coach-nav a {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 15px;
+  border-radius: 8px;
+  color: #34423c;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.coach-nav a:hover {
+  background: #eef3ef;
+}
+
+.coach-nav a.active {
+  background: #173f32;
+  color: white;
+}
+
+.coach-workspace {
+  display: grid;
+  gap: 64px;
+  padding-top: 52px;
+}
+
+.coach-section {
+  min-width: 0;
+  scroll-margin-top: 20px;
+}
+
+.coach-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+  margin-bottom: 24px;
+}
+
+.coach-section-head h1,
+.coach-section-head h2 {
+  margin: 2px 0 8px;
+  color: #1d2924;
+  font-family: Georgia, serif;
+  font-size: clamp(30px, 4vw, 46px);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+.coach-kicker {
+  margin: 0;
+  color: #34715a;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.coach-section-note {
+  max-width: 360px;
+  margin: 0 0 6px;
+  color: #5f6965;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.coach-today-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: 16px;
+}
+
+.coach-today-card {
+  min-height: 236px;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  border: 1px solid #d8ded9;
+  border-radius: 15px;
+  background: white;
+  box-shadow: 0 8px 28px rgba(28, 55, 43, 0.045);
+}
+
+.coach-today-card h2 {
+  margin: 32px 0 8px;
+  color: #21302a;
+  font-family: Georgia, serif;
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.coach-card-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.coach-card-topline time,
+.coach-card-topline > p {
+  margin: 0;
+  color: #25342e;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.coach-kind {
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.coach-kind.class {
+  background: #e8f1fb;
+  color: #315d85;
+}
+
+.coach-kind.private {
+  background: #f5e9f2;
+  color: #7a3f6c;
+}
+
+.coach-card-action {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  border-color: #c7d5ce;
+  color: #174b3a;
+  font-weight: 700;
+}
+
+.coach-empty {
+  padding: 34px;
+  border: 1px dashed #bdc7c1;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.66);
+  color: #44514c;
+  text-align: center;
+}
+
+.coach-empty strong {
+  display: block;
+  color: #24302b;
+  font-family: Georgia, serif;
+  font-size: 22px;
+}
+
+.coach-filter-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: end;
+  padding: 20px;
+  border: 1px solid #d8ded9;
+  border-radius: 14px;
+  background: white;
+}
+
+.coach-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.coach-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.coach-range {
+  color: #606a66;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .coach-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+  margin-top: 18px;
 }
+
 .coach-summary > div {
-  padding: 20px 0;
-  border-bottom: 1px solid #cad2cc;
+  padding: 20px;
+  border: 1px solid #d8ded9;
+  border-radius: 14px;
+  background: #fbfcfa;
 }
+
 .coach-summary strong {
   display: block;
-  font-size: 32px;
+  margin-bottom: 7px;
+  color: #173f32;
+  font-family: Georgia, serif;
+  font-size: 34px;
   font-weight: 500;
-  margin-bottom: 8px;
 }
+
 .coach-summary span {
-  font-size: 14px;
   color: #606a66;
+  font-size: 13px;
 }
-.coach-count {
-  min-width: 110px;
-  text-align: right;
+
+.coach-summary-note {
+  max-width: 760px;
+  margin: 14px 0 24px;
+  color: #69736e;
+  font-size: 12px;
+  line-height: 1.55;
 }
-.coach-count strong {
-  display: block;
+
+.coach-schedule-list {
+  overflow: hidden;
+  border: 1px solid #d8ded9;
+  border-radius: 15px;
+  background: white;
+}
+
+.coach-week-switcher {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.coach-week-switcher strong {
+  color: #34423c;
+  font-size: 14px;
+  text-align: center;
+}
+
+.coach-week-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid #d8ded9;
+  border-radius: 15px;
+  background: #dfe4e1;
+  gap: 1px;
+}
+
+.coach-week-day {
+  min-width: 0;
+  background: #fff;
+}
+
+.coach-week-day > header {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex-direction: column;
+  border-bottom: 1px solid #e3e7e4;
+  color: #5c6862;
+  text-transform: uppercase;
+}
+
+.coach-week-day > header span,
+.coach-week-day > header small {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.coach-week-day > header strong {
+  color: #173f32;
+  font-family: Georgia, serif;
   font-size: 24px;
+  font-weight: 500;
 }
-.coach-count span {
-  color: #606a66;
-  font-size: 14px;
+
+.coach-week-events {
+  min-height: 210px;
+  padding: 8px;
 }
-.coach-workspace .record {
+
+.coach-week-events > p {
+  margin: 12px 4px;
+  color: #9aa19d;
+  font-size: 11px;
+  text-align: center;
+}
+
+.coach-week-event {
+  display: flex;
+  gap: 4px;
+  flex-direction: column;
+  margin-bottom: 8px;
+  padding: 10px;
+  border-left: 3px solid #4c8b70;
+  border-radius: 8px;
+  background: #edf5f0;
+  color: #26352f;
+  text-decoration: none;
   overflow-wrap: anywhere;
 }
+
+.coach-week-event:hover {
+  background: #e2efe8;
+}
+
+.coach-week-event time {
+  color: #32624f;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.coach-week-event strong {
+  font-family: Georgia, serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.coach-week-event span,
+.coach-week-event small {
+  color: #65706b;
+  font-size: 10px;
+}
+
+.coach-schedule-card {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
+  padding: 22px;
+  border-bottom: 1px solid #e2e6e3;
+}
+
+.coach-schedule-card:last-child {
+  border-bottom: 0;
+}
+
+.coach-date-tile {
+  display: grid;
+  place-items: center;
+  padding: 9px 6px;
+  border-radius: 11px;
+  background: #edf3ef;
+  color: #345447;
+  line-height: 1;
+}
+
+.coach-date-tile span,
+.coach-date-tile small {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.coach-date-tile strong {
+  margin: 5px 0;
+  color: #173f32;
+  font-family: Georgia, serif;
+  font-size: 28px;
+  font-weight: 500;
+}
+
+.coach-schedule-body {
+  min-width: 0;
+}
+
+.coach-schedule-body h3 {
+  margin: 7px 0 4px;
+  color: #233029;
+  font-family: Georgia, serif;
+  font-size: 19px;
+  font-weight: 500;
+}
+
+.coach-schedule-body p {
+  overflow-wrap: anywhere;
+}
+
+.coach-capacity-bar {
+  max-width: 360px;
+  height: 4px;
+  margin-top: 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e4e9e6;
+}
+
+.coach-capacity-bar span {
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  background: #4c8b70;
+}
+
+.coach-attendance-summary {
+  margin: 7px 0 0;
+  color: #65706b;
+  font-size: 12px;
+}
+
+.coach-roster-link {
+  white-space: nowrap;
+}
+
+.coach-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: -30px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.coach-roster-head {
+  margin-top: 54px;
+}
+
+.coach-customer-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.coach-customer-head h3,
+.coach-customer-head p {
+  margin: 0;
+}
+
+.coach-customer-avatar {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #dcebe4;
+  color: #174b3a;
+  font-size: 18px;
+  font-weight: 700;
+  object-fit: cover;
+}
+
+.coach-training-profile {
+  display: grid;
+  gap: 14px;
+  margin: 18px 0;
+  padding: 18px;
+  border: 1px solid #dbe3de;
+  border-radius: 12px;
+  background: #f7faf8;
+}
+
+.coach-training-profile h4,
+.coach-training-profile p {
+  margin: 0;
+}
+
+.coach-training-profile h4 {
+  color: #244637;
+  font-size: 14px;
+}
+
+.coach-training-profile strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #56615c;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.coach-profile-signature {
+  color: #385b4c;
+  font-family: Georgia, serif;
+  font-size: 17px;
+  font-style: italic;
+}
+
+.coach-workspace .record,
+.coach-workspace .roster-booking {
+  overflow-wrap: anywhere;
+}
+
 .coach-workspace button,
 .coach-workspace input,
-.coach-workspace select {
+.coach-workspace select,
+.coach-workspace .button {
   min-height: 44px;
 }
-@media (max-width: 600px) {
+
+.coach-portal-footer {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0 24px 48px;
+  color: #737b77;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+@media (max-width: 800px) {
+  .coach-portal-bar,
+  .coach-nav {
+    padding-inline: 16px;
+  }
+
+  .coach-portal-bar {
+    min-height: 72px;
+  }
+
+  .coach-account-name {
+    display: none;
+  }
+
+  .coach-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .coach-nav a {
+    min-width: 0;
+    padding-inline: 8px;
+    text-align: center;
+  }
+
   .coach-workspace {
-    padding: 20px 16px 40px;
+    gap: 48px;
+    padding: 36px 16px 48px;
   }
-  .coach-workspace .form-grid {
-    grid-template-columns: 1fr;
-  }
-  .coach-summary {
-    gap: 12px;
-  }
-  .coach-summary strong {
-    font-size: 26px;
-  }
-  .coach-record {
+
+  .coach-section-head {
     align-items: flex-start;
     flex-direction: column;
+    gap: 9px;
   }
-  .coach-count {
+
+  .coach-section-note {
+    max-width: 100%;
+  }
+
+  .coach-filter-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .coach-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .coach-filter-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .coach-filter-actions button {
+    width: 100%;
+  }
+
+  .coach-range {
+    white-space: normal;
+  }
+
+  .coach-week-switcher {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .coach-week-switcher strong {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .coach-week-switcher .button {
+    width: 100%;
+    text-align: center;
+  }
+
+  .coach-week-calendar {
+    grid-template-columns: 1fr;
+  }
+
+  .coach-week-day {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .coach-week-day > header {
+    min-height: 100%;
+    border-right: 1px solid #e3e7e4;
+    border-bottom: 0;
+  }
+
+  .coach-week-events {
+    min-height: 86px;
+    padding: 10px;
+  }
+
+  .coach-week-events > p {
     text-align: left;
+  }
+
+  .coach-schedule-card {
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 14px;
+    padding: 18px 16px;
+  }
+
+  .coach-date-tile strong {
+    font-size: 24px;
+  }
+
+  .coach-roster-link {
+    grid-column: 1 / -1;
+    width: 100%;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .coach-brand small,
+  button.coach-sign-out {
+    font-size: 11px;
+  }
+
+  .coach-account {
+    gap: 5px;
+  }
+
+  .coach-account form {
+    margin-left: 0;
+  }
+
+  button.coach-sign-out {
+    padding-inline: 8px;
+  }
+
+  .coach-nav {
+    gap: 4px;
+  }
+
+  .coach-nav a {
+    font-size: 12px;
+  }
+
+  .coach-summary {
+    gap: 8px;
+  }
+
+  .coach-summary > div {
+    padding: 14px 10px;
+  }
+
+  .coach-summary strong {
+    font-size: 27px;
+  }
+
+  .coach-summary span {
+    font-size: 11px;
+  }
+
+  .coach-today-card {
+    min-height: 218px;
+    padding: 20px;
   }
 }

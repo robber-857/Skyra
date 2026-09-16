@@ -21,10 +21,15 @@ export function coachDateRange(
   const today = DateTime.fromJSDate(now, { zone: timezone }).startOf("day");
   if (!today.isValid)
     throw new DomainError("INVALID_TIMEZONE", "Invalid studio timezone.", 400);
+  const requestedStart = input.from
+    ? DateTime.fromISO(input.from, { zone: timezone }).startOf("day")
+    : null;
   const start =
     input.range === "custom"
-      ? DateTime.fromISO(input.from || "", { zone: timezone }).startOf("day")
-      : today;
+      ? requestedStart || DateTime.invalid("Missing custom start")
+      : input.range === "week"
+        ? (requestedStart || today).startOf("week")
+        : today;
   const lastDay =
     input.range === "custom"
       ? DateTime.fromISO(input.to || "", { zone: timezone }).startOf("day")
@@ -32,6 +37,9 @@ export function coachDateRange(
   if (
     !start.isValid ||
     !lastDay.isValid ||
+    (input.range === "week" &&
+      input.from &&
+      requestedStart?.toISODate() !== input.from) ||
     (input.range === "custom" &&
       (start.toISODate() !== input.from || lastDay.toISODate() !== input.to)) ||
     lastDay < start ||

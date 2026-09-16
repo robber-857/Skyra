@@ -19,6 +19,7 @@ import {
 } from "../services/coach-auth.server";
 import { BookingActions } from "../components/booking-actions";
 import { Feedback, Status } from "../components/admin-ui";
+import { CoachPortalShell } from "../components/coach-portal-shell";
 export { links, headers } from "./coach";
 export async function loader({ request, params }: LoaderFunctionArgs) {
   try {
@@ -60,9 +61,19 @@ export async function action({ request, params }: ActionFunctionArgs) {
 export default function Roster() {
   const { session: s, coachName, now, keys } = useLoaderData<typeof loader>();
   return (
-    <main className="workspace coach-workspace">
-      <Link to="/coach">Back to your classes</Link>
-      <h1>Class roster</h1>
+    <CoachPortalShell coachName={coachName} active="schedule">
+      <Link className="coach-back-link" to="/coach#schedule">
+        <span aria-hidden="true">←</span> Back to my schedule
+      </Link>
+      <div className="coach-section-head coach-roster-head">
+        <div>
+          <p className="coach-kicker">Session detail</p>
+          <h1>Class roster</h1>
+        </div>
+        <p className="coach-section-note">
+          Only operational details for this assigned session are shown.
+        </p>
+      </div>
       <Feedback result={useActionData<typeof action>()} />
       <section className="panel">
         <h2>{s.service.name}</h2>
@@ -91,9 +102,47 @@ export default function Roster() {
         </p>
         {s.bookings.map((b) => (
           <article className="roster-booking" key={b.id}>
-            <h3>Customer {b.customerId.slice(-8)}</h3>
-            <p className="muted">Booking {b.id}</p>
+            <div className="coach-customer-head">
+              {b.customer.avatarDataUrl ? (
+                <img
+                  className="coach-customer-avatar"
+                  src={b.customer.avatarDataUrl}
+                  alt=""
+                />
+              ) : (
+                <span className="coach-customer-avatar" aria-hidden="true">
+                  {(b.customer.preferredName || "C").charAt(0).toUpperCase()}
+                </span>
+              )}
+              <div>
+                <h3>
+                  {b.customer.preferredName ||
+                    `Customer ${b.customerId.slice(-8)}`}
+                </h3>
+                <p className="muted">Booking {b.id}</p>
+              </div>
+            </div>
             <Status>{b.status}</Status>
+            <section
+              className="coach-training-profile"
+              aria-label={`Training profile for ${
+                b.customer.preferredName || "customer"
+              }`}
+            >
+              <h4>Training profile</h4>
+              {b.customer.signature && (
+                <p className="coach-profile-signature">
+                  “{b.customer.signature}”
+                </p>
+              )}
+              <div>
+                <strong>Training goals</strong>
+                <p>
+                  {b.customer.trainingGoals ||
+                    "No training goals have been added."}
+                </p>
+              </div>
+            </section>
             {b.customerComment && (
               <div className="booking-comment">
                 <h4>Customer note for this booking</h4>
@@ -116,6 +165,6 @@ export default function Roster() {
         ))}
         {!s.bookings.length && <p>No registrations yet.</p>}
       </section>
-    </main>
+    </CoachPortalShell>
   );
 }

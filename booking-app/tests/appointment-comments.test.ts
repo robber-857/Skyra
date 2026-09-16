@@ -52,7 +52,7 @@ async function target(f: Awaited<ReturnType<typeof privateFixture>>) {
   await publishWeek(f.actor, local.toISODate()!);
   return slot;
 }
-test("paid private appointment confirms directly with comment snapshot and two notifications", async () => {
+test("paid private appointment confirms directly with comment snapshot and three notifications", async () => {
   const f = await privateFixture();
   const note = "Work on shoulders <script>alert(1)</script>";
   await db.bookingAttempt.update({
@@ -72,7 +72,7 @@ test("paid private appointment confirms directly with comment snapshot and two n
   const notifications = await db.bookingNotification.findMany({
     where: { shopId: f.shop.id },
   });
-  expect(notifications).toHaveLength(2);
+  expect(notifications).toHaveLength(3);
   expect(JSON.stringify(notifications)).not.toContain("shoulders");
   expect(
     JSON.stringify(

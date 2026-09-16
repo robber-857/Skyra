@@ -2,6 +2,8 @@
 
 更新：2026-09-14。
 
+> 2026-09-16 澄清：本页描述的是开发店测试入口，不是正式 Coach 注册。当前 `Coach` 表没有 email，Admin 只创建 Coach 记录并临时生成测试链接；Coach 不可自助注册。正式方向为 Admin 向已存在 Coach 的已验证邮箱发送邀请，尚未实现。Customer 的 Shopify 登录及主页 newsletter 与 Coach 登录无关。完整边界见 [身份、登录与主页邮箱关系](identity-login-and-email.md)。
+
 ## Buffer before / after
 
 - Buffer before 是该老师每节课之前的准备时间，单位为分钟。
@@ -16,7 +18,7 @@
 2. 找到要测试的老师，例如 Development Coach。点击其旁边 **Create test sign-in link**。
 3. 页面提示生成成功后，点击 **Open coach test portal**，新标签页打开该老师登录页。
 4. 点击 **Continue to my schedule**，进入 Coach 后台。链接 15 分钟有效且只能用一次，登录会话最长 8 小时；退出或过期后回 People 重新生成。
-5. 在 **Show classes** 选择一周、一个月或自定义日期，查看该老师课程、人数与容量；进入 **View roster** 查看该节课的预约名册、留言和到课状态。
+5. 在 **My schedule** 查看本周 Monday–Sunday 日历、Month 或自定义日期；进入 **View roster** 查看该节课的 Training profile、预约留言，并在课后按需要记录 No-show。Coach 不做 Check-in / Attended。
 
 老师必须先在 Classes & Passes 关联可教授课程，再在 Weekly Schedule 把场次分配给他。没有分配课程或日期范围不包含课程时，Coach 显示空列表；没有客户预约就没有留言或人数。测试本身不会创建客户预约，公开预约/付款开关保持关闭。
 

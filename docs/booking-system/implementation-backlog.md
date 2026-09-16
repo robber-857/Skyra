@@ -1,5 +1,17 @@
 # Skyra Booking System — V3 开发规划与 MVP 任务清单
 
+## 2026-09-16：Coach / Reports 收口与发布关口
+
+- [x] Coach Today、Monday–Sunday 周课表、Training profile roster、课后 No-show、退回 1 次 Pass、Admin 提醒和 24 小时默认 Attended。
+- [x] Coach 自助提交账号申请；Admin 把申请审批到当前店已有 Coach，未知/未批准邮箱不获权限。
+- [x] Admin Overview、三方站内 Booking 通知、原型两块式 Reports、CSV 与双报告 ZIP。
+- [x] Render Dev 只读确认 Karen/Add coach 和 `PUBLISHED` 排课；35 文件 / 379 项全量回归及手机/桌面模拟通过。
+- [ ] 配置真实事务邮件 provider、发信域名与 Render secrets，完成 Karen 真实收件/登录 UAT。
+- [ ] 完成真实 Customer Account 和 Drop-in / 新 Pass / 已有 Pass 的 Shopify 测试交易闭环 UAT。
+- [ ] 完成备份恢复、告警、reconciliation、正式店安装与分阶段开关切换后，才开放交易。
+
+完整证据、商户/银行卡准备和可延期能力见 [发布前收口](release-readiness-2026-09-16.md)。
+
 
 ## 2026-09-16：Coach 个人中心接手队列
 
@@ -144,7 +156,7 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 - [ ] M0-01 定义 Class、Appointment、Course、Pass、Booking 的产品术语。
 - [ ] M0-02 确定 Class 最早/最晚预约时间。
 - [ ] M0-03 确定免费取消、Late Cancel、No-show 规则。
-- [ ] M0-04 确定扣次时机：Confirm 时 Reserve，Complete/Late Cancel/No-show 时 Consume。
+- [x] M0-04 扣次时机：Confirm 时 Reserve；Complete / Late Cancel 时 Consume；按 2026-09-16 最新决定，No-show 时 Release 回 available Pass 并提醒 Admin。
 - [ ] M0-05 确定提前取消是否恢复次数。
 - [x] M0-06 用户确认 Appointment 符合预约/付款条件后直接确认，不设置人工审批。
 - [ ] M0-07 确定 Appointment 是否允许 Any available coach。
@@ -239,7 +251,7 @@ Home 当前 section 已将唯一的 @app block 用于 Instafeed，因此 Booking
 - 对最后一个 Class 名额发送 20 个并发请求，最多只成功 1 个。
 - 同一个 Customer 双击 Book 只产生 1 个活动 Hold/Booking。
 - 同一个 Coach 不会出现 buffer 后仍重叠的 Appointment。
-- 合规取消恢复预留次数；Late Cancel/No-show 不恢复。
+- 合规取消和 No-show 恢复预留次数；No-show 另提醒 Admin；Late Cancel 不恢复。
 - 改期失败不会丢失原预约。
 
 ## 8. M4 — Shopify Cart、Checkout、Order 与 Refund
@@ -316,20 +328,24 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 
 ## 10. M6 — Coach Portal
 
+最新身份要求：本地已实现 Admin 授权 loginEmail 后，Coach 自助申请邮件链接并在首次验证时激活；未知邮箱不授予 Coach 权限。迁移 018、加密 outbox 与可选 transport 已接，真实配置与 Karen 原 Dev UAT 未完成，详见 [自助登录/邮件交接](coach-self-service-and-email-2026-09-16.md)。旧“不能自助申请”描述由此更新。
+
 预计开发量：4–6 个工作日。
 
 ### 任务
 
-- [x] M6-01 Coach Today dashboard：店铺时区的今日课程、人数和预约引用，链接对应名册；真实客户姓名待资料接通。
-- [ ] M6-02 Day/Week schedule。已实现 /coach 的未来 7 天/30 天/自定义日期只读课程列表；日历视图及真实邀请登录验收待完成。
-- [ ] M6-03 Class Session roster 和状态操作已实现；真实客户姓名/有限联系资料接通待完成。
-- [x] M6-04 Check-in、Attended、No-show 及权限、截止时间、账本幂等和并发测试完成。
-- [ ] M6-05 Appointment 名册/客户逐次留言已实现；真实客户姓名与有限联系资料待接通。
+- [x] M6-00 统一响应式 Portal shell：`/coach` 与 Session/Roster 共用桌面/手机品牌栏、Coach 身份、退出及 Today / My schedule 导航；Roster 不重复成为顶层入口。390px / 1440px 本地生产构建 fixture 已通过，无横向溢出；真实账号 UAT 待完成。
+- [x] M6-01 Coach Today dashboard：店铺时区的今日课程、课程/私教 badge、人数/容量、名册入口、空状态和响应式卡片；Roster 已接通 Training profile preferred name。
+- [ ] M6-02 Week schedule 的 Monday–Sunday 桌面周日历、前后翻周及手机逐日日程已完成；Month / custom 列表保留。真实邀请登录验收仍未完成，因此本项暂不整体勾选。
+- [x] M6-03 Class / Appointment roster 已接 Booking App Training profile 的 preferred name、头像、签名、训练目标及逐次 Booking note；不暴露 Shopify 身份、订单、支付或地址。
+- [x] M6-04 按最新范围移除 Coach Check-in / Attended，只保留课后 No-show。No-show 释放 1 次预留课回 available Pass，并由 Admin Overview 提醒；24 小时后 Worker 默认结算为 Attended。权限、账本幂等、审计和自动结算测试已完成。
+- [x] M6-05 Appointment 使用与 Class 相同的本人 Session roster、Training profile 与逐次留言，不新增 Coach 审批。
 - [ ] M6-06 Availability recurring hours。
 - [ ] M6-07 Time off / exception。
 - [ ] M6-08 Schedule change notifications。
-- [x] M6-09 当前课程查询、Today、Class/Appointment Roster（含逐次留言）和到课操作均有访问/操作审计，审计不存留言正文。
+- [x] M6-09 当前课程查询、Today、Class/Appointment Roster（含逐次留言）、No-show 和系统自动结算均有访问/操作审计，审计不存留言正文。
 - [x] M6-10 按用户新范围改为 Customer 每次 Booking 可选留言，Coach 在本节名册查看；已实现归属、冻结、长度限制和文本转义，不做回复/其他留言系统。
+- [ ] M6-11 Admin 授权身份邮箱、Coach 自助激活/登录、换邮箱撤销、加密登录 outbox 与 Worker 代码已完成；真实 provider 配置、边缘限流和 Karen 实际收件登录验收未完成。
 
 ### 验收
 
@@ -344,7 +360,7 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 
 ### 任务
 
-- [ ] M7-01 Overview 的 Today schedule/预约名单已实现；可操作异常处理与逐 Customer Pass expiry alert 待做。
+- [ ] M7-01 Overview 已有 Today schedule、容量、payment attention、逐 Customer Pass expiry、Booking 通知和 No-show alert；异常人工恢复动作仍待做。
 - [ ] M7-02 People：一个页面内分 Customer / Coach 区域；Customer 显示 Pass、余额、到期、消费、下次预约，Coach 显示权限、可教课程、availability、weekly load。
 - [ ] M7-03 Classes & Passes：一个页面创建/编辑 Class 与 Pass；Class 包含名称、drop-in price、duration、capacity、location、eligible coaches 和 suggested defaults。
 - [ ] M7-04 Pass package：Shopify Variant price mapping，加 Booking DB credits、validity、eligible classes、online sale state。
@@ -353,7 +369,7 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
   - 点击场次可编辑课程、Coach、日期时间和容量；未来场次、Coach/Location 冲突、有效 Hold、最低容量、跨店与并发版本均由服务端保护并写审计。
 - [ ] M7-06 Bookings 列表、详情、改期、取消、attendance 已实现；saved filters、Admin 手工创建、waitlist 待完成。
 - [ ] M7-07 Booking detail 已显示 Session、Customer 内部引用、Entitlement 流水、Timeline 和改期关联；真实 Customer 资料/完整 Payment 导航待完成。
-- [ ] M7-08 Reports 已有日期筛选、预约状态、已验证购买值及当前未用课次汇总；per-customer spending 和 credits/expiry CSV 待完成。
+- [x] M7-08 Reports 已有日期/Customer 筛选、Booking App validated spend、NEW_PASS revenue、per-customer spending、逐 Pass credits/expiry 与两类 CSV。Shopify 全店订单/discount/refund 同步不在当前完成范围，页面标记 Not synced。
 - [ ] M7-09 Cancel / Admin 豁免课次已分离并要求确认/原因；资金退款不实现，线下处理记录待完成。
 - [ ] M7-10 Settings：notifications、locations/resources、policy、roles、integration health、failed webhook/reconcile、audit。
 
@@ -372,7 +388,7 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 
 ### 通知
 
-- [ ] M8-01 Booking confirmation。Customer/Coach 模板、事务通知、Admin 预览与 adapter 接口已完成；真实邮件 provider/收件人解析/投递未接。
+- [ ] M8-01 Booking confirmation。Customer/Coach/Admin 模板、三方幂等任务、Admin/Coach 站内通知、地址配置、预览与 adapter 接口已完成；真实 provider、verified recipient 解析、Worker 投递与收件验收未接。
 - [ ] M8-02 Reminder。
 - [ ] M8-03 Reschedule/cancellation。
 - [x] M8-04 已移除 Appointment 审批通知需求；直接确认复用 Customer/Coach confirmation 任务，真实发信接通见 M8-01。
@@ -506,7 +522,7 @@ Customer Account 后续独立交付，不使用本轮交易截图作为页面结
 
 ## 最新续开发：付款确认、邮件与 Coach（2026-09-12）
 
-已在本地接通 ORDER_PAID_RECEIVED Worker：冻结购买条款、NEW_PASS/Drop-in 权益、原子 GRANT/RESERVE/CONFIRMED、PaidBookingResult 的 Checkout/Order-Line 去重、可恢复过期 Hold 的容量重查与 Needs Attention。预约确认同时生成 Customer + 对应 Coach 两条幂等通知；含邮件模板、预览、投递 adapter 接口和重试/UNKNOWN 状态，**尚未配置或发送真实邮件**。
+已在本地接通 ORDER_PAID_RECEIVED Worker：冻结购买条款、NEW_PASS/Drop-in 权益、原子 GRANT/RESERVE/CONFIRMED、PaidBookingResult 的 Checkout/Order-Line 去重、可恢复过期 Hold 的容量重查与 Needs Attention。预约确认现在同时生成 Customer + 对应 Coach + Admin 三条幂等通知；Coach/Admin 有站内未读收件箱，含邮件模板、预览、投递 adapter 接口和重试/UNKNOWN 状态，**尚未配置或发送真实邮件**。
 
 新增独立受保护的 Coach 只读个人中心 /coach，按上课日期筛选未来 7 天、30 天和自定义区间，显示报名人次/容量及出席、取消、No-show。单次链接/会话/退出服务和页面已实现；真实 Coach 邮箱绑定、邀请发信和真实账号验收仍未完成。Admin Bookings 现可只读查看 Needs Attention、近期预约和邮件预览，不能执行退款/人工重新确认。
 

@@ -96,11 +96,8 @@ function loadBooking(tx: Prisma.TransactionClient, id: string) {
 }
 async function changeBooking(identity: Identity, raw: unknown) {
   const input = bookingChangeInput.parse(raw);
-  if (
-    identity.kind === "COACH" &&
-    !["CHECK_IN", "COMPLETE", "NO_SHOW"].includes(input.action)
-  )
-    fail("FORBIDDEN", "Only Operations can manage cancellations.", 403);
+  if (identity.kind === "COACH" && input.action !== "NO_SHOW")
+    fail("FORBIDDEN", "Coaches can only record a no-show.", 403);
   if (identity.kind === "CUSTOMER" && input.action !== "CANCEL")
     fail("FORBIDDEN", "Customers can only cancel their own booking.", 403);
   return withBooking(identity, input.bookingId, async (tx, booking, now) => {
@@ -195,7 +192,7 @@ async function changeBooking(identity: Identity, raw: unknown) {
         );
       const reserve = reservations[0];
       const settle =
-        status === "CANCELLED"
+        status === "CANCELLED" || status === "NO_SHOW"
           ? releaseEntitlementReservation
           : consumeEntitlementReservation;
       await settle(tx, {
@@ -268,6 +265,109 @@ export async function coachChangeBooking(token: string, raw: unknown) {
     raw,
   );
 }
+
+const defaultAttendanceDelayMs = 24 * 3600000;
+
+export async function settleDefaultAttendanceWork(
+  options: { batchSize?: number; shopId?: string } = {},
+) {
+  const now = await databaseNow(db);
+  const candidates = await db.booking.findMany({
+    where: {
+      ...(options.shopId ? { shopId: options.shopId } : {}),
+      status: "CONFIRMED",
+      session: {
+        status: { in: ["PUBLISHED", "COMPLETED"] },
+        endsAt: { lte: new Date(now.getTime() - defaultAttendanceDelayMs) },
+      },
+    },
+    select: { id: true, shopId: true, sessionId: true },
+    orderBy: { createdAt: "asc" },
+    take: options.batchSize || 100,
+  });
+  let settled = 0;
+  let failed = 0;
+  const errors: string[] = [];
+  for (const candidate of candidates) {
+    try {
+      const changed = await db.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "ClassSession" WHERE id = ${candidate.sessionId}::uuid AND "shopId" = ${candidate.shopId}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM "Booking" WHERE id = ${candidate.id}::uuid AND "shopId" = ${candidate.shopId}::uuid FOR UPDATE`;
+        const booking = await loadBooking(tx, candidate.id);
+        const clock = await databaseNow(tx);
+        if (
+          booking.status !== "CONFIRMED" ||
+          booking.session.endsAt.getTime() + defaultAttendanceDelayMs >
+            clock.getTime()
+        )
+          return false;
+        const reservations = await tx.entitlementLedgerEntry.findMany({
+          where: {
+            shopId: booking.shopId,
+            bookingId: booking.id,
+            kind: "RESERVE",
+          },
+        });
+        if (reservations.length !== 1 || !reservations[0].reservationKey)
+          fail(
+            "BOOKING_LEDGER_REVIEW",
+            "This booking needs a credit ledger review before auto-settlement.",
+          );
+        await consumeEntitlementReservation(tx, {
+          shopId: booking.shopId,
+          entitlementId: reservations[0].entitlementId,
+          reservationKey: reservations[0].reservationKey!,
+          bookingId: booking.id,
+          idempotencyKey: "booking-settle:" + booking.id,
+        });
+        const updated = await tx.booking.update({
+          where: { id: booking.id },
+          data: { status: "ATTENDED", version: { increment: 1 } },
+        });
+        const reason =
+          "Automatically attended after the 24-hour no-show window.";
+        await tx.bookingChange.create({
+          data: {
+            shopId: booking.shopId,
+            bookingId: booking.id,
+            idempotencyKey: booking.id,
+            actorKind: "SYSTEM",
+            actorId: "SYSTEM",
+            action: "AUTO_COMPLETE",
+            reason,
+            fromStatus: booking.status,
+            toStatus: updated.status,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            shopId: booking.shopId,
+            actorId: "SYSTEM",
+            action: "BOOKING_AUTO_COMPLETE",
+            entityId: booking.id,
+            before: { status: booking.status, version: booking.version },
+            after: { status: updated.status, version: updated.version, reason },
+          },
+        });
+        await tx.bookingNotification.updateMany({
+          where: {
+            shopId: booking.shopId,
+            bookingId: booking.id,
+            template: "BOOKING_CONFIRMED_V1",
+            status: "PENDING",
+          },
+          data: { status: "SUPPRESSED", lastError: "NOTIFICATION_OBSOLETE" },
+        });
+        return true;
+      });
+      if (changed) settled += 1;
+    } catch (error) {
+      failed += 1;
+      errors.push(error instanceof Error ? error.message : "Unknown error");
+    }
+  }
+  return { scanned: candidates.length, settled, failed, errors };
+}
 export async function staffBookingDetail(actor: Actor, id: string) {
   requireOperations(actor);
   z.string().uuid().parse(id);
@@ -321,6 +421,15 @@ export async function coachRoster(token: string, id: string) {
           status: true,
           version: true,
           checkedInAt: true,
+          customer: {
+            select: {
+              preferredName: true,
+              avatarBytes: true,
+              avatarMimeType: true,
+              signature: true,
+              trainingGoals: true,
+            },
+          },
         },
         orderBy: { createdAt: "asc" },
       },
@@ -336,7 +445,23 @@ export async function coachRoster(token: string, id: string) {
     },
   });
   return {
-    session,
+    session: {
+      ...session,
+      bookings: session.bookings.map(({ customer, ...booking }) => ({
+        ...booking,
+        customer: {
+          preferredName: customer.preferredName,
+          avatarDataUrl:
+            customer.avatarBytes && customer.avatarMimeType
+              ? `data:${customer.avatarMimeType};base64,${Buffer.from(
+                  customer.avatarBytes,
+                ).toString("base64")}`
+              : null,
+          signature: customer.signature,
+          trainingGoals: customer.trainingGoals,
+        },
+      })),
+    },
     coachName: identity.name,
     now: (await databaseNow(db)).toISOString(),
   };

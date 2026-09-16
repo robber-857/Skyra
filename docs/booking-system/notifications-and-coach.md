@@ -1,5 +1,15 @@
 # Booking 邮件与 Coach 课程报名
 
+## 最新续开发：自助身份与投递代码（2026-09-16）
+
+最新状态见 [Coach 自助激活与品牌邮件](coach-self-service-and-email-2026-09-16.md)。已接可选 Resend transport、加密 Coach 登录 outbox、Worker 登录与 Coach/Admin Booking 邮件投递，默认关闭；Customer 受保护邮箱解析、reminder/改期、真实配置和收件验收尚未完成。无真实邮件发送，PENDING 不代表已发送。主商店 Notifications 的 sender email 不会自动配置 Booking App 或 Dev 店。
+
+## 2026-09-16 更新
+
+Booking confirmation 已扩展为 Customer、对应 Coach 与 Admin 三条幂等 `BookingNotification`。Coach Portal 和 Admin Overview 复用这些记录作为持久站内通知，新增 `readAt` 与服务端收件人范围校验；People 可保存 Coach `notificationEmail`，Settings 可保存 Shop `operationsEmail`。两者只是通知地址，不是 Coach 登录身份。
+
+真实邮件仍未发送：尚未选择 provider、验证发信域名、接 Worker adapter 或完成真实收件验收。页面中的 PENDING 表示任务存在，不代表邮件已进入 provider 或 inbox。完整本轮记录见 [Coach/Admin 通知、Overview 与 Reports](coach-admin-notifications-reports-2026-09-16.md)。
+
 ## 本轮状态：Appointment、留言与 Today（2026-09-13）
 
 Appointment 直接确认复用 Customer/Coach 通知任务，Admin/Coach Today 和每节课客户留言已实现。留言只在该 Booking 详情/名册显示，不进入邮件或独立消息系统。真实发信 provider、客户地址解析与 Coach 验证邮箱仍待经营者配置，没有实际发送。

@@ -256,11 +256,12 @@ test("expired holds stop counting immediately, before the worker runs", async ()
   const f = await fixture(1),
     a = await f.start();
   const hold = await f.hold(a.token);
+  const expiredAt = Date.now();
   await db.bookingHold.update({
     where: { id: hold.id },
     data: {
-      createdAt: new Date(Date.now() - 16 * 60000),
-      expiresAt: new Date(Date.now() - 60000),
+      createdAt: new Date(expiredAt - 16 * 60000),
+      expiresAt: new Date(expiredAt - 60000),
     },
   });
   expect(
@@ -281,11 +282,12 @@ test("expiry worker is repeatable, updates attempts and appends one audit event"
   const f = await fixture(),
     a = await f.start(),
     h = await f.hold(a.token);
+  const expiredAt = Date.now();
   await db.bookingHold.update({
     where: { id: h.id },
     data: {
-      createdAt: new Date(Date.now() - 16 * 60000),
-      expiresAt: new Date(Date.now() - 60000),
+      createdAt: new Date(expiredAt - 16 * 60000),
+      expiresAt: new Date(expiredAt - 60000),
     },
   });
   await db.bookingAttempt.updateMany({

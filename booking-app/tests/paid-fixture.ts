@@ -92,6 +92,7 @@ export async function paidFixture(
       expiresAt: new Date(Date.now() + 1800000),
     },
   });
+  const holdClock = Date.now();
   const hold = await db.bookingHold.create({
     data: {
       shopId: shop.id,
@@ -102,8 +103,8 @@ export async function paidFixture(
       passPlanId: kind === "NEW_PASS" ? plan.id : null,
       idempotencyKey: randomUUID(),
       status: expiredHold ? "EXPIRED" : "ACTIVE",
-      createdAt: new Date(Date.now() - (expiredHold ? 960000 : 30000)),
-      expiresAt: new Date(Date.now() + (expiredHold ? -60000 : 840000)),
+      createdAt: new Date(holdClock - (expiredHold ? 960000 : 30000)),
+      expiresAt: new Date(holdClock + (expiredHold ? -60000 : 840000)),
     },
   });
   const checkout = await db.bookingCheckout.create({

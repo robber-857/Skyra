@@ -31,6 +31,7 @@ model Shop {
   id              String    @id @default(uuid()) @db.Uuid
   domain          String    @unique
   timezone        String    @default("Australia/Sydney")
+  operationsEmail String?
   status          String    @default("ACTIVE")
   rules           Json      @default("{}")
   rulesApprovedAt DateTime? @db.Timestamptz
@@ -58,16 +59,20 @@ model Category {
 }
 
 model Coach {
-  id              String         @id @default(uuid()) @db.Uuid
-  shopId          String         @db.Uuid
-  name            String
-  status          String         @default("ACTIVE")
-  bufferBeforeMin Int            @default(0)
-  bufferAfterMin  Int            @default(0)
-  services        ServiceCoach[]
-  sessions        ClassSession[]
+  id                String         @id @default(uuid()) @db.Uuid
+  shopId            String         @db.Uuid
+  name              String
+  notificationEmail String?
+  loginEmail        String?
+  loginVerifiedAt   DateTime? @db.Timestamptz
+  status            String         @default("ACTIVE")
+  bufferBeforeMin   Int            @default(0)
+  bufferAfterMin    Int            @default(0)
+  services          ServiceCoach[]
+  sessions          ClassSession[]
 
   @@unique([shopId, id])
+  @@unique([shopId, loginEmail])
 }
 
 model Location {
@@ -415,6 +420,7 @@ model BookingNotification {
   availableAt       DateTime  @default(now()) @db.Timestamptz
   claimedAt         DateTime? @db.Timestamptz
   acceptedAt        DateTime? @db.Timestamptz
+  readAt            DateTime? @db.Timestamptz
   providerMessageId String?
   lastError         String?
   createdAt         DateTime  @default(now()) @db.Timestamptz
@@ -444,12 +450,43 @@ model CoachAccessToken {
   shopId    String   @db.Uuid
   coachId   String   @db.Uuid
   tokenHash String   @unique
+  loginEmail String?
   kind      String
   status    String   @default("ACTIVE")
   expiresAt DateTime @db.Timestamptz
   createdAt DateTime @default(now()) @db.Timestamptz
 
   @@index([shopId, coachId, status])
+}
+
+model CoachLoginDelivery {
+  id                String @id @default(uuid()) @db.Uuid
+  tokenId           String @unique @db.Uuid
+  shopId            String @db.Uuid
+  coachId           String @db.Uuid
+  encryptedPayload  String?
+  status            String @default("PENDING")
+  providerMessageId String?
+  createdAt         DateTime @default(now()) @db.Timestamptz
+  claimedAt         DateTime? @db.Timestamptz
+  expiresAt         DateTime @db.Timestamptz
+
+  @@index([status, createdAt])
+}
+
+model CoachAccountRequest {
+  id              String @id @default(uuid()) @db.Uuid
+  shopId          String @db.Uuid
+  name            String
+  email           String
+  status          String @default("PENDING")
+  approvedCoachId String? @db.Uuid
+  reviewedBy      String?
+  reviewedAt      DateTime? @db.Timestamptz
+  createdAt       DateTime @default(now()) @db.Timestamptz
+
+  @@unique([shopId, email])
+  @@index([shopId, status, createdAt])
 }
 
 model BookingChange {

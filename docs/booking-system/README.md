@@ -1,8 +1,12 @@
 # Skyra Booking System
 
-## 最新交接入口（2026-09-15）
+## 最新交接入口（2026-09-16）
 
-请先阅读 [交易 UAT 阻塞定位与 Customer 个人中心](handoff-2026-09-15.md)。用户已开启开发店三个预约开关；课程类型隔离、Pass 单一类型双层约束和安全 Cart 失败诊断已推送，`skyra-booking-7` 的 Checkout scope 已 release/批准。真实 Drop-in 仍被开发店强制密码页对应的 `Online Store channel is locked` 阻塞；官方确认 Dev Store 不能移除密码页，不能把“去掉密码”继续列为待操作。Customer Account 的 Overview、passes 到期、Bookings/History、Appointments 与头像/签名/训练目标 Profile 已推送且后端迁移已部署；仍需发布新版 UI extension、配置 Find a class URL、实现仅开发店的原生 Cart handoff 并做真实账号 UAT。
+本批最新的完成项、Karen Render Dev 数据证据、35 文件 / 379 项全量回归，以及正式发布前必须补齐的支付、邮件、真实账号和运维关口，统一见 [Coach、Reports 与正式发布前收口](release-readiness-2026-09-16.md)。该文件优先于下方同日较早快照。
+
+Coach 本轮实现、测试证据和剩余工作见 [Coach 个人中心交接](handoff-2026-09-16-coach-portal.md) 与 [Coach/Admin 通知、Overview 与 Reports](coach-admin-notifications-reports-2026-09-16.md)；Customer 与交易阻塞历史见 [2026-09-15 交接](handoff-2026-09-15.md)。Coach 已有统一响应式 Portal、Today、Monday–Sunday 周日历、Training profile roster、课后 No-show、Pass credit release、Admin 提醒与 24 小时默认 Attended settlement；Admin/Coach 站内 Booking notification、Admin Overview 与两类 Reports/CSV 已在本地实现。当前改动仍未 commit / push / deploy，迁移已应用本地开发库与测试库，未应用 Render。
+
+最新 [Coach 自助激活与邮件](coach-self-service-and-email-2026-09-16.md) 已实现 Admin 授权独立登录邮箱后的自助邮件申请/首次激活。Customer 仍用 Shopify 验证码，主页填写邮箱只是营销订阅，见 [身份、登录与主页邮箱关系](identity-login-and-email.md)。真实邮件配置、Customer 邮箱解析、Karen 原 Dev 数据库与真实 UAT 尚未完成；当前均未部署。
 
 ## 2026-09-14：Git 交付与 Coach 测试入口
 
@@ -34,30 +38,33 @@ My account 原先使用相对 /account，本地预览把 Shopify 认证请求送
 
 ## 当前开发进度
 
-已创建并绑定 **Skyra Booking**。目前已实现团课预约/付款回调/课次账本的本地闭环、客户个人中心与取消改期、Coach 排期人数/名册/到课操作、Admin 预约管理与基础 Reports。本轮新增私教固定时段直接确认、逐次课程留言和 Today 名单；真实 Shopify 登录与 Checkout、联系方式/发信、异常人工处理、动态 availability 和生产运行仍待完成。请优先阅读 [2026-09-13 交接](handoff-2026-09-13.md)、[开发状态](development-status.md) 和 [本轮功能说明](appointment-and-comments.md)。
+已创建并绑定 **Skyra Booking**。目前已实现团课预约/付款回调/课次账本的本地闭环、客户个人中心与取消改期、Coach Today/周课表/Training profile roster/No-show、Admin/Coach 站内 Booking 通知、Admin Overview、预约管理与逐 Customer/Pass Reports/CSV。Coach 不做 Check-in / Attended；No-show 释放 1 次预留 Pass 并提醒 Admin，其余 Booking 在 24 小时窗口后由 Worker 默认结算。真实 Customer 登录与 Checkout UAT、正式 Coach email invitation、真实邮件投递、Shopify refund 财务同步、异常人工处理、动态 availability 和生产运行仍待完成。请优先阅读 [开发状态](development-status.md)、[Coach 交接](handoff-2026-09-16-coach-portal.md) 和 [身份登录说明](identity-login-and-email.md)。
 
 ## 推荐阅读顺序
 
-1. [系统架构与 Shopify 实现边界](./architecture.md)
-2. [Booking、Pass、Checkout 与同步流程](./booking-pass-flow.md)
-3. [三端低保真交互原型](./wireframes.html)（Customer Booking 可在同一区块切换步骤）
-4. [数据库模型与 ERD](./data-model.md)
-5. [MVP 开发任务与顺序](./implementation-backlog.md)
+1. [身份、登录与主页邮箱关系](./identity-login-and-email.md)
+2. [系统架构与 Shopify 实现边界](./architecture.md)
+3. [Booking、Pass、Checkout 与同步流程](./booking-pass-flow.md)
+4. [三端低保真交互原型](./wireframes.html)（早期参考；Coach 操作以最新交接和代码为准）
+5. [数据库模型与 ERD](./data-model.md)
+6. [MVP 开发任务与顺序](./implementation-backlog.md)
 
 ## 各文档职责
 
 | 文件                        | 用途                                                                                                                    |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `architecture.md`           | 系统边界、三端页面、Shopify 能力、部署架构和数据归属                                                                    |
+| `identity-login-and-email.md` | Customer/Coach/Admin 身份、Shopify 登录、Coach 邀请现状与主页 newsletter 关系                                          |
 | `booking-pass-flow.md`      | 登录、选择 Pass、Checkout、付款回调、扣次、通知与数据同步                                                               |
 | `wireframes.html`           | Customer、Admin、Coach 三端可点击低保真原型；Home 与 Programs 复用同一个 Booking section 状态机；Admin 保持六个日常入口 |
 | `data-model.md`             | 核心表、关系、约束、状态和数据所有权                                                                                    |
 | `implementation-backlog.md` | 当前唯一执行计划：MVP/P1/P2 范围、开发顺序、文件迁移和验收任务                                                          |
+| `coach-admin-notifications-reports-2026-09-16.md` | Coach/Admin 通知、Overview、Reports 数据口径、验证证据与未完成邮件/部署工作 |
 
 ## 核心实现原则
 
 1. 客户只使用 Shopify Customer Account，不创建第二套客户密码。
-2. Admin 使用 Shopify Embedded App；Coach 使用独立、受限的 Portal。
+2. Admin 使用 Shopify Embedded App；Coach 使用独立、受限的 Portal。Coach 由 Admin 邀请已存在记录，不自助注册，也不复用 Shopify Customer Account。
 3. Pass 在 Shopify 中是可购买商品，在 Booking DB 中是可消费权益。
 4. 已有 Pass 预约不进入 Checkout；购买新 Pass 才进入 Shopify Checkout。
 5. 付款后通过幂等 Webhook 创建权益并确认 Booking。
@@ -67,7 +74,7 @@ My account 原先使用相对 /account，本地预览把 Shopify 认证请求送
 9. 留言仅由客户在每次 Booking 填写并保存于 Booking DB；本人、对应 Coach 和获授权 Admin 可看。不开发老师回复或其他留言系统。
 10. Home 与 Programs 不复制两套 Booking 代码：两个主题占位节点由同一个 Theme App Extension app embed 挂载。
 11. 浏览、课程详情、Pass 选择、已有 Pass 确认和结果状态都在当前 Booking section 内切换；登录和付款分别使用 Shopify Customer Account 与 Shopify Checkout，完成后返回原 section 并恢复 Booking attempt。
-12. Book 必须即时验证 Shopify Customer Account 登录；未登录弹出 Skyra 登录提示，桌面打开 Shopify 登录窗口，手机/受限浏览器同页登录，返回原课程并重新验证。当前已接服务端 opaque Attempt、不可换绑的 Shopify 客户身份和固定返回路径；真实开发店客户登录联调尚未完成。
+12. Book 必须即时验证 Shopify Customer Account 登录；未登录显示 Skyra 登录提示，并用当前顶层页面进入 Shopify 托管登录，返回原课程后重新验证。当前已接服务端 opaque Attempt、不可换绑的 Shopify 客户身份和固定返回路径；真实开发店 Customer 全流程 UAT 尚未签收。
 13. 本轮 Find a Class、Select a pass 和交易摘要参考图只定义 Home / Programs 的下单 UI；Customer Account 的 My Bookings / My Passes 已完成本地实现，真实账号接通待验收。
 
 ## 已清理的旧假设
