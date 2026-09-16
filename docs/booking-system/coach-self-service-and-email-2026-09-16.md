@@ -1,8 +1,8 @@
 # Coach 自助激活、Dev 核验与品牌邮件
 
-更新：2026-09-16。分支 `bookingdev`，本轮开始/结束 HEAD 均为 `e7dd9094c1293274d6ad19a40395295bbf736ddf`；修改尚未提交或部署。
+更新：2026-09-16。分支 `bookingdev`；运行提交 `06468757b36688826519b516b25996f8a2f3f57b` 已推送并部署 Render Dev，CI `35080110796` 与 deploy `dep-dal64seq1p3s73ekc8bg` 成功。
 
-> 最新复核：产品主流程已更新为 Coach 自己在 `/coach/login` 提交姓名/邮箱申请，Admin 在 People 的 Coach account requests 中把申请批准到已有 Coach；不是先由 Admin 猜测并填写邮箱。Render Dev 已确认 Karen 与其 `PUBLISHED` 课程存在，完整回归为 35 文件 / 379 项。真实邮件仍未发送。详见 [Coach、Reports 与正式发布前收口](release-readiness-2026-09-16.md)；下文保留了实现过程中的较早描述。
+> 最新复核：产品主流程已更新为 Coach 自己在 `/coach/login` 提交姓名/邮箱申请，Admin 在 People 的 Coach account requests 中把申请批准到已有 Coach；不是先由 Admin 猜测并填写邮箱。Render Dev 已确认 Karen 与其 `PUBLISHED` 课程存在，完整回归为 35 文件 / 379 项，015–019 已部署。Karen 当前仍未绑定 login/notification email，Render 真实邮件配置全为空，因此没有真实发送。详见 [Coach、Reports 与正式发布前收口](release-readiness-2026-09-16.md)；下文保留了实现过程中的较早描述。
 
 ## 产品决定与实际使用方式
 

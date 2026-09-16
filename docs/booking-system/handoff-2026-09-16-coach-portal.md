@@ -4,7 +4,7 @@
 
 ## 收口复核（优先于下方较早快照）
 
-最新完成项、Karen Render Dev 只读证据、35 文件 / 379 项全量回归、真实邮件边界与正式发布关口见 [Coach、Reports 与正式发布前收口](release-readiness-2026-09-16.md)。Karen 已确认是 Dev 数据库中的 `ACTIVE` Coach，并绑定一节 2026-09-18 10:00 Australia/Sydney、状态 `PUBLISHED` 的 `[DEV] Aerial Foundations`；People 的 Add coach 已生效。下文“Karen 未核验 / 课程 DRAFT / 33 文件 371 项”是本轮较早快照，不再代表当前状态。
+最新完成项、Karen Render Dev 只读证据、35 文件 / 379 项全量回归、真实邮件边界与正式发布关口见 [Coach、Reports 与正式发布前收口](release-readiness-2026-09-16.md)。Karen 已确认是 Dev 数据库中的 `ACTIVE` Coach，并绑定一节 2026-09-18 10:00 Australia/Sydney、状态 `PUBLISHED` 的 `[DEV] Aerial Foundations`；People 的 Add coach 已生效。运行提交 `06468757b36688826519b516b25996f8a2f3f57b`、CI `35080110796`、Render deploy `dep-dal64seq1p3s73ekc8bg` 已通过，015–019 已应用。下文“Karen 未核验 / 课程 DRAFT / 33 文件 371 项”是本轮较早快照，不再代表当前状态。
 
 ## 身份与登录结论
 

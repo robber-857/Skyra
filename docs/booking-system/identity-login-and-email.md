@@ -2,7 +2,7 @@
 
 ## 2026-09-16 最新 Coach 账号入口
 
-Coach 现在先在 `/coach/login` 自己填写姓名和邮箱提交账号申请；该申请不授予权限。Admin 在 People → Coach account requests 选择当前店已有 Coach（例如 Karen）并批准，系统才绑定登录邮箱并进入 magic-link 首次验证。People 中旧的 Authorized login email 控件仍可用于人工改绑/撤销，但不是新 Coach 的首选授权流程。Karen 的 Dev Coach 与 `PUBLISHED` 课程已通过 Render 内部只读查询确认；真实事务邮件/provider 尚未配置。完整证据见 [发布前收口](release-readiness-2026-09-16.md)。
+Coach 现在先在 `/coach/login` 自己填写姓名和邮箱提交账号申请；该申请不授予权限。Admin 在 People → Coach account requests 选择当前店已有 Coach（例如 Karen）并批准，系统才绑定登录邮箱并进入 magic-link 首次验证。People 中旧的 Authorized login email 控件仍可用于人工改绑/撤销，但不是新 Coach 的首选授权流程。该流程已部署 Render Dev；Karen 与 `PUBLISHED` 课程已确认，但她尚未提交/获批邮箱，真实事务邮件/provider 也尚未配置。完整证据见 [发布前收口](release-readiness-2026-09-16.md)。
 
 更新：2026-09-16。
 

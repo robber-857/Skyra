@@ -4,9 +4,9 @@
 
 本批最新的完成项、Karen Render Dev 数据证据、35 文件 / 379 项全量回归，以及正式发布前必须补齐的支付、邮件、真实账号和运维关口，统一见 [Coach、Reports 与正式发布前收口](release-readiness-2026-09-16.md)。该文件优先于下方同日较早快照。
 
-Coach 本轮实现、测试证据和剩余工作见 [Coach 个人中心交接](handoff-2026-09-16-coach-portal.md) 与 [Coach/Admin 通知、Overview 与 Reports](coach-admin-notifications-reports-2026-09-16.md)；Customer 与交易阻塞历史见 [2026-09-15 交接](handoff-2026-09-15.md)。Coach 已有统一响应式 Portal、Today、Monday–Sunday 周日历、Training profile roster、课后 No-show、Pass credit release、Admin 提醒与 24 小时默认 Attended settlement；Admin/Coach 站内 Booking notification、Admin Overview 与两类 Reports/CSV 已在本地实现。当前改动仍未 commit / push / deploy，迁移已应用本地开发库与测试库，未应用 Render。
+Coach 本轮实现、测试证据和剩余工作见 [Coach 个人中心交接](handoff-2026-09-16-coach-portal.md) 与 [Coach/Admin 通知、Overview 与 Reports](coach-admin-notifications-reports-2026-09-16.md)；Customer 与交易阻塞历史见 [2026-09-15 交接](handoff-2026-09-15.md)。Coach 已有统一响应式 Portal、Today、Monday–Sunday 周日历、Training profile roster、课后 No-show、Pass credit release、Admin 提醒与 24 小时默认 Attended settlement；Admin/Coach 站内 Booking notification、Admin Overview 与两类 Reports/CSV 已部署到 Render Dev。运行 SHA `06468757b36688826519b516b25996f8a2f3f57b`，CI run `35080110796` 与 Render deploy `dep-dal64seq1p3s73ekc8bg` 成功，015–019 已应用。
 
-最新 [Coach 自助激活与邮件](coach-self-service-and-email-2026-09-16.md) 已实现 Admin 授权独立登录邮箱后的自助邮件申请/首次激活。Customer 仍用 Shopify 验证码，主页填写邮箱只是营销订阅，见 [身份、登录与主页邮箱关系](identity-login-and-email.md)。真实邮件配置、Customer 邮箱解析、Karen 原 Dev 数据库与真实 UAT 尚未完成；当前均未部署。
+最新 [Coach 自助激活与邮件](coach-self-service-and-email-2026-09-16.md) 已实现 Coach 自己提交姓名/邮箱申请、Admin 审批到已有 Coach 后的首次激活。Customer 仍用 Shopify 验证码，主页填写邮箱只是营销订阅，见 [身份、登录与主页邮箱关系](identity-login-and-email.md)。Karen Dev 数据已确认，但真实邮件配置、Customer 邮箱解析和 Karen 真实收件/登录 UAT 尚未完成。
 
 ## 2026-09-14：Git 交付与 Coach 测试入口
 

@@ -2,7 +2,7 @@
 
 ## 2026-09-16：正式发布前当前关口
 
-Coach/Reports 本地代码已完成全量回归：35 文件 / 379 项、完整构建、Worker build、两组 390px / 1440px 浏览器流程和报告 ZIP 标准读取通过；Render Dev 已确认 Karen 与她的 `PUBLISHED` 课程存在。以上仍不等于正式发布就绪：真实 Coach 邮件、Customer Account、Shopify 测试付款到 Booking/Pass 的后端闭环、备份恢复/告警、正式店安装与开关切换尚未签收。当前优先行动、老板连接银行卡所需资料及不可延期关口见 [Coach、Reports 与正式发布前收口](release-readiness-2026-09-16.md)。下方 2026-09-13/14 数字保留为历史基线。
+Coach/Reports 已完成全量回归：35 文件 / 379 项、完整构建、Worker build、两组 390px / 1440px 浏览器流程和报告 ZIP 标准读取通过；提交 `06468757…` 的 CI 与 Render deploy 已通过，015–019 已应用，Karen 与她的 `PUBLISHED` 课程仍完整。以上仍不等于正式发布就绪：真实 Coach 邮件、Customer Account、Shopify 测试付款到 Booking/Pass 的后端闭环、备份恢复/告警、正式店安装与开关切换尚未签收。当前优先行动、老板连接银行卡所需资料及不可延期关口见 [Coach、Reports 与正式发布前收口](release-readiness-2026-09-16.md)。下方 2026-09-13/14 数字保留为历史基线。
 
 ## 2026-09-14：接口恢复与测试版准备
 

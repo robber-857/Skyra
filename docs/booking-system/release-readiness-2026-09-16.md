@@ -78,4 +78,11 @@
 
 ## 本批交付状态
 
-当前代码与文档仍位于本地 `bookingdev` 工作区；待提交、GitHub CI、Render pre-deploy migration、Dev health、Coach 登录页和 Admin 页面部署验证完成后，在本节追加 commit / run / deploy 证据。没有发布正式店、没有开启付款开关、没有发送真实邮件。
+- 运行提交：`06468757b36688826519b516b25996f8a2f3f57b`，本地与 `origin/bookingdev` 一致。
+- GitHub Actions：Booking App run `35080110796` success；setup、check 与完整 test 全部通过。
+- Render Dev：deploy `dep-dal64seq1p3s73ekc8bg` 在同一 SHA Live；pre-deploy 成功应用 015–019，Web/Worker 启动，`/health` 200。
+- 部署后 `/coach/login` 返回 200，显示 Coach 自助申请姓名/邮箱表单；当前同时提示 Email activation 尚未连接。
+- 部署后只读任务 `job-dal66adbedkc73bdmsl0` 确认 Karen/课程仍完整、CoachAccountRequest 表可用；Karen 尚未绑定 login/notification email，当前申请数 0。
+- Render 的 mail provider、From、provider secret、Coach login shop 和 payload key 当前均未配置；没有真实发送邮件。
+
+本批只部署到 Dev Render。没有发布正式店、没有发布新的 Shopify App extension version、没有开启付款开关、没有发送真实邮件。
