@@ -79,7 +79,16 @@ try {
       await page.getByLabel("Your name", { exact: true }).fill("Karen");
       await page.getByLabel("Your email", { exact: true }).fill("karen@example.com");
       await page.getByRole("button", { name: "Request coach account", exact: true }).click();
-      await page.getByRole("status").waitFor();
+      const requestDialog = page.getByRole("dialog");
+      await requestDialog.waitFor(); await requestDialog.getByText("Your account request is with Skyra", { exact: true }).waitFor();
+      await page.screenshot({ path: resolve(out, "login-request-success-390.png"), fullPage: true });
+      await requestDialog.getByRole("button", { name: "Close", exact: true }).click(); await requestDialog.waitFor({ state: "hidden" });
+      await page.getByLabel("Your name", { exact: true }).evaluate(input => input.removeAttribute("minlength"));
+      await page.getByLabel("Your name", { exact: true }).fill("K");
+      await page.getByRole("button", { name: "Request coach account", exact: true }).click();
+      await requestDialog.waitFor(); await requestDialog.getByText("We could not submit your request", { exact: true }).waitFor();
+      await page.screenshot({ path: resolve(out, "login-request-error-390.png"), fullPage: true });
+      await requestDialog.getByRole("button", { name: "Close", exact: true }).click(); await requestDialog.waitFor({ state: "hidden" });
       const request = await db.coachAccountRequest.findFirstOrThrow({ where: { shopId: fixture.shop.id } });
       assert.equal(request.status, "PENDING"); assert.equal((await db.coach.findUniqueOrThrow({ where: { id: fixture.coach.id } })).loginEmail, null);
       await reviewCoachAccount(actor, { requestId: request.id, decision: "approve", coachId: fixture.coach.id });

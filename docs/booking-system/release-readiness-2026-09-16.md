@@ -9,6 +9,7 @@
 - Coach 不 Check in。Booking 默认会出席；课程结束后可标记 No-show，系统退回 1 次已预留 Pass，并给 Admin 建立提醒。24 小时窗口后仍未标记的 Booking 自动结算为 Attended。
 - Customer Booking 确认会建立 Customer、对应 Coach、Admin 三方站内通知；邮件任务和可选投递 adapter 已实现。
 - Coach 登录页已支持 Coach 自己填写姓名和邮箱提交账号申请。申请不会直接取得权限；Admin 在 People → Coach account requests 选择现有 Coach（例如 Karen）并批准后，才绑定登录邮箱。
+- People 的 Coach 邮箱设置已改为左侧 Authorized login email、右侧 Booking-notification email，手机端上下排列；公开 Coach 注册提交后会弹出可关闭的成功或失败结果，不再只显示页面内文字。
 - Admin Reports 已按 `wireframes.html` 的两块结构实现：Customer spending 与 Purchased Passes with unused classes；支持日期、Customer 筛选、单份 CSV 和双报告 ZIP。
 - Reports 当前不会伪造 Shopify refund：尚未同步的 Refund 显示未连接；全店 Shopify 订单/折扣/退款不是当前 Booking 报表数据源。
 

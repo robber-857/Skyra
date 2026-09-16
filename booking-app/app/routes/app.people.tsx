@@ -340,58 +340,81 @@ export default function People() {
         )}
         {coaches.length === 0 && <p className="empty">No coaches yet.</p>}
         {coaches.map((coach) => (
-          <article className="record" key={coach.id}>
-            <div>
+          <article className="record coach-record" key={coach.id}>
+            <div className="coach-record-details">
               <h3>{coach.name}</h3>
               <p className="muted">
                 {coach.bufferBeforeMin} min before · {coach.bufferAfterMin} min
                 after
               </p>
-              <Form method="post" className="inline-email-form">
-                <input
-                  type="hidden"
-                  name="intent"
-                  value="coach-notification-email"
-                />
-                <input type="hidden" name="coachId" value={coach.id} />
-                <label>
-                  <span className="visually-hidden">
-                    Booking-notification email for {coach.name}
-                  </span>
-                  <input
-                    name="notificationEmail"
-                    type="email"
-                    maxLength={254}
-                    defaultValue={coach.notificationEmail || ""}
-                    placeholder="Not configured"
-                  />
-                </label>
-                <button disabled={busy}>Save email</button>
-              </Form>
-              {canBindLogin && coach.status === "ACTIVE" && (
-                <Form method="post" className="inline-email-form">
+              <div className="coach-email-settings">
+                {canBindLogin && coach.status === "ACTIVE" && (
+                  <Form method="post" className="coach-email-setting">
+                    <input
+                      type="hidden"
+                      name="intent"
+                      value="coach-login-email"
+                    />
+                    <input type="hidden" name="coachId" value={coach.id} />
+                    <div className="coach-email-setting-head">
+                      <strong>Authorized login email</strong>
+                      <span className="muted">
+                        {coach.loginVerifiedAt ? "Verified" : "Not activated"}
+                      </span>
+                    </div>
+                    <p className="muted">
+                      Grants portal access after email verification.
+                    </p>
+                    <label className="field">
+                      <span className="visually-hidden">
+                        Authorized login email for {coach.name}
+                      </span>
+                      <input
+                        name="loginEmail"
+                        type="email"
+                        maxLength={254}
+                        defaultValue={coach.loginEmail || ""}
+                        placeholder="Not authorized"
+                      />
+                    </label>
+                    <div className="actions">
+                      <button disabled={busy}>Authorize login email</button>
+                    </div>
+                  </Form>
+                )}
+                <Form
+                  method="post"
+                  className="coach-email-setting coach-email-setting-notification"
+                >
                   <input
                     type="hidden"
                     name="intent"
-                    value="coach-login-email"
+                    value="coach-notification-email"
                   />
                   <input type="hidden" name="coachId" value={coach.id} />
-                  <label>
-                    Authorized login email
+                  <div className="coach-email-setting-head">
+                    <strong>Booking-notification email</strong>
+                  </div>
+                  <p className="muted">
+                    Receives booking updates; does not grant login access.
+                  </p>
+                  <label className="field">
+                    <span className="visually-hidden">
+                      Booking-notification email for {coach.name}
+                    </span>
                     <input
-                      name="loginEmail"
+                      name="notificationEmail"
                       type="email"
                       maxLength={254}
-                      defaultValue={coach.loginEmail || ""}
-                      placeholder="Not authorized"
+                      defaultValue={coach.notificationEmail || ""}
+                      placeholder="Not configured"
                     />
                   </label>
-                  <button disabled={busy}>Authorize login email</button>
-                  <span className="muted">
-                    {coach.loginVerifiedAt ? "Verified" : "Not activated"}
-                  </span>
+                  <div className="actions">
+                    <button disabled={busy}>Save email</button>
+                  </div>
                 </Form>
-              )}
+              </div>
             </div>
             {testAccessAvailable && coach.status === "ACTIVE" && (
               <Form method="post">

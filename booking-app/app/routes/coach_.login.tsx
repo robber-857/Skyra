@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   data,
   Form,
@@ -39,9 +39,11 @@ export const loader = async () =>
   );
 export async function action({ request }: ActionFunctionArgs) {
   requireCoachFormOrigin(request);
+  let intent = "";
   try {
     const form = await request.formData();
-    if (form.get("intent") === "request-account") {
+    intent = String(form.get("intent") || "");
+    if (intent === "request-account") {
       if (!form.get("website"))
         await requestCoachAccount({
           name: String(form.get("name") || ""),
@@ -49,6 +51,7 @@ export async function action({ request }: ActionFunctionArgs) {
         });
       return data(
         {
+          feedbackFor: "request-account" as const,
           message:
             "Request received. The studio Admin will review your name and email in People. You cannot access a roster until approved and your email is verified.",
         },
@@ -73,17 +76,27 @@ export async function action({ request }: ActionFunctionArgs) {
     if (error instanceof DomainError)
       return data(
         {
+          feedbackFor:
+            intent === "request-account"
+              ? ("request-account" as const)
+              : undefined,
           error: ["MAIL_NOT_CONFIGURED", "REGISTRATION_UNAVAILABLE"].includes(
             error.code,
           )
             ? error.message
-            : "This sign-in link has expired or was already used. Request a new link.",
+            : intent === "request-account"
+              ? error.message
+              : "This sign-in link has expired or was already used. Request a new link.",
         },
         { status: error.status, headers: headers() },
       );
     if (error instanceof z.ZodError)
       return data(
         {
+          feedbackFor:
+            intent === "request-account"
+              ? ("request-account" as const)
+              : undefined,
           error:
             "Enter your name (2–100 characters) and a valid email address.",
         },
@@ -94,6 +107,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 export default function CoachLogin() {
   const [token, setToken] = useState("");
+  const feedbackDialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const readLink = () => {
       const value =
@@ -108,6 +122,17 @@ export default function CoachLogin() {
     return () => window.removeEventListener("hashchange", readLink);
   }, []);
   const result = useActionData<typeof action>();
+  const accountFeedback = (
+    result &&
+    "feedbackFor" in result &&
+    result.feedbackFor === "request-account"
+      ? result
+      : null
+  ) as { error?: string; message?: string } | null;
+  useEffect(() => {
+    if (accountFeedback && !feedbackDialog.current?.open)
+      feedbackDialog.current?.showModal();
+  }, [accountFeedback]);
   const { emailSignInAvailable, registrationAvailable } =
     useLoaderData<typeof loader>();
   const busy = useNavigation().state !== "idle";
@@ -116,12 +141,40 @@ export default function CoachLogin() {
       <section className="panel">
         <p className="muted">SKYRA · COACH</p>
         <h1>Your coach portal</h1>
-        {result && "error" in result && (
+        {result && !accountFeedback && "error" in result && (
           <p role="alert" className="feedback error">
             {result.error}
           </p>
         )}
-        {result && "message" in result && <p role="status">{result.message}</p>}
+        {result && !accountFeedback && "message" in result && (
+          <p role="status">{result.message}</p>
+        )}
+        {accountFeedback && (
+          <dialog
+            ref={feedbackDialog}
+            className={`feedback-dialog ${accountFeedback.error ? "error" : "success"}`}
+            aria-labelledby="coach-request-result-title"
+          >
+            <p className="feedback-dialog-kicker">
+              {accountFeedback.error ? "Request failed" : "Request sent"}
+            </p>
+            <h2 id="coach-request-result-title">
+              {accountFeedback.error
+                ? "We could not submit your request"
+                : "Your account request is with Skyra"}
+            </h2>
+            <p>{accountFeedback.error || accountFeedback.message}</p>
+            <div className="actions">
+              <button
+                type="button"
+                className="primary"
+                onClick={() => feedbackDialog.current?.close()}
+              >
+                Close
+              </button>
+            </div>
+          </dialog>
+        )}
         {token ? (
           <form method="post" action="/coach/login">
             <input type="hidden" name="token" value={token} />
