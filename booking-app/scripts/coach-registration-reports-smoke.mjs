@@ -15,6 +15,7 @@ import { deliverCoachLogin } from "../app/services/coach-self-service.server.ts"
 import { bookingReports } from "../app/services/booking-reports.server.ts";
 import { AdminReportsView } from "../app/components/admin-reports-view.tsx";
 import { reportCsv, reportZip } from "../app/lib/report-exports.server.ts";
+import People from "../app/routes/app.people.tsx";
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
 if (new URL(process.env.DATABASE_URL).pathname !== "/skyra_booking_test") throw new Error("Dedicated test DB required");
@@ -29,13 +30,16 @@ const css = await readFile("app/styles/admin.css", "utf8");
 const router = createMemoryRouter([{ path: "/app/reports", element: createElement(AdminReportsView, { data: report, error: null }) }], { initialEntries: ["/app/reports"] });
 const markup = renderToString(createElement(RouterProvider, { router }));
 const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><body>${markup}</body></html>`;
+const peopleData = { coaches: [{ ...fixture.coach, name: "Karen", loginEmail: "karen@example.com", notificationEmail: "karen@example.com", loginVerifiedAt: null }], testAccessAvailable: false, canBindLogin: true, emailSignInAvailable: false, accountRequests: [] };
+const peopleRouter = createMemoryRouter([{ id: "people", path: "/app/people", element: createElement(People), loader: () => peopleData }], { initialEntries: ["/app/people"], hydrationData: { loaderData: { people: peopleData } } });
+const peopleHtml = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><body>${renderToString(createElement(RouterProvider, { router: peopleRouter }))}</body></html>`;
 const preview = createServer((request, response) => {
   const url = new URL(request.url, "http://127.0.0.1:3315");
   if (url.pathname === "/app/reports/export") {
     const kind = url.searchParams.get("type");
     response.writeHead(200, { "Content-Type": kind === "both" ? "application/zip" : "text/csv", "Content-Disposition": `attachment; filename="reports.${kind === "both" ? "zip" : "csv"}"` });
     response.end(kind === "both" ? reportZip(report) : reportCsv(report, kind === "unused" ? "unused" : "spending"));
-  } else { response.writeHead(200, { "Content-Type": "text/html" }); response.end(html); }
+  } else { response.writeHead(200, { "Content-Type": "text/html" }); response.end(url.pathname === "/app/people" ? peopleHtml : html); }
 });
 await new Promise(resolve => preview.listen(3315, "127.0.0.1", resolve));
 // Fake configuration in a dedicated fixture process. No Worker is started,
@@ -72,6 +76,13 @@ try {
     await page.getByRole("link", { name: "Export both reports", exact: true }).click();
     const download = await downloadPromise; await download.saveAs(resolve(out, `reports-${width}.zip`));
     assert.equal(await download.failure(), null);
+    await page.goto("http://127.0.0.1:3315/app/people");
+    const loginBounds = await page.getByLabel("Authorized login email for Karen", { exact: true }).boundingBox();
+    const notificationBounds = await page.getByLabel("Booking-notification email for Karen", { exact: true }).boundingBox();
+    assert.ok(loginBounds && notificationBounds);
+    assert.ok(width > 600 ? loginBounds.x < notificationBounds.x && Math.abs(loginBounds.y - notificationBounds.y) < 1 : loginBounds.y < notificationBounds.y);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await page.screenshot({ path: resolve(out, `people-${width}.png`), fullPage: true });
     await page.goto("http://127.0.0.1:3314/coach/login");
     await page.getByLabel("Your name", { exact: true }).waitFor();
     await page.screenshot({ path: resolve(out, `login-${width}.png`), fullPage: true });
@@ -104,7 +115,7 @@ try {
       assert.ok((await db.coach.findUniqueOrThrow({ where: { id: fixture.coach.id } })).loginVerifiedAt);
     }
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
-    assert.deepEqual(errors, []); results.push({ width, reportsTables: true, csvZipDownload: true, registrationForm: true, noOverflow: true, pageErrors: errors });
+    assert.deepEqual(errors, []); results.push({ width, reportsTables: true, csvZipDownload: true, peopleEmailLayout: true, registrationForm: true, noOverflow: true, pageErrors: errors });
     await context.close();
   }
   await writeFile(resolve(out, "results.json"), JSON.stringify({ results, mockEmailFlow: true, realEmailSent: false, realKarenUat: false }, null, 2));

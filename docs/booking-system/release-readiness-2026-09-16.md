@@ -77,9 +77,9 @@
 - 银行账户只在 Shopify 后台填写，不发给开发人员，不截图保存到项目文档。
 - 同时确认 `hello@skyrastudio.com.au` 与 DNS 管理账号可登录；Shopify 通知发件认证和 Booking App 事务邮件 provider 是两套配置，都要分别验收。
 
-## 本批交付状态
+## 前一批交付状态（06468757）
 
-- 运行提交：`06468757b36688826519b516b25996f8a2f3f57b`，本地与 `origin/bookingdev` 一致。
+- 前一批运行提交：`06468757b36688826519b516b25996f8a2f3f57b`。
 - GitHub Actions：Booking App run `35080110796` success；setup、check 与完整 test 全部通过。
 - Render Dev：deploy `dep-dal64seq1p3s73ekc8bg` 在同一 SHA Live；pre-deploy 成功应用 015–019，Web/Worker 启动，`/health` 200。
 - 部署后 `/coach/login` 返回 200，显示 Coach 自助申请姓名/邮箱表单；当前同时提示 Email activation 尚未连接。
@@ -87,3 +87,14 @@
 - Render 的 mail provider、From、provider secret、Coach login shop 和 payload key 当前均未配置；没有真实发送邮件。
 
 本批只部署到 Dev Render。没有发布正式店、没有发布新的 Shopify App extension version、没有开启付款开关、没有发送真实邮件。
+
+## Coach 邮箱布局与注册反馈补丁验收
+
+- 运行提交：`a1b83b76b7f78cef962ced0ea721a3cf66cb20aa`，已推送 `bookingdev`。
+- People：Authorized login email 在左栏，Booking-notification email 在右栏；手机端依次上下排列，输入框、说明与按钮对齐。授权/保存的后台逻辑未改变。
+- `/coach/login`：Request coach account 的成功或业务/校验失败会显示原生 modal dialog，支持 Close 与 Escape；成功仅代表申请已收到，不代表账号获批、激活或邮件已投递。
+- 专用数据库完整回归：35 个文件 / 379 项通过；完整 `check`、Worker bundle 通过。
+- 浏览器：390px / 1440px 的实际 People 组件布局、登录表单和 Reports 模拟流程通过，无横向溢出、`pageErrors=[]`；成功与服务端校验失败弹窗均实际触发并关闭。
+- 证据：`output/playwright/coach-registration-reports/` 中的 `people-390.png`、`people-1440.png`、`login-request-success-390.png`、`login-request-error-390.png` 和 `results.json`。邮件仍使用 mock，`realEmailSent=false`、`realKarenUat=false`。
+- GitHub Actions：run `35083383326` success。Render Dev：deploy `dep-dal6lc95efls73fqojh0` Live，与上述运行 SHA 一致。
+- 线上只读核对：登录页、`/health`、弹窗 JS 均 200；新成功/失败文案与 People grid CSS 已发布。未在真实 Dev 创建测试申请、未修改 Karen 邮箱、未发送邮件。
