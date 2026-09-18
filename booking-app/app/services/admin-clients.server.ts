@@ -165,13 +165,13 @@ export async function adminClientDetail(
       if (!client) throw new DomainError("NOT_FOUND", "Client not found.", 404);
       const where = { shopId: shop.id, customerId: id };
       const total = await tx.entitlement.count({ where }),
-        pages = Math.max(1, Math.ceil(total / 25)),
+        pages = Math.max(1, Math.ceil(total / 5)),
         page = Math.min(input.passPage, pages);
       const passes = await tx.entitlement.findMany({
         where,
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        skip: (page - 1) * 25,
-        take: 25,
+        skip: (page - 1) * 5,
+        take: 5,
         include: {
           passPlan: { select: { name: true } },
           service: { select: { name: true } },

@@ -8,10 +8,17 @@ const query = z
   .object({
     view: z.enum(["upcoming", "history", "passes"]).default("upcoming"),
     cursor: z.string().uuid().optional(),
+    page: z.coerce.number().int().min(1).max(100000).optional(),
   })
   .strict();
 export async function customerAccountData(actor: BookingActor, raw: unknown) {
   const input = query.parse(raw);
+  if (input.page !== undefined && (input.view !== "passes" || input.cursor))
+    throw new DomainError(
+      "INVALID_PAGE",
+      "Choose a Pass page without a cursor.",
+      400,
+    );
   if (!actor.customerGid)
     throw new DomainError(
       "LOGIN_REQUIRED",
@@ -37,77 +44,101 @@ export async function customerAccountData(actor: BookingActor, raw: unknown) {
     bookings: [],
     passes: [],
     nextCursor: null,
+    page: 1,
+    totalPages: 1,
+    totalPasses: 0,
   };
   if (!customer) return empty;
   if (input.view === "passes") {
-    if (
-      input.cursor &&
-      !(await db.entitlement.findFirst({
-        where: { id: input.cursor, shopId: shop.id, customerId: customer.id },
-      }))
-    )
-      throw new DomainError("INVALID_CURSOR", "Choose a valid page.", 400);
-    const rows = await db.entitlement.findMany({
-      where: { shopId: shop.id, customerId: customer.id },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: 26,
-      ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
-      include: {
-        passPlan: {
-          select: {
-            name: true,
-            services: { select: { service: { select: { name: true } } } },
+    return db.$transaction(
+      async (tx) => {
+        const where = { shopId: shop.id, customerId: customer.id };
+        const totalPasses = await tx.entitlement.count({ where });
+        const numbered = input.page !== undefined;
+        const pageSize = numbered ? 5 : 25;
+        const totalPages = Math.max(1, Math.ceil(totalPasses / pageSize));
+        const page = Math.min(input.page || 1, totalPages);
+        if (
+          input.cursor &&
+          !(await tx.entitlement.findFirst({
+            where: {
+              id: input.cursor,
+              shopId: shop.id,
+              customerId: customer.id,
+            },
+          }))
+        )
+          throw new DomainError("INVALID_CURSOR", "Choose a valid page.", 400);
+        const rows = await tx.entitlement.findMany({
+          where: { shopId: shop.id, customerId: customer.id },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: numbered ? 5 : 26,
+          ...(numbered ? { skip: (page - 1) * 5 } : {}),
+          ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+          include: {
+            passPlan: {
+              select: {
+                name: true,
+                services: { select: { service: { select: { name: true } } } },
+              },
+            },
+            service: { select: { name: true, kind: true } },
+            ledgerEntries: {
+              orderBy: { createdAt: "desc" },
+              select: {
+                id: true,
+                kind: true,
+                availableDelta: true,
+                reservedDelta: true,
+                consumedDelta: true,
+                createdAt: true,
+              },
+            },
           },
-        },
-        service: { select: { name: true, kind: true } },
-        ledgerEntries: {
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            kind: true,
-            availableDelta: true,
-            reservedDelta: true,
-            consumedDelta: true,
-            createdAt: true,
-          },
-        },
-      },
-    });
-    return {
-      ...empty,
-      passes: rows.slice(0, 25).map((e) => {
-        const balance = e.ledgerEntries.reduce(
-          (b, x) => ({
-            available: b.available + x.availableDelta,
-            reserved: b.reserved + x.reservedDelta,
-            used: b.used + x.consumedDelta,
-          }),
-          { available: 0, reserved: 0, used: 0 },
-        );
+        });
         return {
-          id: e.id,
-          name: e.passPlan?.name || e.service?.name || "Class credit",
-          status:
-            e.status === "ACTIVE" && e.expiresAt <= now ? "EXPIRED" : e.status,
-          startsAt: e.startsAt.toISOString(),
-          expiresAt: e.expiresAt.toISOString(),
-          ...balance,
-          eligibleClasses: e.passPlan?.services.map((s) => s.service.name) || [
-            e.service?.name || "",
-          ],
-          history: e.ledgerEntries.slice(0, 20).map((x) => ({
-            id: x.id,
-            kind: x.kind,
-            availableDelta: x.availableDelta,
-            reservedDelta: x.reservedDelta,
-            consumedDelta: x.consumedDelta,
-            createdAt: x.createdAt.toISOString(),
-          })),
-          historyTruncated: e.ledgerEntries.length > 20,
+          ...empty,
+          passes: rows.slice(0, pageSize).map((e) => {
+            const balance = e.ledgerEntries.reduce(
+              (b, x) => ({
+                available: b.available + x.availableDelta,
+                reserved: b.reserved + x.reservedDelta,
+                used: b.used + x.consumedDelta,
+              }),
+              { available: 0, reserved: 0, used: 0 },
+            );
+            return {
+              id: e.id,
+              name: e.passPlan?.name || e.service?.name || "Class credit",
+              status:
+                e.status === "ACTIVE" && e.expiresAt <= now
+                  ? "EXPIRED"
+                  : e.status,
+              startsAt: e.startsAt.toISOString(),
+              expiresAt: e.expiresAt.toISOString(),
+              ...balance,
+              eligibleClasses: e.passPlan?.services.map(
+                (s) => s.service.name,
+              ) || [e.service?.name || ""],
+              history: e.ledgerEntries.slice(0, 20).map((x) => ({
+                id: x.id,
+                kind: x.kind,
+                availableDelta: x.availableDelta,
+                reservedDelta: x.reservedDelta,
+                consumedDelta: x.consumedDelta,
+                createdAt: x.createdAt.toISOString(),
+              })),
+              historyTruncated: e.ledgerEntries.length > 20,
+            };
+          }),
+          nextCursor: !numbered && rows.length > 25 ? rows[24].id : null,
+          page,
+          totalPages,
+          totalPasses,
         };
-      }),
-      nextCursor: rows.length > 25 ? rows[24].id : null,
-    };
+      },
+      { isolationLevel: "RepeatableRead" },
+    );
   }
   if (
     input.cursor &&

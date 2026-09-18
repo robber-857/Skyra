@@ -8,6 +8,12 @@ Reports customer names also open the profile; the report dropdown still filters.
 Directory pages show 10 clients, with Previous/Next, current / total page count
 and a page jump. Page and search are URL parameters, retained on refresh.
 
+Client detail Passes & class credits show 5 items per page, with Previous/Next,
+current / total pages and a page jump. The passPage URL parameter survives refresh.
+Customer Account My passes uses the same 5-item numbered API, restoring its tab
+and page from Shopify navigation entry state on refresh. Legacy cursor clients
+and the Overview summary keep their existing 25-item API contract.
+
 Display names use preferred name, then Shopify first + last name, then email,
 then “Unnamed client”. Internal UUIDs remain the stable relational identifiers.
 Shopify contact data is refreshed in batches on Admin page loads, with a one-hour

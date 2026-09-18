@@ -2,6 +2,7 @@ import type { Api } from "@shopify/ui-extensions/customer-account.page.render";
 import "@shopify/ui-extensions/preact";
 import { render } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
+import { restoredPassNavigation, withPassNavigation } from "./pass-navigation";
 
 type View =
   "overview" | "upcoming" | "history" | "passes" | "appointments" | "profile";
@@ -57,6 +58,9 @@ type Account = {
   bookings: Booking[];
   passes: Pass[];
   nextCursor: string | null;
+  page: number;
+  totalPages: number;
+  totalPasses: number;
 };
 type Profile = {
   preferredName: string;
@@ -169,10 +173,11 @@ async function request<T>(
   }
 }
 
-function accountData(view: DataView, cursor?: string) {
+function accountData(view: DataView, cursor?: string, page?: number) {
   const path = new URL("/api/customer-bookings", apiBase());
   path.searchParams.set("view", view);
   if (cursor) path.searchParams.set("cursor", cursor);
+  if (page !== undefined) path.searchParams.set("page", String(page));
   return request<Account>(path.href);
 }
 
@@ -219,7 +224,13 @@ function fieldValue(event: Event) {
 }
 
 function AccountPage() {
-  const [view, setView] = useState<View>("overview");
+  const initialPassState = restoredPassNavigation(
+    navigation.currentEntry.getState(),
+  );
+  const [view, setView] = useState<View>(
+    initialPassState.active ? "passes" : "overview",
+  );
+  const passPage = useRef(initialPassState.page);
   const [data, setData] = useState<Account | null>(null);
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [draft, setDraft] = useState<Profile>(emptyProfile);
@@ -235,7 +246,11 @@ function AccountPage() {
   const generation = useRef(0);
   const bookingUrl = findClassUrl();
 
-  async function load(nextView: View, cursor?: string) {
+  async function load(
+    nextView: View,
+    cursor?: string,
+    requestedPage = passPage.current,
+  ) {
     const run = ++generation.current;
     setBusy(true);
     setError("");
@@ -260,6 +275,19 @@ function AccountPage() {
           setData({ ...upcoming, passes: passes.passes, nextCursor: null });
           setProfile(nextProfile);
           setDraft(nextProfile);
+        }
+      } else if (nextView === "passes") {
+        const next = await accountData("passes", undefined, requestedPage);
+        if (run === generation.current) {
+          setData(next);
+          passPage.current = next.page;
+          navigation.updateCurrentEntry({
+            state: withPassNavigation(
+              navigation.currentEntry.getState(),
+              true,
+              next.page,
+            ),
+          });
         }
       } else if (nextView === "appointments") {
         const [upcoming, history] = await Promise.all([
@@ -287,7 +315,18 @@ function AccountPage() {
               : next,
           );
       }
-      if (run === generation.current) setUncertain(false);
+      if (run === generation.current) {
+        setUncertain(false);
+        if (nextView !== "passes") {
+          navigation.updateCurrentEntry({
+            state: withPassNavigation(
+              navigation.currentEntry.getState(),
+              false,
+              passPage.current,
+            ),
+          });
+        }
+      }
     } catch (caught) {
       if (run === generation.current)
         setError(
@@ -496,219 +535,225 @@ function AccountPage() {
           {busy && (
             <s-box padding="base" background="subdued" borderRadius="base">
               <s-stack direction="inline" gap="small" alignItems="center">
-                <s-spinner
-                  size="small"
-                  accessibilityLabel="Loading account"
-                />
+                <s-spinner size="small" accessibilityLabel="Loading account" />
                 <s-text color="subdued">Loading your Skyra account…</s-text>
               </s-stack>
             </s-box>
           )}
-        {moving && (
-          <s-section heading="Choose another class time">
-            <s-stack gap="base">
-              <s-text>
-                Changes are available at least 12 hours before your current
-                booking. Your credit keeps its original expiry date.
-              </s-text>
-              {targets.length === 0 && (
-                <s-text>
-                  No other eligible times are available. Your booking is
-                  unchanged.
-                </s-text>
-              )}
-              {targets.map((option) => (
-                <s-button
-                  key={option.id}
-                  disabled={busy || uncertain}
-                  variant={target?.id === option.id ? "primary" : "secondary"}
-                  onClick={() => setTarget(option)}
-                >
-                  {date(option.startsAt, option.timezone)} · {option.coachName}
-                </s-button>
-              ))}
-              {target && (
-                <s-button
-                  variant="primary"
-                  disabled={busy || uncertain}
-                  onClick={() => void moveBooking()}
-                >
-                  Confirm new time
-                </s-button>
-              )}
-              <s-button
-                disabled={busy}
-                onClick={() => {
-                  setMoving(null);
-                  setTarget(null);
-                }}
-              >
-                Keep current booking
-              </s-button>
-            </s-stack>
-          </s-section>
-        )}
-        {selected && (
-          <s-section heading="Cancel this booking?">
-            <s-stack gap="base">
-              <s-text>
-                {selected.className} ·{" "}
-                {date(selected.startsAt, selected.timezone)}
-              </s-text>
-              <s-text>
-                {selected.cancellationOutcome === "CANCELLED"
-                  ? "Cancelling at least 12 hours before the start returns the class credit to your pass."
-                  : "This is within 12 hours of the start. Cancelling will use the class credit."}{" "}
-                No payment refund is issued here.
-              </s-text>
-              <s-stack direction="inline" gap="small">
-                <s-button
-                  variant="primary"
-                  disabled={busy || uncertain}
-                  onClick={() => void cancel()}
-                >
-                  Confirm cancellation
-                </s-button>
-                <s-button disabled={busy} onClick={() => setSelected(null)}>
-                  Keep booking
-                </s-button>
-              </s-stack>
-            </s-stack>
-          </s-section>
-        )}
-        {view === "overview" && data && (
-          <Overview
-            account={data}
-            profile={profile}
-            bookingUrl={bookingUrl}
-            open={setView}
-          />
-        )}
-        {view === "passes" && data && <Passes account={data} />}
-        {(view === "upcoming" || view === "history") && data && (
-          <Bookings
-            account={data}
-            view={view}
-            open={setView}
-            busy={busy}
-            uncertain={uncertain}
-            select={setSelected}
-            move={chooseTime}
-          />
-        )}
-        {view === "appointments" && data && (
-          <Appointments
-            account={data}
-            bookingUrl={bookingUrl}
-            busy={busy}
-            uncertain={uncertain}
-            select={setSelected}
-            move={chooseTime}
-          />
-        )}
-        {view === "profile" && (
-          <s-stack gap="base">
-            <s-banner>
-              Shopify continues to manage your account name, email and
-              addresses. Training profile stores only your Skyra photo,
-              preferred name, signature and training goals.
-            </s-banner>
-            <s-section heading="Training profile">
+          {moving && (
+            <s-section heading="Choose another class time">
               <s-stack gap="base">
-                <s-stack
-                  direction="inline"
-                  gap="base"
-                  justifyContent="space-between"
-                  alignItems="center"
-                >
-                  <s-stack gap="small">
-                    <s-heading>
-                      {draft.preferredName || "Skyra member"}
-                    </s-heading>
-                    {draft.signature && <s-text>{draft.signature}</s-text>}
-                  </s-stack>
-                  <s-avatar
-                    size="large-200"
-                    initials={initials}
-                    src={draft.avatarDataUrl || undefined}
-                    alt="Your Skyra profile avatar"
-                  />
-                </s-stack>
-                <s-divider />
-                <s-drop-zone
-                  label="Upload profile photo"
-                  accessibilityLabel="Upload a PNG, JPEG or WebP profile photo"
-                  accept="image/png,image/jpeg,image/webp"
-                  error={avatarError || undefined}
-                  disabled={busy}
-                  onChange={(event) => void chooseAvatar(event)}
-                />
-                {draft.avatarDataUrl && (
+                <s-text>
+                  Changes are available at least 12 hours before your current
+                  booking. Your credit keeps its original expiry date.
+                </s-text>
+                {targets.length === 0 && (
+                  <s-text>
+                    No other eligible times are available. Your booking is
+                    unchanged.
+                  </s-text>
+                )}
+                {targets.map((option) => (
                   <s-button
-                    disabled={busy}
-                    onClick={() =>
-                      setDraft((current) => ({
-                        ...current,
-                        avatarDataUrl: null,
-                      }))
-                    }
+                    key={option.id}
+                    disabled={busy || uncertain}
+                    variant={target?.id === option.id ? "primary" : "secondary"}
+                    onClick={() => setTarget(option)}
                   >
-                    Remove photo
+                    {date(option.startsAt, option.timezone)} ·{" "}
+                    {option.coachName}
+                  </s-button>
+                ))}
+                {target && (
+                  <s-button
+                    variant="primary"
+                    disabled={busy || uncertain}
+                    onClick={() => void moveBooking()}
+                  >
+                    Confirm new time
                   </s-button>
                 )}
-                <s-text>Maximum 512 KB. PNG, JPEG or WebP only.</s-text>
-                <s-text-field
-                  label="Preferred name"
-                  value={draft.preferredName}
-                  maxLength={80}
-                  disabled={busy}
-                  onInput={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      preferredName: fieldValue(event),
-                    }))
-                  }
-                />
-                <s-text-area
-                  label="Signature"
-                  value={draft.signature}
-                  maxLength={160}
-                  rows={3}
-                  disabled={busy}
-                  onInput={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      signature: fieldValue(event),
-                    }))
-                  }
-                />
-                <s-text-area
-                  label="Training goals"
-                  value={draft.trainingGoals}
-                  maxLength={1000}
-                  rows={6}
-                  disabled={busy}
-                  onInput={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      trainingGoals: fieldValue(event),
-                    }))
-                  }
-                />
                 <s-button
-                  variant="primary"
-                  loading={busy}
-                  disabled={busy || !!avatarError}
-                  onClick={() => void saveProfile()}
+                  disabled={busy}
+                  onClick={() => {
+                    setMoving(null);
+                    setTarget(null);
+                  }}
                 >
-                  Save training profile
+                  Keep current booking
                 </s-button>
               </s-stack>
             </s-section>
-          </s-stack>
-        )}
-        {data?.nextCursor &&
-          (view === "upcoming" || view === "history" || view === "passes") && (
+          )}
+          {selected && (
+            <s-section heading="Cancel this booking?">
+              <s-stack gap="base">
+                <s-text>
+                  {selected.className} ·{" "}
+                  {date(selected.startsAt, selected.timezone)}
+                </s-text>
+                <s-text>
+                  {selected.cancellationOutcome === "CANCELLED"
+                    ? "Cancelling at least 12 hours before the start returns the class credit to your pass."
+                    : "This is within 12 hours of the start. Cancelling will use the class credit."}{" "}
+                  No payment refund is issued here.
+                </s-text>
+                <s-stack direction="inline" gap="small">
+                  <s-button
+                    variant="primary"
+                    disabled={busy || uncertain}
+                    onClick={() => void cancel()}
+                  >
+                    Confirm cancellation
+                  </s-button>
+                  <s-button disabled={busy} onClick={() => setSelected(null)}>
+                    Keep booking
+                  </s-button>
+                </s-stack>
+              </s-stack>
+            </s-section>
+          )}
+          {view === "overview" && data && (
+            <Overview
+              account={data}
+              profile={profile}
+              bookingUrl={bookingUrl}
+              open={setView}
+            />
+          )}
+          {view === "passes" && data && (
+            <s-stack gap="base">
+              <Passes account={data} />
+              <PassPagination
+                account={data}
+                busy={busy}
+                changePage={(page) => void load("passes", undefined, page)}
+              />
+            </s-stack>
+          )}
+          {(view === "upcoming" || view === "history") && data && (
+            <Bookings
+              account={data}
+              view={view}
+              open={setView}
+              busy={busy}
+              uncertain={uncertain}
+              select={setSelected}
+              move={chooseTime}
+            />
+          )}
+          {view === "appointments" && data && (
+            <Appointments
+              account={data}
+              bookingUrl={bookingUrl}
+              busy={busy}
+              uncertain={uncertain}
+              select={setSelected}
+              move={chooseTime}
+            />
+          )}
+          {view === "profile" && (
+            <s-stack gap="base">
+              <s-banner>
+                Shopify continues to manage your account name, email and
+                addresses. Training profile stores only your Skyra photo,
+                preferred name, signature and training goals.
+              </s-banner>
+              <s-section heading="Training profile">
+                <s-stack gap="base">
+                  <s-stack
+                    direction="inline"
+                    gap="base"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <s-stack gap="small">
+                      <s-heading>
+                        {draft.preferredName || "Skyra member"}
+                      </s-heading>
+                      {draft.signature && <s-text>{draft.signature}</s-text>}
+                    </s-stack>
+                    <s-avatar
+                      size="large-200"
+                      initials={initials}
+                      src={draft.avatarDataUrl || undefined}
+                      alt="Your Skyra profile avatar"
+                    />
+                  </s-stack>
+                  <s-divider />
+                  <s-drop-zone
+                    label="Upload profile photo"
+                    accessibilityLabel="Upload a PNG, JPEG or WebP profile photo"
+                    accept="image/png,image/jpeg,image/webp"
+                    error={avatarError || undefined}
+                    disabled={busy}
+                    onChange={(event) => void chooseAvatar(event)}
+                  />
+                  {draft.avatarDataUrl && (
+                    <s-button
+                      disabled={busy}
+                      onClick={() =>
+                        setDraft((current) => ({
+                          ...current,
+                          avatarDataUrl: null,
+                        }))
+                      }
+                    >
+                      Remove photo
+                    </s-button>
+                  )}
+                  <s-text>Maximum 512 KB. PNG, JPEG or WebP only.</s-text>
+                  <s-text-field
+                    label="Preferred name"
+                    value={draft.preferredName}
+                    maxLength={80}
+                    disabled={busy}
+                    onInput={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        preferredName: fieldValue(event),
+                      }))
+                    }
+                  />
+                  <s-text-area
+                    label="Signature"
+                    value={draft.signature}
+                    maxLength={160}
+                    rows={3}
+                    disabled={busy}
+                    onInput={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        signature: fieldValue(event),
+                      }))
+                    }
+                  />
+                  <s-text-area
+                    label="Training goals"
+                    value={draft.trainingGoals}
+                    maxLength={1000}
+                    rows={6}
+                    disabled={busy}
+                    onInput={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        trainingGoals: fieldValue(event),
+                      }))
+                    }
+                  />
+                  <s-button
+                    variant="primary"
+                    loading={busy}
+                    disabled={busy || !!avatarError}
+                    onClick={() => void saveProfile()}
+                  >
+                    Save training profile
+                  </s-button>
+                </s-stack>
+              </s-section>
+            </s-stack>
+          )}
+          {data?.nextCursor && (view === "upcoming" || view === "history") && (
             <s-button
               disabled={busy}
               onClick={() => void load(view, data.nextCursor!)}
@@ -785,61 +830,65 @@ function Overview({
           gridTemplateColumns="@container (inline-size > 760px) repeat(3, minmax(0, 1fr)), 1fr"
         >
           <s-section heading="Active pass">
-          {activePass ? (
-            <s-stack gap="small">
-              <s-badge>{labels[activePass.status]}</s-badge>
-              <s-heading>{activePass.name}</s-heading>
-              <s-text>{activePass.available} ready to book</s-text>
-              {activePass.reserved > 0 && (
-                <s-text color="subdued">
-                  {activePass.reserved} upcoming booking
-                  {activePass.reserved === 1 ? "" : "s"} using this pass
+            {activePass ? (
+              <s-stack gap="small">
+                <s-badge>{labels[activePass.status]}</s-badge>
+                <s-heading>{activePass.name}</s-heading>
+                <s-text>{activePass.available} ready to book</s-text>
+                {activePass.reserved > 0 && (
+                  <s-text color="subdued">
+                    {activePass.reserved} upcoming booking
+                    {activePass.reserved === 1 ? "" : "s"} using this pass
+                  </s-text>
+                )}
+                <s-text>
+                  Expires {shortDate(activePass.expiresAt, account.timezone)}
                 </s-text>
-              )}
-              <s-text>
-                Expires {shortDate(activePass.expiresAt, account.timezone)}
-              </s-text>
-              <s-button onClick={() => open("passes")}>View passes</s-button>
-            </s-stack>
-          ) : (
-            <s-text>No active pass yet.</s-text>
-          )}
-        </s-section>
-        <s-section heading="Next class">
-          {nextClass ? (
-            <s-stack gap="small">
-              <s-badge>{labels[nextClass.status] || nextClass.status}</s-badge>
-              <s-heading>{nextClass.className}</s-heading>
-              <s-text>{date(nextClass.startsAt, nextClass.timezone)}</s-text>
-              <s-text>
-                {nextClass.coachName} · {nextClass.locationName}
-              </s-text>
-              <s-button onClick={() => open("upcoming")}>View booking</s-button>
-            </s-stack>
-          ) : (
-            <s-text>No upcoming class.</s-text>
-          )}
-        </s-section>
-        <s-section heading="Next appointment">
-          {nextAppointment ? (
-            <s-stack gap="small">
-              <s-badge>
-                {labels[nextAppointment.status] || nextAppointment.status}
-              </s-badge>
-              <s-heading>{nextAppointment.className}</s-heading>
-              <s-text>
-                {date(nextAppointment.startsAt, nextAppointment.timezone)}
-              </s-text>
-              <s-text>
-                {nextAppointment.coachName} · {nextAppointment.locationName}
-              </s-text>
-              <s-button onClick={() => open("upcoming")}>
-                View booking
-              </s-button>
-            </s-stack>
-          ) : (
-            <s-text>No upcoming appointment.</s-text>
-          )}
+                <s-button onClick={() => open("passes")}>View passes</s-button>
+              </s-stack>
+            ) : (
+              <s-text>No active pass yet.</s-text>
+            )}
+          </s-section>
+          <s-section heading="Next class">
+            {nextClass ? (
+              <s-stack gap="small">
+                <s-badge>
+                  {labels[nextClass.status] || nextClass.status}
+                </s-badge>
+                <s-heading>{nextClass.className}</s-heading>
+                <s-text>{date(nextClass.startsAt, nextClass.timezone)}</s-text>
+                <s-text>
+                  {nextClass.coachName} · {nextClass.locationName}
+                </s-text>
+                <s-button onClick={() => open("upcoming")}>
+                  View booking
+                </s-button>
+              </s-stack>
+            ) : (
+              <s-text>No upcoming class.</s-text>
+            )}
+          </s-section>
+          <s-section heading="Next appointment">
+            {nextAppointment ? (
+              <s-stack gap="small">
+                <s-badge>
+                  {labels[nextAppointment.status] || nextAppointment.status}
+                </s-badge>
+                <s-heading>{nextAppointment.className}</s-heading>
+                <s-text>
+                  {date(nextAppointment.startsAt, nextAppointment.timezone)}
+                </s-text>
+                <s-text>
+                  {nextAppointment.coachName} · {nextAppointment.locationName}
+                </s-text>
+                <s-button onClick={() => open("upcoming")}>
+                  View booking
+                </s-button>
+              </s-stack>
+            ) : (
+              <s-text>No upcoming appointment.</s-text>
+            )}
           </s-section>
         </s-grid>
       </s-query-container>
@@ -852,6 +901,68 @@ function Overview({
   );
 }
 
+function PassPagination({
+  account,
+  busy,
+  changePage,
+}: {
+  account: Account;
+  busy: boolean;
+  changePage: (page: number) => void;
+}) {
+  const [jump, setJump] = useState(String(account.page));
+  useEffect(() => setJump(String(account.page)), [account.page]);
+  const target = jump.trim() ? Number(jump) : NaN;
+  const valid =
+    Number.isInteger(target) && target >= 1 && target <= account.totalPages;
+  return (
+    <s-section heading="Pass pages">
+      <s-stack gap="base">
+        <s-text>
+          5 Passes or class credits per page · {account.totalPasses} total
+        </s-text>
+        <s-stack direction="inline" gap="base" alignItems="center">
+          <s-button
+            disabled={busy || account.page === 1}
+            onClick={() => changePage(account.page - 1)}
+          >
+            Previous
+          </s-button>
+          <s-stack accessibilityRole="status">
+            <s-text>
+              {account.page} / {account.totalPages}
+            </s-text>
+          </s-stack>
+          <s-button
+            disabled={busy || account.page === account.totalPages}
+            onClick={() => changePage(account.page + 1)}
+          >
+            Next
+          </s-button>
+        </s-stack>
+        <s-stack direction="inline" gap="base" alignItems="end">
+          <s-number-field
+            label="Go to page"
+            value={jump}
+            min={1}
+            max={account.totalPages}
+            step={1}
+            disabled={busy}
+            onInput={(event) => setJump(fieldValue(event))}
+          />
+          <s-button
+            disabled={busy || !valid}
+            onClick={() => {
+              if (valid) changePage(target);
+            }}
+          >
+            Go
+          </s-button>
+        </s-stack>
+      </s-stack>
+    </s-section>
+  );
+}
 function Passes({ account }: { account: Account }) {
   if (!account.passes.length)
     return (

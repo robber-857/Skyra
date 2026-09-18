@@ -188,6 +188,9 @@ export function AdminClientDetailView({
   warning: string | null;
 }) {
   const c = data.client;
+  const navigate = useNavigate(),
+    navigation = useNavigation();
+  const busy = navigation.state !== "idle";
   return (
     <main className="workspace clients-workspace">
       <Link to="/app/clients" className="client-back">
@@ -336,25 +339,51 @@ export function AdminClientDetailView({
             </article>
           ))}
         </div>
-        {data.pages > 1 && (
-          <nav className="catalog-pagination" aria-label="Pass pages">
-            <span className="muted">
-              Page {data.page} of {data.pages}
+        <nav className="catalog-pagination" aria-label="Pass pages">
+          <span className="muted">5 Passes or class credits per page</span>
+          <div className="catalog-page-controls">
+            <button
+              type="button"
+              disabled={busy || data.page === 1}
+              onClick={() => navigate(`?passPage=${data.page - 1}`)}
+            >
+              Previous
+            </button>
+            <span
+              className="catalog-page-count"
+              role="status"
+              aria-live="polite"
+            >
+              <span className="visually-hidden">Page </span>
+              {data.page} / {data.pages}
             </span>
-            <div className="catalog-page-controls">
-              {data.page > 1 && (
-                <Link className="button" to={`?passPage=${data.page - 1}`}>
-                  Previous Passes
-                </Link>
-              )}
-              {data.page < data.pages && (
-                <Link className="button" to={`?passPage=${data.page + 1}`}>
-                  Next Passes
-                </Link>
-              )}
-            </div>
-          </nav>
-        )}
+            <button
+              type="button"
+              disabled={busy || data.page === data.pages}
+              onClick={() => navigate(`?passPage=${data.page + 1}`)}
+            >
+              Next
+            </button>
+          </div>
+          <Form method="get" className="catalog-page-jump">
+            <label htmlFor="client-pass-page">Go to page</label>
+            <input
+              key={`${data.page}:${data.pages}`}
+              id="client-pass-page"
+              name="passPage"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={data.pages}
+              step={1}
+              required
+              defaultValue={data.page}
+            />
+            <button type="submit" disabled={busy}>
+              Go
+            </button>
+          </Form>
+        </nav>
         <p className="muted">
           Balances come from recorded credit transactions. Reserved credits are
           allocated to bookings.
