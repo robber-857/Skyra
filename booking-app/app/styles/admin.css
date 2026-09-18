@@ -917,3 +917,11 @@ button.danger-text:hover {
 @media(max-width: 600px) {
   .bookings-workspace .booking-record { padding: 16px; }
 }
+
+.notification-filter { display: grid; gap: 6px; font-size: 13px; color: var(--muted, #687773); }
+.notification-head { padding: 0; border: 0; background: transparent; align-items: flex-start; }
+.notification-filter select { min-width: 210px; max-width: 100%; padding: 10px 12px; border: 1px solid #a7b0ab; border-radius: 7px; background: white; color: #262c2b; font: inherit; margin: 0; }
+@media(max-width: 600px) {
+  .notification-filter { width: 100%; }
+  .notification-filter select { width: 100%; min-width: 0; }
+}

@@ -10,7 +10,10 @@
 
 ## Booking emails
 
-每行是同店一个 Booking、recipient kind / id 与 template 的唯一通知。不同 Booking 或确认／取消通知会增加新行；同一通知重试增加 attempts，不复制新行。当前页面只展示最新 50 条 Booking 确认和取消通知，不包括 Coach login 邮件、Shopify 订单邮件或未实现的提醒／No-show 独立邮件。
+每行是同店一个 Booking、recipient kind / id 与 template 的唯一通知。不同 Booking 或确认／取消通知会增加新行；同一通知重试增加 attempts，不复制新行。页面按 All / Admin / Coach / Customer 收件角色分类筛选同店全部 Booking 确认和取消通知，服务端每页 8 条，不再截断于最近 50 条，不包括 Coach login 邮件、Shopify 订单邮件或未实现的提醒／No-show 独立邮件。
+
+- 分类下拉框切换后，通知从第 1 页开始；支持 Previous / Next、当前页 / 总页数、Go 或 Enter 跳转。
+- notificationKind / notificationPage 保存到 URL，刷新和浏览器返回保留分类与页码；保留 shop / host / bookingPage 等上下文，两个列表独立分页。无效分类回 All，无效页码回第一页，越界页码取最后一页，空分类显示空状态。
 
 - PENDING：等待尝试发送；0 attempts 表示从未尝试。
 - SENDING：发送程序已领取通知。
@@ -36,3 +39,5 @@ Preview email 根据当前有效 Booking 和收件对象生成预览，不会发
 真实账本测试涵盖 Pass / Drop-in 的十路并发重试、无 RELEASE、一次 CONSUME、订单来源不变、自动结算不重复、staff No-show。分页测试覆盖 57 条稳定排序、8 页、越界、无效输入、跨店权限和空列表。本地 UI 使用实际组件与模拟数据验证分页、Enter、刷新和查询上下文；这些证据不替代 Shopify 已登录后台 UAT、真实支付或收件箱投递验收。
 
 本轮本地验证结果：npm run check 通过；专用测试库全量 36 个文件 / 382 项全部通过；production-build Coach smoke 在 390px / 1440px 的登录、站内通知、周课表、Month、Training profile、No-show CONSUME、空列表与退出均通过，pageErrors=[]、无横向溢出。Booking 组件 UI fixture 在 1280px / 390px 的 17 条记录分页（8/8/1）、Previous/Next、Go/Enter、无效页码、刷新和 shop 查询参数保留验证通过，控制台无错误／警告。此轮不增加数据库迁移。
+
+通知分类分页补充验证：npm run check 和专用测试库 36 个文件 / 382 项全部通过；数据库验证 74 条通知的 10 页、Admin / Coach / Customer 分类计数、稳定排序、跨店隔离、异常页码与空列表。实际 Booking 组件 fixture 在 1280px / 390px 验证分类、8 条/页、翻页、Go / Enter、无效输入、刷新保留分类及页码、浏览器返回和两个列表独立分页；无页面错误和横向溢出。不改变通知状态或邮件发送配置，不增加数据库迁移。

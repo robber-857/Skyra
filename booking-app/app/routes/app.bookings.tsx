@@ -10,16 +10,24 @@ import { bookingOperationsData } from "../services/booking-operations.server";
 import { Status } from "../components/admin-ui";
 export async function loader({ request }: LoaderFunctionArgs) {
   const { actor } = await adminContext(request);
-  return bookingOperationsData(
-    actor,
-    Number(new URL(request.url).searchParams.get("bookingPage") || 1),
-  );
+  const params = new URL(request.url).searchParams;
+  return bookingOperationsData(actor, Number(params.get("bookingPage") || 1), {
+    notificationPage: Number(params.get("notificationPage") || 1),
+    notificationKind: params.get("notificationKind") || "ALL",
+  });
 }
 export const headers = () => ({ "Cache-Control": "private, no-store" });
 export default function Bookings() {
   const data = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { page, pageSize, totalCount, totalPages } = data.pagination;
+  const email = data.notificationPagination;
+  function changeNotifications(value: number, kind = email.kind) {
+    const params = new URLSearchParams(searchParams);
+    params.set("notificationPage", String(value));
+    params.set("notificationKind", kind);
+    setSearchParams(params, { preventScrollReset: true });
+  }
   function changePage(value: number) {
     const params = new URLSearchParams(searchParams);
     params.set("bookingPage", String(value));
@@ -142,12 +150,33 @@ export default function Bookings() {
           </form>
         </nav>
       )}
-      <section className="panel">
-        <h2>Booking emails</h2>
+      <section className="panel record-list" aria-label="Booking emails">
+        <div className="catalog-list-head notification-head">
+          <h2>Booking emails</h2>
+          <label className="notification-filter" htmlFor="notification-kind">
+            Notification category
+            <select
+              id="notification-kind"
+              value={email.kind}
+              onChange={(event) => changeNotifications(1, event.target.value)}
+            >
+              <option value="ALL">All notifications</option>
+              <option value="ADMIN">Admin notifications</option>
+              <option value="COACH">Coach notifications</option>
+              <option value="CUSTOMER">Customer confirmations</option>
+            </select>
+          </label>
+        </div>
+        <p className="muted" role="status" aria-live="polite">
+          {email.totalCount
+            ? `${(email.page - 1) * email.pageSize + 1}–${Math.min(email.page * email.pageSize, email.totalCount)} of ${email.totalCount}`
+            : "0 notifications"}{" "}
+          · 8 per page
+        </p>
         <p className="muted">
-          Latest 50 booking confirmation and cancellation notifications. Each
-          row is one notification; retries update its attempt count. Preview
-          email generates current content and does not send it or confirm inbox
+          Booking confirmation and cancellation notifications. Each row is one
+          notification; retries update its attempt count. Preview email
+          generates current content and does not send it or confirm inbox
           delivery.
         </p>
         <details className="booking-email-help">
@@ -204,10 +233,73 @@ export default function Bookings() {
           ))
         ) : (
           <p className="muted">
-            Notifications appear after a booking is confirmed.
+            {email.kind === "ALL"
+              ? "Notifications appear after a booking is confirmed."
+              : "No notifications in this category."}
           </p>
         )}
       </section>
+      {email.totalCount > 0 && (
+        <nav
+          className="catalog-pagination"
+          aria-label="Booking emails pagination"
+        >
+          <div className="catalog-page-controls">
+            <button
+              type="button"
+              disabled={email.page === 1}
+              onClick={() => changeNotifications(email.page - 1)}
+            >
+              Previous
+            </button>
+            <span
+              className="catalog-page-count"
+              role="status"
+              aria-live="polite"
+            >
+              <span className="visually-hidden">Page </span>
+              {email.page} / {email.totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={email.page === email.totalPages}
+              onClick={() => changeNotifications(email.page + 1)}
+            >
+              Next
+            </button>
+          </div>
+          <form
+            className="catalog-page-jump"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const target = Number(
+                new FormData(event.currentTarget).get("page"),
+              );
+              if (
+                Number.isInteger(target) &&
+                target >= 1 &&
+                target <= email.totalPages
+              )
+                changeNotifications(target);
+            }}
+          >
+            <label htmlFor="notification-page">Go to page</label>
+            <input
+              key={`${email.page}:${email.totalPages}`}
+              id="notification-page"
+              name="page"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={email.totalPages}
+              step={1}
+              required
+              defaultValue={email.page}
+            />
+            <button type="submit">Go</button>
+          </form>
+        </nav>
+      )}
     </main>
   );
 }

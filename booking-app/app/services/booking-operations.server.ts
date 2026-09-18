@@ -1,11 +1,37 @@
 import db from "../db.server";
 import { requireOperations, type Actor } from "./authorization";
-export async function bookingOperationsData(actor: Actor, requestedPage = 1) {
+export async function bookingOperationsData(
+  actor: Actor,
+  requestedPage = 1,
+  options: { notificationPage?: number; notificationKind?: string } = {},
+) {
   requireOperations(actor);
   const pageSize = 8;
-  const totalCount = await db.booking.count({
-    where: { shopId: actor.shopId },
-  });
+  const notificationKind = ["ADMIN", "COACH", "CUSTOMER"].includes(
+    options.notificationKind || "",
+  )
+    ? options.notificationKind!
+    : "ALL";
+  const notificationWhere = {
+    shopId: actor.shopId,
+    ...(notificationKind === "ALL" ? {} : { recipientKind: notificationKind }),
+  };
+  const [totalCount, notificationCount] = await Promise.all([
+    db.booking.count({ where: { shopId: actor.shopId } }),
+    db.bookingNotification.count({ where: notificationWhere }),
+  ]);
+  const notificationPages = Math.max(
+    1,
+    Math.ceil(notificationCount / pageSize),
+  );
+  const requestedNotificationPage = options.notificationPage ?? 1;
+  const notificationPage = Math.min(
+    Number.isSafeInteger(requestedNotificationPage) &&
+      requestedNotificationPage > 0
+      ? requestedNotificationPage
+      : 1,
+    notificationPages,
+  );
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const page = Math.min(
     Number.isSafeInteger(requestedPage) && requestedPage > 0
@@ -41,9 +67,10 @@ export async function bookingOperationsData(actor: Actor, requestedPage = 1) {
       take: 50,
     }),
     db.bookingNotification.findMany({
-      where: { shopId: actor.shopId },
-      orderBy: { createdAt: "desc" },
-      take: 50,
+      where: notificationWhere,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: (notificationPage - 1) * pageSize,
+      take: pageSize,
       select: {
         id: true,
         bookingId: true,
@@ -68,6 +95,13 @@ export async function bookingOperationsData(actor: Actor, requestedPage = 1) {
     bookings,
     pagination: { page, pageSize, totalCount, totalPages },
     notifications,
+    notificationPagination: {
+      page: notificationPage,
+      pageSize,
+      totalCount: notificationCount,
+      totalPages: notificationPages,
+      kind: notificationKind,
+    },
     attention: receipts.map((r) => ({
       id: r.id,
       status: r.status,
