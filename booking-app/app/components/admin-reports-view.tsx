@@ -1,4 +1,5 @@
 import { DateTime } from "luxon";
+import { useRef } from "react";
 import { Form, Link } from "react-router";
 import type { bookingReports } from "../services/booking-reports.server";
 
@@ -13,6 +14,7 @@ export function AdminReportsView({
   data: ReportData | null;
   error: string | null;
 }) {
+  const datePickerRef = useRef<HTMLDetailsElement>(null);
   const query = new URLSearchParams();
   if (data) {
     query.set("range", data.range.range);
@@ -41,9 +43,15 @@ export function AdminReportsView({
           </p>
         </div>
       </header>
-      <Form method="get" className="reports-toolbar">
+      <Form
+        method="get"
+        className="reports-toolbar"
+        onSubmit={() => {
+          if (datePickerRef.current) datePickerRef.current.open = false;
+        }}
+      >
         <input type="hidden" name="range" value="custom" />
-        <details className="report-date-picker">
+        <details ref={datePickerRef} className="report-date-picker">
           <summary className="button">
             {data
               ? `${date(data.range.from)} – ${date(data.range.to)}`
