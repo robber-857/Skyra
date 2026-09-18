@@ -1,5 +1,6 @@
 import { beforeAll, afterAll, expect, test } from "vitest";
 import { randomUUID } from "node:crypto";
+import { DateTime } from "luxon";
 import db from "../app/db.server";
 import { paidFixture, queuePaid } from "./paid-fixture";
 import { processPaidBookingEvent } from "../app/services/paid-booking.server";
@@ -35,7 +36,12 @@ test("coach sees only assigned classes and confirmed registration counts", async
   const token = await login(f);
   const other = await paidFixture();
   await processPaidBookingEvent((await queuePaid(other)).id);
-  const result = await coachSchedule(token, { range: "week" });
+  const result = await coachSchedule(token, {
+    range: "week",
+    from: DateTime.fromJSDate(f.session.startsAt, {
+      zone: f.session.timezone,
+    }).toISODate()!,
+  });
   expect(result.rows.map((r) => r.id)).toEqual([f.session.id]);
   expect(result.summary).toMatchObject({
     sessions: 1,

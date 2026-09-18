@@ -7,7 +7,8 @@ const menuToggle = document.querySelector(".menu-toggle");
 const menuLabel = document.querySelector(".menu-toggle__label");
 const primaryNav = document.querySelector(".primary-nav");
 const heroImage = document.querySelector(".hero-media__image");
-const mainContent = document.querySelector("main");
+// Shopify wraps the custom header and navigation in its own main element.
+const mainContent = document.querySelector("#main");
 const siteFooter = document.querySelector("footer");
 function applyMotionPreference() {
   body.classList.toggle("motion-enabled", !prefersReducedMotion.matches && !staticMode);
