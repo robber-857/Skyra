@@ -10,9 +10,11 @@ const money = (cents: number) =>
 export function AdminReportsView({
   data,
   error,
+  warning,
 }: {
   data: ReportData | null;
   error: string | null;
+  warning?: string | null;
 }) {
   const datePickerRef = useRef<HTMLDetailsElement>(null);
   const query = new URLSearchParams();
@@ -104,6 +106,11 @@ export function AdminReportsView({
           {error}
         </p>
       )}
+      {warning && (
+        <p className="feedback error" role="alert">
+          {warning}
+        </p>
+      )}
       {data && (
         <>
           <section className="report-block" aria-labelledby="customer-spending">
@@ -156,9 +163,7 @@ export function AdminReportsView({
                   {data.spending.rows.map((row) => (
                     <tr key={row.customerId}>
                       <td>
-                        <Link
-                          to={`/app/reports?range=${data.range.range}&from=${data.range.from}&to=${data.range.to}&customer=${row.customerId}`}
-                        >
+                        <Link to={`/app/clients/${row.customerId}`}>
                           {row.customerName}
                         </Link>
                       </td>
@@ -245,9 +250,7 @@ export function AdminReportsView({
                     return (
                       <tr key={row.entitlementId}>
                         <td>
-                          <Link
-                            to={`/app/reports?range=${data.range.range}&from=${data.range.from}&to=${data.range.to}&customer=${row.customerId}`}
-                          >
+                          <Link to={`/app/clients/${row.customerId}`}>
                             {row.customerName}
                           </Link>
                         </td>

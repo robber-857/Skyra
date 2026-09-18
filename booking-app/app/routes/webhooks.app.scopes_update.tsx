@@ -17,5 +17,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       },
     });
   }
+  if (!current.includes("read_customers")) {
+    const studio = await db.shop.findUnique({ where: { domain: shop } });
+    if (studio)
+      await db.customerProfile.updateMany({
+        where: { shopId: studio.id },
+        data: { shopifyName: "", email: null, contactSyncedAt: null },
+      });
+  }
   return new Response();
 };

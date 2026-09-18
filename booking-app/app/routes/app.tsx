@@ -16,6 +16,7 @@ export default function App() {
       <NavMenu>
         <a href="/app">Overview</a>
         <a href="/app/people">People</a>
+        <a href="/app/clients">Clients</a>
         <a href="/app/catalog">Classes &amp; Passes</a>
         <a href="/app/schedule">Weekly Schedule</a>
         <a href="/app/bookings">Bookings</a>

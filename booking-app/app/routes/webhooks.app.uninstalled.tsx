@@ -13,6 +13,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const shop = await tx.shop.findUnique({ where: { domain } });
     await tx.session.deleteMany({ where: { shop: domain } });
     if (shop) {
+      await tx.customerProfile.updateMany({
+        where: { shopId: shop.id },
+        data: { shopifyName: "", email: null, contactSyncedAt: null },
+      });
       await tx.shop.update({
         where: { id: shop.id },
         data: { status: "UNINSTALLED" },

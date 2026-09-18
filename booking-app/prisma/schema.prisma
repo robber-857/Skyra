@@ -250,6 +250,9 @@ model CustomerProfile {
   shopId             String           @db.Uuid
   shopifyCustomerGid String
   preferredName      String           @default("")
+  shopifyName        String           @default("")
+  email              String?
+  contactSyncedAt    DateTime?        @db.Timestamptz
   avatarBytes        Bytes?
   avatarMimeType     String?
   signature          String           @default("")
@@ -262,6 +265,7 @@ model CustomerProfile {
   updatedAt          DateTime         @updatedAt @db.Timestamptz
 
   @@unique([shopId, shopifyCustomerGid])
+  @@index([shopId, createdAt])
   @@unique([shopId, id])
 }
 
