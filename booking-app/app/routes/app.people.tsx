@@ -5,11 +5,13 @@ import {
   useLoaderData,
   useActionData,
   useNavigation,
+  useSearchParams,
   type HeadersFunction,
   type LoaderFunctionArgs,
   type ActionFunctionArgs,
 } from "react-router";
 import db from "../db.server";
+import { coachListData } from "../services/people.server";
 import { adminContext } from "../services/context.server";
 import { audit, lockShop } from "../services/catalog.server";
 import { publicError } from "../lib/errors.server";
@@ -49,10 +51,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
               take: 100,
             })
           : [],
-      coaches: await db.coach.findMany({
-        where: { shopId: actor.shopId },
-        orderBy: { name: "asc" },
-      }),
+      ...(await coachListData(
+        actor,
+        Number(new URL(request.url).searchParams.get("coachPage") || 1),
+      )),
     },
     { headers: privateHeaders },
   );
@@ -180,11 +182,20 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function People() {
   const {
     coaches,
+    coachOptions,
+    pagination,
     testAccessAvailable,
     canBindLogin,
     emailSignInAvailable,
     accountRequests,
   } = useLoaderData<typeof loader>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { page, pageSize, totalCount, totalPages } = pagination;
+  function changePage(value: number) {
+    const params = new URLSearchParams(searchParams);
+    params.set("coachPage", String(value));
+    setSearchParams(params, { preventScrollReset: true });
+  }
   const result = useActionData<typeof action>();
   const busy = useNavigation().state !== "idle";
   return (
@@ -239,13 +250,11 @@ export default function People() {
                     <option value="" disabled>
                       Choose a coach
                     </option>
-                    {coaches
-                      .filter((coach) => coach.status === "ACTIVE")
-                      .map((coach) => (
-                        <option key={coach.id} value={coach.id}>
-                          {coach.name}
-                        </option>
-                      ))}
+                    {coachOptions.map((coach) => (
+                      <option key={coach.id} value={coach.id}>
+                        {coach.name}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <button
@@ -323,8 +332,16 @@ export default function People() {
           </div>
         </Form>
       </section>
-      <section className="panel">
-        <h2>Coaches</h2>
+      <section className="panel" aria-label="Coaches">
+        <div className="catalog-list-head notification-head">
+          <h2>Coaches</h2>
+          <p className="muted" role="status" aria-live="polite">
+            {totalCount
+              ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, totalCount)} of ${totalCount}`
+              : "0 coaches"}{" "}
+            · 8 per page
+          </p>
+        </div>
         <p className="muted">
           Login email grants access after verification. Booking-notification
           email is separate and does not grant access.{" "}
@@ -332,6 +349,26 @@ export default function People() {
             ? "Email sign-in transport is configured."
             : "Email sign-in transport is not configured yet."}
         </p>
+        <details className="booking-email-help">
+          <summary>How does coach login activation work?</summary>
+          <p className="muted">
+            Admin saves an authorized login email below. The coach then opens
+            the{" "}
+            <a href="/coach/login" target="_blank" rel="noopener noreferrer">
+              coach sign-in page
+            </a>
+            , requests a link using that email, and follows the email link to
+            verify and sign in. The login status then changes to Verified
+            automatically. Coach scheduling status is separate.
+          </p>
+          {!emailSignInAvailable && (
+            <p className="muted">
+              Email verification is currently unavailable. Configure the
+              server’s coach sign-in mail service before coaches can activate by
+              email.
+            </p>
+          )}
+        </details>
         {testAccessAvailable && (
           <p className="muted">
             Development testing: create a one-time link to view a coach’s
@@ -359,7 +396,11 @@ export default function People() {
                     <div className="coach-email-setting-head">
                       <strong>Authorized login email</strong>
                       <span className="muted">
-                        {coach.loginVerifiedAt ? "Verified" : "Not activated"}
+                        {coach.loginVerifiedAt
+                          ? "Verified"
+                          : coach.loginEmail
+                            ? "Awaiting email verification"
+                            : "Not authorized"}
                       </span>
                     </div>
                     <p className="muted">
@@ -426,6 +467,64 @@ export default function People() {
           </article>
         ))}
       </section>
+      {totalCount > 0 && (
+        <nav className="catalog-pagination" aria-label="Coaches pagination">
+          <div className="catalog-page-controls">
+            <button
+              type="button"
+              disabled={page === 1}
+              onClick={() => changePage(page - 1)}
+            >
+              Previous
+            </button>
+            <span
+              className="catalog-page-count"
+              role="status"
+              aria-live="polite"
+            >
+              <span className="visually-hidden">Page </span>
+              {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page === totalPages}
+              onClick={() => changePage(page + 1)}
+            >
+              Next
+            </button>
+          </div>
+          <form
+            className="catalog-page-jump"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const target = Number(
+                new FormData(event.currentTarget).get("page"),
+              );
+              if (
+                Number.isInteger(target) &&
+                target >= 1 &&
+                target <= totalPages
+              )
+                changePage(target);
+            }}
+          >
+            <label htmlFor="coach-page">Go to page</label>
+            <input
+              key={`${page}:${totalPages}`}
+              id="coach-page"
+              name="page"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={totalPages}
+              step={1}
+              required
+              defaultValue={page}
+            />
+            <button type="submit">Go</button>
+          </form>
+        </nav>
+      )}
     </main>
   );
 }
