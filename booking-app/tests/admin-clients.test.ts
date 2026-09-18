@@ -273,9 +273,26 @@ test("client pagination clamps empty/out-of-range pages and retains deterministi
   });
   const a = await adminClients(actor, {}),
     b = await adminClients(actor, { page: 999 });
-  expect(a.clients).toHaveLength(50);
+  expect(a.clients).toHaveLength(10);
   expect(b.clients).toHaveLength(3);
-  expect(b.page).toBe(2);
-  expect(new Set([...a.clients, ...b.clients].map((c) => c.id)).size).toBe(53);
+  expect(b.page).toBe(6);
+  const allPages = await Promise.all(
+    Array.from({ length: 6 }, (_, i) => adminClients(actor, { page: i + 1 })),
+  );
+  expect(
+    new Set(allPages.flatMap((p) => p.clients.map((c) => c.id))).size,
+  ).toBe(53);
+  expect(
+    (await adminClients(actor, { page: 3 })).clients.map((c) => c.id),
+  ).toEqual(allPages[2].clients.map((c) => c.id));
+  const filtered = await adminClients(actor, { q: "Client 0", page: 2 });
+  expect(filtered).toMatchObject({ page: 2, pages: 6, total: 52 });
+  expect(filtered.clients).toHaveLength(10);
+  expect(await adminClients(actor, { q: "No match", page: 3 })).toMatchObject({
+    page: 1,
+    pages: 1,
+    total: 0,
+    clients: [],
+  });
   await expect(adminClients(actor, { page: "oops" })).rejects.toThrow();
 });

@@ -5,6 +5,8 @@ Sync Shopify clients imports/refreshes 100 Shopify customers at a time, with a
 continuation button when more exist. Search matches Shopify name, preferred name
 or email. A client name opens their profile, Pass history and 10 latest bookings.
 Reports customer names also open the profile; the report dropdown still filters.
+Directory pages show 10 clients, with Previous/Next, current / total page count
+and a page jump. Page and search are URL parameters, retained on refresh.
 
 Display names use preferred name, then Shopify first + last name, then email,
 then “Unnamed client”. Internal UUIDs remain the stable relational identifiers.

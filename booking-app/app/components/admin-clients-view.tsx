@@ -1,5 +1,5 @@
 import { DateTime } from "luxon";
-import { Form, Link, useNavigation } from "react-router";
+import { Form, Link, useNavigate, useNavigation } from "react-router";
 import type {
   adminClients,
   adminClientDetail,
@@ -18,6 +18,7 @@ export function AdminClientsView({
   warning: string | null;
   result?: { error?: string; message?: string; nextCursor?: string | null };
 }) {
+  const navigate = useNavigate();
   const navigation = useNavigation(),
     busy = navigation.state !== "idle";
   const pageLink = (page: number) =>
@@ -131,21 +132,46 @@ export function AdminClientsView({
         )}
       </section>
       <nav className="catalog-pagination" aria-label="Client pages">
-        <span className="muted">
-          Page {data.page} of {data.pages}
-        </span>
+        <span className="muted">10 clients per page</span>
         <div className="catalog-page-controls">
-          {data.page > 1 && (
-            <Link className="button" to={pageLink(data.page - 1)}>
-              Previous
-            </Link>
-          )}
-          {data.page < data.pages && (
-            <Link className="button" to={pageLink(data.page + 1)}>
-              Next
-            </Link>
-          )}
+          <button
+            type="button"
+            disabled={busy || data.page === 1}
+            onClick={() => navigate(pageLink(data.page - 1))}
+          >
+            Previous
+          </button>
+          <span className="catalog-page-count" role="status" aria-live="polite">
+            <span className="visually-hidden">Page </span>
+            {data.page} / {data.pages}
+          </span>
+          <button
+            type="button"
+            disabled={busy || data.page === data.pages}
+            onClick={() => navigate(pageLink(data.page + 1))}
+          >
+            Next
+          </button>
         </div>
+        <Form method="get" action="/app/clients" className="catalog-page-jump">
+          <input type="hidden" name="q" value={data.q} />
+          <label htmlFor="client-page">Go to page</label>
+          <input
+            key={`${data.q}:${data.page}:${data.pages}`}
+            id="client-page"
+            name="page"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={data.pages}
+            step={1}
+            required
+            defaultValue={data.page}
+          />
+          <button type="submit" disabled={busy}>
+            Go
+          </button>
+        </Form>
       </nav>
       <p className="muted">
         Classes left includes available and reserved credits on active, valid

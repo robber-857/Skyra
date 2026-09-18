@@ -47,7 +47,7 @@ export async function adminClients(actor: Actor, raw: unknown) {
           : {}),
       };
       const total = await tx.customerProfile.count({ where });
-      const pages = Math.max(1, Math.ceil(total / 50)),
+      const pages = Math.max(1, Math.ceil(total / 10)),
         page = Math.min(input.page, pages);
       const clients = await tx.customerProfile.findMany({
         where,
@@ -56,8 +56,8 @@ export async function adminClients(actor: Actor, raw: unknown) {
           { preferredName: "asc" },
           { id: "asc" },
         ],
-        skip: (page - 1) * 50,
-        take: 50,
+        skip: (page - 1) * 10,
+        take: 10,
         select: {
           id: true,
           preferredName: true,
