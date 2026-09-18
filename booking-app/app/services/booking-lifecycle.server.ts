@@ -192,7 +192,7 @@ async function changeBooking(identity: Identity, raw: unknown) {
         );
       const reserve = reservations[0];
       const settle =
-        status === "CANCELLED" || status === "NO_SHOW"
+        status === "CANCELLED"
           ? releaseEntitlementReservation
           : consumeEntitlementReservation;
       await settle(tx, {

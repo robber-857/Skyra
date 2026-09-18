@@ -23,8 +23,8 @@ beforeAll(() => {
     throw Error("Dedicated test database required");
 });
 afterAll(() => db.$disconnect());
-async function fixture() {
-  const f = await paidFixture();
+async function fixture(kind: "NEW_PASS" | "DROP_IN" = "NEW_PASS") {
+  const f = await paidFixture(kind);
   await processPaidBookingEvent((await queuePaid(f)).id);
   const booking = await db.booking.findFirstOrThrow({
     where: { shopId: f.shop.id },
@@ -234,32 +234,85 @@ test("future attendance cannot prematurely consume credits", async () => {
     await db.bookingChange.count({ where: { bookingId: f.booking.id } }),
   ).toBe(0);
 });
-test("Coach no-show after class returns one credit and alerts Admin", async () => {
+test.each(["NEW_PASS", "DROP_IN"] as const)(
+  "%s no-show consumes once under concurrent Coach retries and never returns credit",
+  async (kind) => {
+    const f = await fixture(kind);
+    const notification = await db.bookingNotification.findFirstOrThrow({
+      where: { bookingId: f.booking.id, recipientKind: "CUSTOMER" },
+    });
+    const email = await previewBookingNotification(f.shop.id, notification.id);
+    expect(email.text).toContain("Pass credits are not returned");
+    expect(email.text).toContain("Drop-in payments are not refunded");
+    await classAt(f, -7200000, -3600000);
+    const input = { ...f.input, action: "NO_SHOW" };
+    const results = await Promise.all(
+      Array.from({ length: 10 }, () => coachChangeBooking(f.coachToken, input)),
+    );
+    expect(
+      results.every((r) => r.status === "NO_SHOW" && r.version === 2),
+    ).toBe(true);
+    await expect(
+      staffChangeBooking(f.actor, {
+        ...f.input,
+        action: "CANCEL_WAIVE",
+        idempotencyKey: randomUUID(),
+      }),
+    ).rejects.toMatchObject({ code: "STALE_BOOKING" });
+    expect(
+      await entitlementBalance(db, f.shop.id, f.entitlement.id),
+    ).toMatchObject({
+      availableUnits: kind === "NEW_PASS" ? 4 : 0,
+      reservedUnits: 0,
+      consumedUnits: 1,
+    });
+    expect(
+      await db.entitlementLedgerEntry.count({
+        where: { bookingId: f.booking.id, kind: "RELEASE" },
+      }),
+    ).toBe(0);
+    expect(
+      await db.entitlementLedgerEntry.count({
+        where: { bookingId: f.booking.id, kind: "CONSUME" },
+      }),
+    ).toBe(1);
+    expect(
+      await db.auditLog.count({
+        where: {
+          shopId: f.shop.id,
+          entityId: f.booking.id,
+          action: "BOOKING_NO_SHOW",
+        },
+      }),
+    ).toBe(1);
+    expect(
+      await db.bookingChange.count({ where: { bookingId: f.booking.id } }),
+    ).toBe(1);
+    expect(
+      await db.paidBookingResult.findFirstOrThrow({
+        where: { bookingId: f.booking.id },
+      }),
+    ).toMatchObject({
+      status: "CONFIRMED",
+      sourceOrderGid: f.booking.sourceOrderGid,
+    });
+    await classAt(f, -26 * 3600000, -25 * 3600000);
+    expect(
+      await settleDefaultAttendanceWork({ shopId: f.shop.id }),
+    ).toMatchObject({ scanned: 0, settled: 0 });
+  },
+);
+
+test("staff no-show uses the reserved credit", async () => {
   const f = await fixture();
   await classAt(f, -7200000, -3600000);
   expect(
-    (await coachChangeBooking(f.coachToken, { ...f.input, action: "NO_SHOW" }))
+    (await staffChangeBooking(f.actor, { ...f.input, action: "NO_SHOW" }))
       .status,
   ).toBe("NO_SHOW");
-  await expect(
-    staffChangeBooking(f.actor, {
-      ...f.input,
-      action: "CANCEL_WAIVE",
-      idempotencyKey: randomUUID(),
-    }),
-  ).rejects.toMatchObject({ code: "STALE_BOOKING" });
   expect(
     await entitlementBalance(db, f.shop.id, f.entitlement.id),
-  ).toMatchObject({ availableUnits: 5, reservedUnits: 0, consumedUnits: 0 });
-  expect(
-    await db.auditLog.count({
-      where: {
-        shopId: f.shop.id,
-        entityId: f.booking.id,
-        action: "BOOKING_NO_SHOW",
-      },
-    }),
-  ).toBe(1);
+  ).toMatchObject({ availableUnits: 4, reservedUnits: 0, consumedUnits: 1 });
 });
 
 test("confirmed bookings auto-settle as attended after the 24-hour no-show window", async () => {

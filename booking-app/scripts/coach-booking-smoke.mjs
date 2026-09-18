@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import process from "node:process";
+import { DateTime } from "luxon";
 import { createRequire } from "node:module";
 import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -57,6 +59,8 @@ try {
     await page.getByLabel("1 unread").waitFor();
     await page.getByRole("link", { name: "My schedule", exact: true }).click();
     await page.waitForURL(base+"/coach#schedule");
+    const fixtureDate = DateTime.fromJSDate(f.session.startsAt, { zone: f.session.timezone }).toISODate();
+    await page.goto(base+"/coach?range=week&from="+fixtureDate+"#schedule");
     await page.getByRole("region", { name: "Weekly class calendar" }).waitFor();
     assert.equal(await page.locator(".coach-week-day").count(), 7);
     assert.equal(await page.locator(".coach-week-event").count(), 1);
@@ -81,8 +85,8 @@ try {
     await page.getByRole("checkbox").check();
     await page.getByRole("button",{name:"Apply booking action"}).click();
     await page.getByText("This booking is no show.",{exact:false}).waitFor();
-    assert.equal(await db.entitlementLedgerEntry.count({where:{shopId:f.shop.id,kind:"RELEASE"}}),1);
-    assert.equal(await db.entitlementLedgerEntry.count({where:{shopId:f.shop.id,kind:"CONSUME"}}),0);
+    assert.equal(await db.entitlementLedgerEntry.count({where:{shopId:f.shop.id,kind:"RELEASE"}}),0);
+    assert.equal(await db.entitlementLedgerEntry.count({where:{shopId:f.shop.id,kind:"CONSUME"}}),1);
     assert.equal(await db.auditLog.count({where:{shopId:f.shop.id,entityId:booked.id,action:"BOOKING_NO_SHOW"}}),1);
     await page.screenshot({path:resolve(output,'roster-'+width+'.png'),fullPage:true});
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
@@ -96,7 +100,7 @@ try {
     await page.waitForURL(base+"/coach/login");
     await page.goto(base+"/coach"); assert.ok(page.url().endsWith("/coach/login"));
     assert.deepEqual(pageErrors,[]);
-    results.push({ width, login:true, appNotifications:true, weeklyCalendar:true, monthFilter:true, trainingProfile:true, noShowRelease:true, customEmptyState:true, logout:true, noHorizontalOverflow:!overflow, pageErrors });
+    results.push({ width, login:true, appNotifications:true, weeklyCalendar:true, monthFilter:true, trainingProfile:true, noShowConsumed:true, customEmptyState:true, logout:true, noHorizontalOverflow:!overflow, pageErrors });
     await context.close();
   }
   await writeFile(resolve(output,"results.json"),JSON.stringify(results,null,2));

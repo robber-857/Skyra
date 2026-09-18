@@ -57,8 +57,7 @@ export function BookingActions({
       actions.push({
         value: "NO_SHOW",
         label: "Mark no-show",
-        note:
-          "Record a missed class, return the reserved class credit to the customer’s Pass, and alert Admin for review.",
+        note: "Record a missed class and use its reserved credit. No Pass credit is returned and no Drop-in payment refund is issued.",
       });
   }
   const [selected, setSelected] = useState(actions[0]?.value || "");

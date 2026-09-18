@@ -1,5 +1,7 @@
 # 开发交接：Coach 个人中心
 
+2026-09-18 最新规则：No-show 消费原 Booking 预留的 1 次课，不退 Pass credit，也不自动退 Drop-in 付款。此规则覆盖下文 2026-09-16 的退回课次决定；历史已退课次保留原账本、不追扣。Recent bookings 每页 8 条、前后翻页与页码跳转，邮件状态说明见 [Booking 列表、邮件与 No-show](booking-list-and-no-show-2026-09-18.md)。
+
 更新：2026-09-16。下一会话从本文件开始；Customer 与交易历史见 [2026-09-15 交接](handoff-2026-09-15.md)。
 
 ## 收口复核（优先于下方较早快照）

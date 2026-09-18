@@ -1,5 +1,7 @@
 # Booking V3 — 开发状态
 
+2026-09-18 最新规则：No-show 消费原 Booking 预留的 1 次课，不退 Pass credit，也不自动退 Drop-in 付款。此规则覆盖下文 2026-09-16 的退回课次决定；历史已退课次保留原账本、不追扣。Recent bookings 每页 8 条、前后翻页与页码跳转，邮件状态说明见 [Booking 列表、邮件与 No-show](booking-list-and-no-show-2026-09-18.md)。
+
 ## 最新：发布前收口复核（2026-09-16）
 
 专用测试库全量回归现为 **35 个文件 / 379 项全部通过**；完整 check、Worker build、Coach 与注册/Reports 的 390px / 1440px 浏览器模拟和标准 ZIP 读取均通过。Render Dev 只读诊断已确认 Karen 为 `ACTIVE` Coach，且绑定的 `[DEV] Aerial Foundations` 已 `PUBLISHED`；People 的 Add coach 没有失败。提交 `06468757b36688826519b516b25996f8a2f3f57b` 已推送，CI `35080110796` success，Render deploy `dep-dal64seq1p3s73ekc8bg` Live，015–019 与 Web/Worker/health 验证通过。真实事务邮件仍未配置/发送，Karen 真实收件登录、Customer 真实账号和支付闭环仍未签收。最新证据与正式发布前清单见 [Coach、Reports 与正式发布前收口](release-readiness-2026-09-16.md)；下方同日较早数字与 Karen 未核验结论均为历史快照。

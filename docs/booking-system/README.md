@@ -1,10 +1,12 @@
 # Skyra Booking System
 
+2026-09-18 最新规则：No-show 消费原 Booking 预留的 1 次课，不退 Pass credit，也不自动退 Drop-in 付款。此规则覆盖下文 2026-09-16 的退回课次决定；历史已退课次保留原账本、不追扣。Recent bookings 每页 8 条、前后翻页与页码跳转，邮件状态说明见 [Booking 列表、邮件与 No-show](booking-list-and-no-show-2026-09-18.md)。
+
 ## 最新交接入口（2026-09-16）
 
 本批最新的完成项、Karen Render Dev 数据证据、35 文件 / 379 项全量回归，以及正式发布前必须补齐的支付、邮件、真实账号和运维关口，统一见 [Coach、Reports 与正式发布前收口](release-readiness-2026-09-16.md)。该文件优先于下方同日较早快照。
 
-Coach 本轮实现、测试证据和剩余工作见 [Coach 个人中心交接](handoff-2026-09-16-coach-portal.md) 与 [Coach/Admin 通知、Overview 与 Reports](coach-admin-notifications-reports-2026-09-16.md)；Customer 与交易阻塞历史见 [2026-09-15 交接](handoff-2026-09-15.md)。Coach 已有统一响应式 Portal、Today、Monday–Sunday 周日历、Training profile roster、课后 No-show、Pass credit release、Admin 提醒与 24 小时默认 Attended settlement；Admin/Coach 站内 Booking notification、Admin Overview 与两类 Reports/CSV 已部署到 Render Dev。运行 SHA `06468757b36688826519b516b25996f8a2f3f57b`，CI run `35080110796` 与 Render deploy `dep-dal64seq1p3s73ekc8bg` 成功，015–019 已应用。
+Coach 本轮实现、测试证据和剩余工作见 [Coach 个人中心交接](handoff-2026-09-16-coach-portal.md) 与 [Coach/Admin 通知、Overview 与 Reports](coach-admin-notifications-reports-2026-09-16.md)；Customer 与交易阻塞历史见 [2026-09-15 交接](handoff-2026-09-15.md)。Coach 已有统一响应式 Portal、Today、Monday–Sunday 周日历、Training profile roster、课后 No-show、Pass credit consumption、Admin 提醒与 24 小时默认 Attended settlement；Admin/Coach 站内 Booking notification、Admin Overview 与两类 Reports/CSV 已部署到 Render Dev。运行 SHA `06468757b36688826519b516b25996f8a2f3f57b`，CI run `35080110796` 与 Render deploy `dep-dal64seq1p3s73ekc8bg` 成功，015–019 已应用。
 
 最新 [Coach 自助激活与邮件](coach-self-service-and-email-2026-09-16.md) 已实现 Coach 自己提交姓名/邮箱申请、Admin 审批到已有 Coach 后的首次激活。Customer 仍用 Shopify 验证码，主页填写邮箱只是营销订阅，见 [身份、登录与主页邮箱关系](identity-login-and-email.md)。Karen Dev 数据已确认，但真实邮件配置、Customer 邮箱解析和 Karen 真实收件/登录 UAT 尚未完成。
 
@@ -38,7 +40,7 @@ My account 原先使用相对 /account，本地预览把 Shopify 认证请求送
 
 ## 当前开发进度
 
-已创建并绑定 **Skyra Booking**。目前已实现团课预约/付款回调/课次账本的本地闭环、客户个人中心与取消改期、Coach Today/周课表/Training profile roster/No-show、Admin/Coach 站内 Booking 通知、Admin Overview、预约管理与逐 Customer/Pass Reports/CSV。Coach 不做 Check-in / Attended；No-show 释放 1 次预留 Pass 并提醒 Admin，其余 Booking 在 24 小时窗口后由 Worker 默认结算。真实 Customer 登录与 Checkout UAT、正式 Coach email invitation、真实邮件投递、Shopify refund 财务同步、异常人工处理、动态 availability 和生产运行仍待完成。请优先阅读 [开发状态](development-status.md)、[Coach 交接](handoff-2026-09-16-coach-portal.md) 和 [身份登录说明](identity-login-and-email.md)。
+已创建并绑定 **Skyra Booking**。目前已实现团课预约/付款回调/课次账本的本地闭环、客户个人中心与取消改期、Coach Today/周课表/Training profile roster/No-show、Admin/Coach 站内 Booking 通知、Admin Overview、预约管理与逐 Customer/Pass Reports/CSV。Coach 不做 Check-in / Attended；No-show 消费 1 次预留课次、不退 Pass credit 或 Drop-in 付款，并在 Admin 显示提醒；其余 Booking 在 24 小时窗口后由 Worker 默认结算。真实 Customer 登录与 Checkout UAT、正式 Coach email invitation、真实邮件投递、Shopify refund 财务同步、异常人工处理、动态 availability 和生产运行仍待完成。请优先阅读 [开发状态](development-status.md)、[Coach 交接](handoff-2026-09-16-coach-portal.md) 和 [身份登录说明](identity-login-and-email.md)。
 
 ## 推荐阅读顺序
 

@@ -1,5 +1,7 @@
 # Skyra Booking System — V3 开发规划与 MVP 任务清单
 
+2026-09-18 最新规则：No-show 消费原 Booking 预留的 1 次课，不退 Pass credit，也不自动退 Drop-in 付款。此规则覆盖下文 2026-09-16 的退回课次决定；历史已退课次保留原账本、不追扣。Recent bookings 每页 8 条、前后翻页与页码跳转，邮件状态说明见 [Booking 列表、邮件与 No-show](booking-list-and-no-show-2026-09-18.md)。
+
 ## 2026-09-16：Coach / Reports 收口与发布关口
 
 - [x] Coach Today、Monday–Sunday 周课表、Training profile roster、课后 No-show、退回 1 次 Pass、Admin 提醒和 24 小时默认 Attended。

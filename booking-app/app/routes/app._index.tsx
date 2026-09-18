@@ -30,14 +30,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
     where: {
       shopId: actor.shopId,
       id: { in: noShowLogs.map((entry) => entry.entityId) },
+      status: "NO_SHOW",
     },
     select: {
       id: true,
       customerId: true,
       customer: { select: { preferredName: true } },
       entitlementLedgerEntries: {
-        where: { kind: "RELEASE" },
-        select: { id: true },
+        where: { kind: { in: ["RELEASE", "CONSUME"] } },
+        select: { kind: true },
         take: 1,
       },
       session: {
@@ -62,6 +63,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
       return [
         {
           bookingId: booking.id,
+          creditReturned:
+            booking.entitlementLedgerEntries[0].kind === "RELEASE",
           customerName:
             booking.customer.preferredName ||
             `Customer ${booking.customerId.slice(-8)}`,
@@ -236,7 +239,9 @@ export default function Overview() {
             </table>
           </div>
           {!overview.expiringPasses.length && (
-            <p className="empty">No active Passes expire in the next 30 days.</p>
+            <p className="empty">
+              No active Passes expire in the next 30 days.
+            </p>
           )}
         </section>
       </div>
@@ -255,16 +260,21 @@ export default function Overview() {
 
       {data.noShowAlerts.length > 0 && (
         <section className="panel feedback" aria-labelledby="no-show-alerts">
-          <h2 id="no-show-alerts">No-show credits returned</h2>
+          <h2 id="no-show-alerts">No-show bookings</h2>
           <p>
-            Coach-recorded no-shows return the reserved class credit to the
-            customer’s Pass. Review these exceptions if follow-up is needed.
+            No-show uses the reserved credit. Pass credits are not returned and
+            Drop-in payments are not refunded.
           </p>
           <div className="record-list">
             {data.noShowAlerts.map((alert) => (
               <article className="record" key={alert.bookingId}>
                 <div>
                   <h3>{alert.customerName}</h3>
+                  <p className="muted">
+                    {alert.creditReturned
+                      ? "Credit returned under the earlier policy."
+                      : "Credit used · No refund."}
+                  </p>
                   <p>
                     {alert.className} · {alert.coachName}
                   </p>
@@ -276,7 +286,10 @@ export default function Overview() {
                     }).format(new Date(alert.startsAt))}
                   </p>
                 </div>
-                <Link className="button" to={`/app/bookings/${alert.bookingId}`}>
+                <Link
+                  className="button"
+                  to={`/app/bookings/${alert.bookingId}`}
+                >
                   Review booking
                 </Link>
               </article>

@@ -904,3 +904,16 @@ button.danger-text:hover {
   .catalog-page-controls { justify-content: space-between; }
   .catalog-page-jump { justify-content: flex-end; }
 }
+
+/* Booking operations */
+.bookings-workspace .booking-record { align-items: flex-start; padding: 18px 20px; }
+.booking-record > div { min-width: 0; }
+.booking-record h3, .booking-record .muted { overflow-wrap: anywhere; }
+.bookings-workspace > .catalog-pagination { margin-bottom: 24px; }
+.booking-email-help { margin: 16px 0; }
+.booking-email-help summary { color: #245944; cursor: pointer; font-size: 14px; }
+.bookings-workspace .record > div { min-width: 0; overflow-wrap: anywhere; }
+.bookings-workspace .record > a, .bookings-workspace .record > span { flex-shrink: 0; }
+@media(max-width: 600px) {
+  .bookings-workspace .booking-record { padding: 16px; }
+}

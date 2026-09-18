@@ -110,7 +110,7 @@ export function renderBookingEmail(details: BookingEmailDetails) {
       : "This booking was cancelled after the free cancellation deadline. One class credit has been used. No payment refund has been issued by this system."
     : isOperations
       ? `This count reflects confirmed bookings when this email was prepared. Check ${isCoach ? "your schedule" : "Admin bookings"} for the latest roster.`
-      : "Your place is reserved. Free cancellation is available until 12 hours before class; late cancellation uses one class credit. If your coach records a no-show, the reserved credit is returned to your Pass and the studio Admin is notified. Original Pass expiry and eligibility still apply.";
+      : "Your place is reserved. Free cancellation is available until 12 hours before class; late cancellation uses one class credit. Your booking is treated as attended by default. A no-show uses one class credit; Pass credits are not returned and Drop-in payments are not refunded. Original Pass expiry and eligibility still apply.";
   return {
     subject,
     text: `${heading}\n\n${rows.map(([label, value]) => `${label}: ${value}`).join("\n")}\n\n${note}\n\nSkyra`,
@@ -153,10 +153,7 @@ export async function previewBookingNotification(
       notification.template === "BOOKING_CANCELLED_V1"
         ? (booking.status as "CANCELLED" | "LATE_CANCEL")
         : undefined,
-    recipientKind: notification.recipientKind as
-      | "CUSTOMER"
-      | "COACH"
-      | "ADMIN",
+    recipientKind: notification.recipientKind as "CUSTOMER" | "COACH" | "ADMIN",
     className: booking.session.service.name,
     coachName: booking.session.coach.name,
     locationName: booking.session.location.name,

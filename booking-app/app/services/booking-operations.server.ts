@@ -1,12 +1,24 @@
 import db from "../db.server";
 import { requireOperations, type Actor } from "./authorization";
-export async function bookingOperationsData(actor: Actor) {
+export async function bookingOperationsData(actor: Actor, requestedPage = 1) {
   requireOperations(actor);
+  const pageSize = 8;
+  const totalCount = await db.booking.count({
+    where: { shopId: actor.shopId },
+  });
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const page = Math.min(
+    Number.isSafeInteger(requestedPage) && requestedPage > 0
+      ? requestedPage
+      : 1,
+    totalPages,
+  );
   const [bookings, receipts, notifications] = await Promise.all([
     db.booking.findMany({
       where: { shopId: actor.shopId },
-      orderBy: { createdAt: "desc" },
-      take: 50,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
       select: {
         id: true,
         status: true,
@@ -35,6 +47,8 @@ export async function bookingOperationsData(actor: Actor) {
       select: {
         id: true,
         bookingId: true,
+        createdAt: true,
+        template: true,
         recipientKind: true,
         status: true,
         attempts: true,
@@ -52,6 +66,7 @@ export async function bookingOperationsData(actor: Actor) {
   });
   return {
     bookings,
+    pagination: { page, pageSize, totalCount, totalPages },
     notifications,
     attention: receipts.map((r) => ({
       id: r.id,
