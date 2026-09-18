@@ -55,7 +55,7 @@ Appointment 固定时段直接确认、逐次留言、Today、Customer Account�
 3. 未登录 Book 显示弹层，桌面/手机统一当前标签页进入 Shopify 托管登录，保留课程 Attempt/预览主题返回。Continue with Shop 完成登录、退出和签名返回仍待真实账户复测。
 4. 登录后选择新 Pass 或 Single class (Drop-in)，Continue 进入 Review 前执行 Shopify Admin + 澳洲 Storefront 实时检查。两个测试商品现已通过检查，可在有效预约窗口内复测真实账号 Review；Checkout 仍未开发/开放。Drop-in 仅覆盖当前场次。
 5. 测试临时断线重试、attempt 过期重新选课、商品变更重新选择，以及登录失效后重新认证。上述异常流程已用本地 fixture 验证。
-6. Admin 可编辑 Classes & Passes、People、Settings、Weekly Schedule；在 Classes & Passes 点击 Check availability 查看每个商品的可售问题和检查时间。
+6. Admin 可编辑 Classes & Passes、People、Settings、Weekly Schedule；在 Classes & Passes 点击 Check product（原 Check availability）查看关联 Shopify 商品的可售配置问题和检查日期／时间；此操作不检查课程剩余名额、不预留座位，也不开放 Checkout。Classes 和 Passes 列表均每页 8 条，支持 Previous／Next、当前页／总页数和 Go to page（输入页码后点击 Go 或按 Enter）；切换标签回到第一页，首尾页禁用对应按钮，空列表不显示分页。
 
 **当前不能支付、扣课或确认预约。** onlineBookingsEnabled=false、checkoutAvailable=false；公开 Checkout route 会在任何 Hold/Cart 写入前返回 CHECKOUT_NOT_AVAILABLE。内部 NEW_PASS/DROP_IN 的 Review → Hold → Cart 编排已完成，但没有接入前端或真实 Shopify Checkout。Entitlement 台账、有效 Pass 选择和保守 Intro 资格已完成；orders/paid、Booking 确认、付款后恢复、已有 Pass UI/原子确认及 Customer/Coach 个人中心尚未完成。
 

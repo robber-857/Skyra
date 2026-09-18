@@ -866,3 +866,41 @@ button.danger-text:hover {
     font-size: 15px;
   }
 }
+
+/* Classes & Passes */
+.catalog-workspace .page-head { margin-bottom: 22px; align-items: flex-start; }
+.catalog-workspace .page-head .muted { margin: 0; }
+.catalog-workspace .page-head > button { flex-shrink: 0; }
+.catalog-list { padding: 0; overflow: hidden; margin-bottom: 16px; }
+.catalog-list-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #dce1de; background: #fafbfa; }
+.catalog-list-head h2 { margin: 0; font-size: 16px; }
+.catalog-list-head p { margin: 0; font-size: 13px; }
+.catalog-workspace .catalog-record { align-items: flex-start; padding: 18px 20px; }
+.catalog-record-details { flex: 1; min-width: 0; }
+.catalog-record h3 { overflow-wrap: anywhere; line-height: 1.4; }
+.catalog-statuses { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.catalog-record .record-actions { justify-content: flex-end; flex-shrink: 0; max-width: 260px; }
+.catalog-record .record-actions a { padding: 9px 0; font-size: 13px; }
+.catalog-availability { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 14px; }
+.catalog-availability form { margin: 0; flex-shrink: 0; }
+.catalog-availability button { padding: 7px 11px; font-size: 13px; }
+.catalog-check-help { font-size: 12px; flex: 1; min-width: 180px; }
+.catalog-availability > [role="status"] { flex-basis: 100%; min-width: 0; overflow-wrap: anywhere; }
+.catalog-availability > [role="status"]:empty { display: none; }
+.catalog-availability > [role="status"] small { display: block; margin-top: 5px; font-size: 12px; }
+.catalog-pagination { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.catalog-page-controls, .catalog-page-jump { display: flex; align-items: center; gap: 10px; margin: 0; }
+.catalog-page-count { min-width: 64px; text-align: center; font-size: 14px; font-variant-numeric: tabular-nums; }
+.catalog-page-jump label { font-size: 13px; color: #606a66; }
+.catalog-page-jump input { width: 72px; padding: 9px 8px; border: 1px solid #a7b0ab; border-radius: 7px; font: inherit; font-size: 14px; background: white; color: #262c2b; }
+.catalog-pagination button:disabled { cursor: default; }
+.catalog-list .empty { padding: 20px; margin: 0; }
+@media (max-width: 600px) {
+  .catalog-list-head { padding: 14px 16px; flex-wrap: wrap; }
+  .catalog-workspace .catalog-record { padding: 16px; flex-direction: column; gap: 14px; }
+  .catalog-record-details { width: 100%; }
+  .catalog-record .record-actions { justify-content: flex-start; max-width: none; }
+  .catalog-pagination { flex-direction: column; align-items: stretch; }
+  .catalog-page-controls { justify-content: space-between; }
+  .catalog-page-jump { justify-content: flex-end; }
+}

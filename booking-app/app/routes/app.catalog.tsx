@@ -29,6 +29,8 @@ const serviceKindLabel = (kind: string) =>
     COURSE: "Workshop",
   })[kind] || "Service";
 
+const PAGE_SIZE = 8;
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const { actor, shop } = await adminContext(request);
   return { ...(await catalogData(actor.shopId)), domain: shop.domain };
@@ -93,17 +95,26 @@ export default function Catalog() {
   const [tab, setTab] = useState<"service" | "pass">("service");
   const [edit, setEdit] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [page, setPage] = useState(1);
   const service = data.services.find((x) => x.id === edit);
   const pass = data.passes.find((x) => x.id === edit);
   const item = tab === "service" ? service : pass;
   const records = tab === "service" ? data.services : data.passes;
+  const totalPages = Math.max(1, Math.ceil(records.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const visibleRecords = records.slice(start, start + PAGE_SIZE);
+  useEffect(() => {
+    setPage((value) => Math.min(value, totalPages));
+  }, [totalPages]);
   function switchTab(value: "service" | "pass") {
     setTab(value);
+    setPage(1);
     setEdit(null);
     setOpen(false);
   }
   return (
-    <main className="workspace">
+    <main className="workspace catalog-workspace">
       <header className="page-head">
         <div>
           <h1>Classes &amp; Passes</h1>
@@ -324,20 +335,29 @@ export default function Catalog() {
         </section>
       )}
       <section
-        className="panel record-list"
+        className="panel record-list catalog-list"
         aria-label={tab === "service" ? "Classes" : "Passes"}
       >
+        <div className="catalog-list-head">
+          <h2>{tab === "service" ? "Classes" : "Passes"}</h2>
+          <p className="muted" role="status" aria-live="polite">
+            {records.length === 0
+              ? "0 items"
+              : `${start + 1}–${Math.min(start + PAGE_SIZE, records.length)} of ${records.length}`}{" "}
+            · 8 per page
+          </p>
+        </div>
         {records.length === 0 && (
           <p className="empty">
             No {tab === "service" ? "classes" : "passes"} yet. Add your first
             one to get started.
           </p>
         )}
-        {records.map((record) => {
+        {visibleRecords.map((record) => {
           const mapping = data.mappings.find((x) => x.ownerId === record.id);
           return (
-            <article className="record" key={record.id}>
-              <div>
+            <article className="record catalog-record" key={record.id}>
+              <div className="catalog-record-details">
                 <h3>{record.name}</h3>
                 <p className="muted">
                   {"durationMin" in record
@@ -351,15 +371,17 @@ export default function Catalog() {
                       " days"}{" "}
                   · {"A$" + (record.requestedPriceCents / 100).toFixed(2)}
                 </p>
-                <Status>{record.status}</Status>{" "}
-                <Status>
-                  {"durationMin" in record
-                    ? serviceKindLabel(record.kind)
-                    : serviceKindLabel(
-                        record.services[0]?.service.kind || "CLASS",
-                      ) + " Pass"}
-                </Status>{" "}
-                <Status>{mapping?.syncStatus || "PENDING"}</Status>
+                <div className="catalog-statuses">
+                  <Status>{record.status}</Status>
+                  <Status>
+                    {"durationMin" in record
+                      ? serviceKindLabel(record.kind)
+                      : serviceKindLabel(
+                          record.services[0]?.service.kind || "CLASS",
+                        ) + " Pass"}
+                  </Status>
+                  <Status>{mapping?.syncStatus || "PENDING"}</Status>
+                </div>
                 {mapping?.lastError && (
                   <p className="sync-error">{mapping.lastError}</p>
                 )}
@@ -412,6 +434,64 @@ export default function Catalog() {
           );
         })}
       </section>
+      {records.length > 0 && (
+        <nav className="catalog-pagination" aria-label="Catalog pagination">
+          <div className="catalog-page-controls">
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setPage(currentPage - 1)}
+            >
+              Previous
+            </button>
+            <span
+              className="catalog-page-count"
+              role="status"
+              aria-live="polite"
+            >
+              <span className="visually-hidden">Page </span>
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={currentPage === totalPages}
+              onClick={() => setPage(currentPage + 1)}
+            >
+              Next
+            </button>
+          </div>
+          <form
+            className="catalog-page-jump"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const target = Number(
+                new FormData(event.currentTarget).get("page"),
+              );
+              if (
+                Number.isInteger(target) &&
+                target >= 1 &&
+                target <= totalPages
+              )
+                setPage(target);
+            }}
+          >
+            <label htmlFor="catalog-page">Go to page</label>
+            <input
+              key={`${tab}:${currentPage}:${totalPages}`}
+              id="catalog-page"
+              name="page"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={totalPages}
+              step={1}
+              required
+              defaultValue={currentPage}
+            />
+            <button type="submit">Go</button>
+          </form>
+        </nav>
+      )}
     </main>
   );
 }

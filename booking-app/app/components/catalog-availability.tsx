@@ -9,14 +9,20 @@ export function CatalogAvailability({ mappingId }: { mappingId: string }) {
   const busy = fetcher.state !== "idle";
   const result = busy ? undefined : fetcher.data;
   return (
-    <div>
+    <div className="catalog-availability">
       <fetcher.Form method="post">
         <input type="hidden" name="intent" value="check-availability" />
         <input type="hidden" name="id" value={mappingId} />
-        <button disabled={busy}>
-          {busy ? "Checking…" : "Check availability"}
+        <button
+          disabled={busy}
+          title="Check the linked Shopify product's sale configuration for Australia / AUD"
+        >
+          {busy ? "Checking…" : "Check product"}
         </button>
       </fetcher.Form>
+      <small className="muted catalog-check-help">
+        Shopify sale setup · Does not check class places or enable checkout.
+      </small>
       <div role="status" aria-live="polite">
         {result?.error && <p className="sync-error">{result.error}</p>}
         {result?.availability && (
@@ -24,9 +30,9 @@ export function CatalogAvailability({ mappingId }: { mappingId: string }) {
             <p className="muted">
               {result.availability.ready
                 ? "Product checks passed (Australia / AUD)."
-                : "Not ready for booking purchases."}{" "}
-              Checked{" "}
-              {new Date(result.availability.checkedAt).toLocaleTimeString()}.
+                : "Product checks need attention."}{" "}
+              Checked {new Date(result.availability.checkedAt).toLocaleString()}
+              .
             </p>
             {result.availability.issues.map((issue) => (
               <p className="sync-error" key={issue.code}>
