@@ -16,6 +16,8 @@ The static homepage preview is not the production Booking System. The approved i
 
 The current architecture, flow, data model, prototype and executable backlog live in [docs/booking-system/README.md](./docs/booking-system/README.md).
 
+Latest launch decision and remaining P0 work: [2026-09-20 launch status](./docs/booking-system/launch-status-2026-09-20.md).
+
 The Shopify App source and setup instructions are in [booking-app/README.md](./booking-app/README.md). See [development status](./docs/booking-system/development-status.md) for verified work, prerequisites and remaining implementation.
 
 ## Preview

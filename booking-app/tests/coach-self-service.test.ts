@@ -162,7 +162,7 @@ test("expired and changed-email pending deliveries are suppressed", async () => 
   ).toBe("SUPPRESSED");
 });
 
-test("Booking mail resolves current Admin and assigned Coach destinations; Customer remains pending", async () => {
+test("Booking mail resolves current Admin, assigned Coach and Shopify Customer destinations", async () => {
   const { f } = await setup();
   vi.stubEnv("SKYRA_BOOKING_MAIL_SHOP", f.shop.domain);
   await db.shop.update({
@@ -177,22 +177,34 @@ test("Booking mail resolves current Admin and assigned Coach destinations; Custo
   const jobs = await db.bookingNotification.findMany({
     where: { shopId: f.shop.id },
   });
-  expect(jobs).toHaveLength(3);
+  expect(jobs).toHaveLength(4);
   const send = vi
     .fn()
     .mockResolvedValue({ status: "ACCEPTED", messageId: "internal-test" });
-  for (const job of jobs) await deliverInternalBookingMail(job.id, send);
+  const resolveCustomer = vi.fn().mockResolvedValue("customer@example.com");
+  for (const job of jobs)
+    await deliverInternalBookingMail(job.id, send, resolveCustomer);
   expect(send.mock.calls.map(([mail]) => mail.to).sort()).toEqual([
     "coach-notify@example.com",
+    "customer@example.com",
     "studio@example.com",
   ]);
-  const customer = jobs.find((job) => job.recipientKind === "CUSTOMER")!;
+  expect(resolveCustomer).toHaveBeenCalledWith(
+    f.shop.domain,
+    f.customer.shopifyCustomerGid,
+  );
+  const customer = jobs.find(
+    (job) => job.template === "BOOKING_CONFIRMED_V1" && job.recipientKind === "CUSTOMER",
+  )!;
   expect(
     (
       await db.bookingNotification.findUniqueOrThrow({
         where: { id: customer.id },
       })
     ).status,
+  ).toBe("ACCEPTED");
+  expect(
+    jobs.find((job) => job.template === "BOOKING_REMINDER_V1")?.status,
   ).toBe("PENDING");
 });
 

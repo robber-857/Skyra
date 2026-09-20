@@ -37,7 +37,11 @@ test("a confirmed booking creates scoped Admin and Coach app notifications with 
     "ADMIN",
     "COACH",
     "CUSTOMER",
+    "CUSTOMER",
   ]);
+  expect(
+    records.find((record) => record.template === "BOOKING_REMINDER_V1"),
+  ).toMatchObject({ recipientKind: "CUSTOMER", status: "PENDING" });
 
   const adminInbox = await adminNotifications(actor);
   expect(adminInbox).toHaveLength(1);

@@ -214,7 +214,7 @@ async function change(identity: Identity, raw: unknown) {
           shopId,
           bookingId: booking.id,
           status: "PENDING",
-          template: "BOOKING_CONFIRMED_V1",
+          template: { in: ["BOOKING_CONFIRMED_V1", "BOOKING_REMINDER_V1"] },
         },
         data: { status: "SUPPRESSED", lastError: "NOTIFICATION_OBSOLETE" },
       });

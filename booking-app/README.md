@@ -1,5 +1,7 @@
 # Skyra Booking
 
+> Latest verified implementation and launch gates: [2026-09-20 launch status](../docs/booking-system/launch-status-2026-09-20.md). The historical current-state paragraph below is retained for implementation chronology.
+
 Booking V3 application for the Skyra Shopify storefront. Generated from the official Shopify React Router TypeScript template; PostgreSQL + Prisma, Redis + BullMQ.
 
 **Current state:** foundation, Admin catalogue/schedule, storefront Browse/Details and Shopify login handoff, server-backed Booking Attempts, computed capacity and internal 15-minute Holds. Not a production-ready booking system. Full Calendar and new-Pass selection/Review are implemented. Confirmed booking, payment, owned-Pass entitlement ledger and role portals are not implemented yet. See [development status](../docs/booking-system/development-status.md) and [preview and testing](../docs/booking-system/preview-testing.md).

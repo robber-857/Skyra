@@ -1,5 +1,7 @@
 # Booking V3 — 开发状态
 
+2026-09-20 最新上线判断、12 小时 Customer 课前提醒、Render 现场配置和 P0 清单见 [上线状态与 12 小时课前提醒](launch-status-2026-09-20.md)。当前不建议在未完成真实邮件、三条支付、Customer/Coach、正式店安装、公开入口和备份/对账 UAT 前开放正式付费预约。
+
 2026-09-18 最新规则：No-show 消费原 Booking 预留的 1 次课，不退 Pass credit，也不自动退 Drop-in 付款。此规则覆盖下文 2026-09-16 的退回课次决定；历史已退课次保留原账本、不追扣。Recent bookings 每页 8 条、前后翻页与页码跳转，邮件状态说明见 [Booking 列表、邮件与 No-show](booking-list-and-no-show-2026-09-18.md)。
 
 ## 最新：发布前收口复核（2026-09-16）

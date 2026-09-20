@@ -41,6 +41,37 @@ export async function enqueueBookingNotifications(
       update: {},
     });
   }
+  if (
+    template === "BOOKING_CONFIRMED_V1" &&
+    booking.session.startsAt > availableAt
+  ) {
+    const reminderAt = new Date(
+      Math.max(
+        availableAt.getTime(),
+        booking.session.startsAt.getTime() - 12 * 60 * 60 * 1000,
+      ),
+    );
+    await tx.bookingNotification.upsert({
+      where: {
+        shopId_bookingId_recipientKind_recipientId_template: {
+          shopId,
+          bookingId,
+          recipientKind: "CUSTOMER",
+          recipientId: booking.customerId,
+          template: "BOOKING_REMINDER_V1",
+        },
+      },
+      create: {
+        shopId,
+        bookingId,
+        recipientKind: "CUSTOMER",
+        recipientId: booking.customerId,
+        template: "BOOKING_REMINDER_V1",
+        availableAt: reminderAt,
+      },
+      update: {},
+    });
+  }
 }
 
 const escape = (value: string) =>
@@ -53,6 +84,7 @@ const escape = (value: string) =>
   );
 export type BookingEmailDetails = {
   cancellation?: "CANCELLED" | "LATE_CANCEL";
+  reminder?: boolean;
   recipientKind: "CUSTOMER" | "COACH" | "ADMIN";
   className: string;
   coachName: string;
@@ -75,13 +107,15 @@ export function renderBookingEmail(details: BookingEmailDetails) {
   const isCoach = details.recipientKind === "COACH";
   const heading = details.cancellation
     ? "Booking cancelled"
-    : isCoach
+    : details.reminder
+      ? "Your class starts soon"
+      : isCoach
       ? "A new booking for your class"
       : details.recipientKind === "ADMIN"
         ? "A new studio booking"
         : "Your booking is confirmed";
   const subject =
-    `${details.cancellation ? "Booking cancelled" : isOperations ? "New booking" : "Booking confirmed"}: ${details.className}`.replace(
+    `${details.cancellation ? "Booking cancelled" : details.reminder ? "Class reminder" : isOperations ? "New booking" : "Booking confirmed"}: ${details.className}`.replace(
       /[\r\n]/g,
       " ",
     );
@@ -108,8 +142,10 @@ export function renderBookingEmail(details: BookingEmailDetails) {
     ? details.cancellation === "CANCELLED"
       ? "This booking has been cancelled and its reserved class credit released. Your Pass retains its original expiry and eligibility. No payment refund has been issued by this system."
       : "This booking was cancelled after the free cancellation deadline. One class credit has been used. No payment refund has been issued by this system."
-    : isOperations
-      ? `This count reflects confirmed bookings when this email was prepared. Check ${isCoach ? "your schedule" : "Admin bookings"} for the latest roster.`
+    : details.reminder
+      ? "Your class starts in about 12 hours and your place is reserved. Free cancellation is available until 12 hours before class; after that, one class credit is used. A no-show uses one class credit; Pass credits are not returned and Drop-in payments are not refunded."
+      : isOperations
+        ? `This count reflects confirmed bookings when this email was prepared. Check ${isCoach ? "your schedule" : "Admin bookings"} for the latest roster.`
       : "Your place is reserved. Free cancellation is available until 12 hours before class; late cancellation uses one class credit. Your booking is treated as attended by default. A no-show uses one class credit; Pass credits are not returned and Drop-in payments are not refunded. Original Pass expiry and eligibility still apply.";
   return {
     subject,
@@ -131,10 +167,13 @@ export async function previewBookingNotification(
       session: { include: { service: true, coach: true, location: true } },
     },
   });
+  const reminder = notification.template === "BOOKING_REMINDER_V1";
+  const now = reminder ? await databaseNow(db) : null;
   if (
     (notification.template === "BOOKING_CANCELLED_V1"
       ? !["CANCELLED", "LATE_CANCEL"].includes(booking.status)
       : booking.status !== "CONFIRMED") ||
+    (reminder && booking.session.startsAt <= now!) ||
     (notification.recipientKind === "COACH"
       ? notification.recipientId !== booking.session.coachId
       : notification.recipientKind === "ADMIN"
@@ -153,6 +192,7 @@ export async function previewBookingNotification(
       notification.template === "BOOKING_CANCELLED_V1"
         ? (booking.status as "CANCELLED" | "LATE_CANCEL")
         : undefined,
+    reminder,
     recipientKind: notification.recipientKind as "CUSTOMER" | "COACH" | "ADMIN",
     className: booking.session.service.name,
     coachName: booking.session.coach.name,

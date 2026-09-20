@@ -101,7 +101,7 @@ test("10 concurrent customer cancellations release once, suppress confirmation a
     where: { bookingId: f.booking.id },
   });
   expect(notifications.filter((n) => n.status === "SUPPRESSED")).toHaveLength(
-    3,
+    4,
   );
   const cancelled = notifications.filter(
     (n) => n.template === "BOOKING_CANCELLED_V1",
@@ -336,11 +336,11 @@ test("confirmed bookings auto-settle as attended after the 24-hour no-show windo
     await db.bookingNotification.count({
       where: {
         bookingId: f.booking.id,
-        template: "BOOKING_CONFIRMED_V1",
+        template: { in: ["BOOKING_CONFIRMED_V1", "BOOKING_REMINDER_V1"] },
         status: "SUPPRESSED",
       },
     }),
-  ).toBe(3);
+  ).toBe(4);
 });
 test("cancellation and completion race settles exactly one outcome", async () => {
   const f = await fixture();

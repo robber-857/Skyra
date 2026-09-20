@@ -1,6 +1,8 @@
 import db from "../db.server";
 import { databaseNow } from "./booking.server";
 import { deliverBookingNotification } from "./booking-notifications.server";
+import { resolveShopifyCustomerEmail } from "./customer-notification-email.server";
+import { log } from "../lib/log.server";
 import {
   sendTransactionalMail,
   transactionalMailReady,
@@ -8,10 +10,27 @@ import {
   type MailOutcome,
 } from "./transactional-mail.server";
 
-// Only operator-authorized studio/coach destinations, resolved server-side.
-// Customer mail needs a separate protected Shopify recipient resolver; do not
-// infer Customer email from a newsletter form or accept it from the browser.
-async function destination(shopId: string, kind: string, recipientId: string) {
+export type CustomerEmailResolver = (
+  shopDomain: string,
+  shopifyCustomerGid: string,
+) => Promise<string | null>;
+
+const shopifyCustomerEmail: CustomerEmailResolver = async (domain, gid) => {
+  // Load Shopify only when a live Customer job is due. This keeps pure mail
+  // tests and disabled transports independent from Shopify runtime secrets.
+  const { unauthenticated } = await import("../shopify.server");
+  const { admin } = await unauthenticated.admin(domain);
+  return resolveShopifyCustomerEmail(admin.graphql, gid);
+};
+
+// Destinations are resolved from trusted server records at send time. Customer
+// addresses come from Shopify protected customer data, never browser input.
+async function destination(
+  shopId: string,
+  kind: string,
+  recipientId: string,
+  resolveCustomer: CustomerEmailResolver,
+) {
   const shop = await db.shop.findFirst({
     where: {
       id: shopId,
@@ -27,6 +46,15 @@ async function destination(shopId: string, kind: string, recipientId: string) {
     });
     return coach?.notificationEmail || null;
   }
+  if (kind === "CUSTOMER") {
+    const customer = await db.customerProfile.findFirst({
+      where: { id: recipientId, shopId },
+      select: { shopifyCustomerGid: true },
+    });
+    return customer
+      ? resolveCustomer(shop.domain, customer.shopifyCustomerGid)
+      : null;
+  }
   return null;
 }
 
@@ -35,25 +63,19 @@ export async function deliverInternalBookingMail(
   send: (
     mail: TransactionalMail,
   ) => Promise<MailOutcome> = sendTransactionalMail,
+  resolveCustomer: CustomerEmailResolver = shopifyCustomerEmail,
 ) {
   const notification = await db.bookingNotification.findUniqueOrThrow({
     where: { id },
   });
-  if (
-    !(await destination(
-      notification.shopId,
-      notification.recipientKind,
-      notification.recipientId,
-    ))
-  )
-    return;
+  const to = await destination(
+    notification.shopId,
+    notification.recipientKind,
+    notification.recipientId,
+    resolveCustomer,
+  );
+  if (!to) return;
   await deliverBookingNotification(id, async (input) => {
-    const to = await destination(
-      input.shopId,
-      input.recipientKind,
-      input.recipientId,
-    );
-    if (!to) return { status: "FAILED" };
     const result = await send({
       to,
       subject: input.subject,
@@ -76,7 +98,7 @@ export async function sweepInternalBookingMail() {
   const jobs = await db.bookingNotification.findMany({
     where: {
       shopId: shop.id,
-      recipientKind: { in: ["COACH", "ADMIN"] },
+      recipientKind: { in: ["CUSTOMER", "COACH", "ADMIN"] },
       status: "PENDING",
       availableAt: { lte: now },
     },
@@ -85,9 +107,14 @@ export async function sweepInternalBookingMail() {
   });
   let processed = 0;
   for (const job of jobs) {
-    if (!(await destination(job.shopId, job.recipientKind, job.recipientId)))
-      continue;
-    await deliverInternalBookingMail(job.id);
-    if (++processed >= 10) break;
+    try {
+      await deliverInternalBookingMail(job.id);
+      if (++processed >= 10) break;
+    } catch (error) {
+      log.warn(
+        { err: error, notificationId: job.id },
+        "Booking email recipient resolution failed",
+      );
+    }
   }
 }

@@ -75,6 +75,7 @@ export async function bookingOperationsData(
         id: true,
         bookingId: true,
         createdAt: true,
+        availableAt: true,
         template: true,
         recipientKind: true,
         status: true,

@@ -163,7 +163,7 @@ export default function Bookings() {
               <option value="ALL">All notifications</option>
               <option value="ADMIN">Admin notifications</option>
               <option value="COACH">Coach notifications</option>
-              <option value="CUSTOMER">Customer confirmations</option>
+              <option value="CUSTOMER">Customer emails</option>
             </select>
           </label>
         </div>
@@ -174,8 +174,8 @@ export default function Bookings() {
           · 8 per page
         </p>
         <p className="muted">
-          Booking confirmation and cancellation notifications. Each row is one
-          notification; retries update its attempt count. Preview email
+          Booking confirmation, reminder and cancellation emails. Each row is
+          one notification; retries update its attempt count. Preview email
           generates current content and does not send it or confirm inbox
           delivery.
         </p>
@@ -189,11 +189,11 @@ export default function Bookings() {
             sent.
           </p>
           <p className="muted">
-            Statuses update automatically. Admin and Coach mail needs enabled
-            server mail configuration and recipient addresses in{" "}
+            Statuses update automatically. Live mail needs enabled server mail
+            configuration and recipient addresses in{" "}
             <Link to="/app/settings">Settings</Link> and{" "}
-            <Link to="/app/people">People</Link>. Customer live mail is not
-            connected yet.
+            <Link to="/app/people">People</Link>. Customer email also requires
+            Shopify customer-data access and a current app authorization.
           </p>
         </details>
         {data.notifications.length ? (
@@ -205,13 +205,21 @@ export default function Bookings() {
                     ? "Coach notification"
                     : item.recipientKind === "ADMIN"
                       ? "Admin notification"
-                      : "Customer confirmation"}
+                      : item.template === "BOOKING_REMINDER_V1"
+                        ? "Customer reminder"
+                        : "Customer confirmation"}
                 </h3>
                 <p className="muted">
                   {item.template === "BOOKING_CANCELLED_V1"
                     ? "Cancellation"
-                    : "Confirmation"}{" "}
-                  · {new Date(item.createdAt).toLocaleString()}
+                    : item.template === "BOOKING_REMINDER_V1"
+                      ? "12-hour reminder · Scheduled for"
+                      : "Confirmation · Created"}{" "}
+                  {new Date(
+                    item.template === "BOOKING_REMINDER_V1"
+                      ? item.availableAt
+                      : item.createdAt,
+                  ).toLocaleString()}
                 </p>
                 <p className="muted">
                   Booking{" "}

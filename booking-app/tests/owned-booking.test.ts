@@ -54,7 +54,7 @@ async function fixture(units = 5) {
     entitlement: grant.entitlement,
   };
 }
-test("10 simultaneous confirmations reserve once, create one booking and three notifications without a new cart or grant", async () => {
+test("10 simultaneous confirmations reserve once, create one booking and confirmation and reminder notifications without a new cart or grant", async () => {
   const f = await fixture();
   const results = await Promise.all(
     Array.from({ length: 10 }, () => confirmOwnedBooking(f.actor, f.input)),
@@ -64,7 +64,7 @@ test("10 simultaneous confirmations reserve once, create one booking and three n
   expect(await db.booking.count({ where: { shopId: f.shop.id } })).toBe(1);
   expect(
     await db.bookingNotification.count({ where: { shopId: f.shop.id } }),
-  ).toBe(3);
+  ).toBe(4);
   const ledger = await db.entitlementLedgerEntry.findMany({
     where: { entitlementId: f.entitlement.id },
   });
@@ -161,7 +161,7 @@ test("last credit across two sessions cannot be spent twice; losing transaction 
   expect(await db.booking.count({ where: { shopId: f.shop.id } })).toBe(1);
   expect(
     await db.bookingNotification.count({ where: { shopId: f.shop.id } }),
-  ).toBe(3);
+  ).toBe(4);
   expect(
     await db.entitlementLedgerEntry.count({
       where: { shopId: f.shop.id, kind: "RESERVE" },

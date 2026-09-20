@@ -235,7 +235,7 @@ async function changeBooking(identity: Identity, raw: unknown) {
         where: {
           shopId: booking.shopId,
           bookingId: booking.id,
-          template: "BOOKING_CONFIRMED_V1",
+          template: { in: ["BOOKING_CONFIRMED_V1", "BOOKING_REMINDER_V1"] },
           status: "PENDING",
         },
         data: { status: "SUPPRESSED", lastError: "NOTIFICATION_OBSOLETE" },
@@ -353,7 +353,7 @@ export async function settleDefaultAttendanceWork(
           where: {
             shopId: booking.shopId,
             bookingId: booking.id,
-            template: "BOOKING_CONFIRMED_V1",
+            template: { in: ["BOOKING_CONFIRMED_V1", "BOOKING_REMINDER_V1"] },
             status: "PENDING",
           },
           data: { status: "SUPPRESSED", lastError: "NOTIFICATION_OBSOLETE" },
