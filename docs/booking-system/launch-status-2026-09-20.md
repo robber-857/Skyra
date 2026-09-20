@@ -6,7 +6,7 @@
 
 **目前不建议在 2026-09-21 直接开放正式付费预约。** 代码主体已接近可验收，但真实邮件、真实 Customer Account、真实 Shopify 测试支付闭环、正式店安装与公开入口切换仍未签收。可以先发布代码和迁移，保持正式交易入口关闭；完成下方 P0 后再开放付费预约。
 
-2026-09-20 现场核对：Render `/health` 返回 200，当前运行提交仍为 `654a30a`；开发店有 4 节未来 `PUBLISHED` 课程。开发店的 Checkout、Owned Pass 环境开关和数据库 `onlineBookingsEnabled` 都为开启，实际离线授权已有 `read_customers`、`read_orders` 与 Storefront 商品/Checkout 权限。该能力只允许 `skyra-booking-dev.myshopify.com`，适合今天做真实 UAT，不代表正式店已经上线。
+2026-09-20 部署后核对：提醒提交 `f6c16d3` 已通过 GitHub CI 并在 Render 成为 `live`，pre-deploy migration 完成，Web 与 Worker 均已启动，公开 `/health` 返回 200。开发店有 4 节未来 `PUBLISHED` 课程；Checkout、Owned Pass 环境开关和数据库 `onlineBookingsEnabled` 都为开启，实际离线授权已有 `read_customers`、`read_orders` 与 Storefront 商品/Checkout 权限。该能力只允许 `skyra-booking-dev.myshopify.com`，适合今天做真实 UAT，不代表正式店已经上线。
 
 ## 本轮完成：Booking 后 12 小时课前提醒
 
