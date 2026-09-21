@@ -2,7 +2,7 @@
 
 ## Release decision
 
-**No-Go for public Booking and real payments.** Code preparation does not constitute production OAuth, Customer Account, payment, email or migration acceptance. The existing public theme/Mindbody entry remains the rollback/current entry.
+**No-Go for public Booking and real payments.** Code preparation does not constitute production OAuth, Customer Account, payment, email or migration acceptance. The existing public theme remains the rollback/current entry; no public Booking entry was enabled.
 
 Target: `mf0n6s-zg.myshopify.com`; branch: `bookingdev`. Never import development customer/order/catalog records or reuse development Product/Variant GIDs.
 
@@ -65,17 +65,24 @@ A failed apply rolls back every business record and retains a batch error code. 
 
 ## Validation and operational evidence
 
-- Dedicated local PostgreSQL `skyra_booking_test`: 44 test files / 422 tests passed in the final local run.
-- Workbook conversion: three synthetic Python tests passed (monthly tranches, private balance correction/restriction, missing mapping and private-path guard).
-- `npm run check`, Worker/importer build, Theme extension build and Shopify App build passed during implementation; final release reruns apply to the committed state.
-- `shopify app config validate --json`: valid, no issues.
-- Live theme re-read: `155942944935` is live; `156227535015` and `156252799143` are unpublished. No public theme was changed by these implementation steps.
-- Existing Render live version at inspection: `b2880f7`; new deployment evidence must be recorded separately.
-- Render SSH rejected existing public-key authentication. `scripts/production-readiness.mjs` provides a read-only runtime report without tokens/customer details and is included in the runtime image.
-- The user authenticated the Shopify installation browser. Production OAuth/install and hidden-theme activation are pending the new release; CLI theme access alone is not installation evidence.
+- Code commit: `cf4b398b90893532cba417a9ee12ffc3884d87d7`; separate handoff documentation commit: `6a0b892`. Both pushed to `origin/bookingdev`, remote SHA verified.
+- Dedicated local PostgreSQL `skyra_booking_test`: 44 files / **422 tests passed**. Three synthetic Python converter tests passed. Type checks, lint, web build, Worker/importer build, Theme extension build and Shopify App build passed.
+- [GitHub CI run 35595607133](https://github.com/robber-857/Skyra/actions/runs/35595607133) passed, including fresh-database migrations, checks, tests, Worker/importer build and Python converter tests.
+- Render `srv-dajsoofqj5pc73euugi0`: code deploy `dep-daohgrh7lnhs73f1jri0` became live at 11:45:31 UTC. Both new Prisma migrations applied successfully; Worker startup observed. `/health` returned `200 {"status":"ok"}`.
+- Production allowlist and three production release switches were written individually through the [Render environment-variable API](https://api-docs.render.com/reference/update-env-var), with all three switches explicitly `false`. Configuration deploy `dep-daohl63tqb8s73fcnb8g` became live at 11:53:56 UTC on the same code commit.
+- Read-only runtime job `job-daohlqajnfac7390vce0` succeeded: target domain matches, production Shop ACTIVE, offline access token present, required commerce/customer scopes present; approval/Checkout/Owned Pass switches and `onlineBookingsEnabled` all false. It reports no customers, services, Passes, coaches, locations, synced products or bookings in this new production tenant. No development data was copied.
+- Shopify App `skyra-booking-14` released and confirmed active, [version 1137176248321](https://dev.shopify.com/dashboard/232832637/apps/420648878081/versions/1137176248321). Configuration validation returned no issues.
+- Production installation/OAuth completed through the authenticated Shopify Admin. Embedded Overview loaded and explicitly showed online bookings closed.
+- Production App Proxy `/apps/skyra-booking/sessions` returned HTTP 200, `Australia/Sydney`, and an empty session list. `orders/paid` is declared in the active App configuration; an unsigned request was rejected with HTTP 400. **Actual Shopify paid-event delivery and reconciliation remain unverified.**
+- Hidden theme `156227535015` (Copy of Skyra Website – Managed) has the Skyra Booking embed enabled and saved. Home/Programs sections and required shared assets/snippet were synced with `--only` and `--nodelete`. Existing files were backed up under ignored `output/production-theme-156227535015`; no theme was published.
+- Hidden Home and Programs loaded the production calendar's empty state at 1440px and 390px. Document width did not exceed the viewport. The inspected Home console error was a missing favicon, not a Booking error. This is empty-state preview verification, not full UAT.
+- Customer Account **draft** configuration `7418773671` (Copy of My Store 3 configuration) was created from the active configuration. Skyra bookings and passes was added, API URL set to `https://skyra-booking-web.onrender.com`, and Find a class URL set to `https://mf0n6s-zg.myshopify.com/pages/programs?preview_theme_id=156227535015`. Reload confirmed saved values, Draft status, and disabled Save. No navigation link or public configuration was published. Editor displays My Skyra and the sign-in-required state; authenticated customer UAT remains pending. Replace the preview URL with the canonical storefront URL only at approved release.
+- Final theme inventory: `155942944935` remains live; `156227535015` and `156252799143` remain unpublished. An independent request to the public homepage confirmed the live theme ID and no Booking root/embed.
+- All seven required mail environment variables and production operations email are absent in the runtime report. No email delivery test has been performed.
+- Private workbook/source balances were audited only. Production catalog/customer UUID mapping, production transaction dry-run, backup/final cutoff and real import have **not** been completed.
 
 ## Remaining launch acceptance
 
-Confirm production offline session/current scopes, App Proxy, orders/paid webhook and Needs Attention/reconciliation; configure the unpublished theme embed and Customer Account page; create actual production catalog and customer mappings; configure Resend secrets/roles and prove actual delivery; perform production DB dry-run, final backup/delta and signed import; then complete controlled payment, Customer Account, Coach/Admin and mobile/desktop UAT. Keep all release and public entry switches closed until that evidence exists.
+Create the approved production catalog and customer mappings; configure Resend credentials/domain and operations email, and prove actual delivery; verify a genuine orders/paid event and Needs Attention/reconciliation; perform the production DB dry-run, final backup/cutoff delta and signed import; then complete controlled payment, authenticated Customer Account, Coach/Admin and mobile/desktop UAT. The source workbook cannot substitute for current cutoff approval. Keep all release and public entry switches closed until that evidence exists. The two prepared drafts are not published launch acceptance.
 
 Shopify operational reference: [Custom distribution and installation](https://shopify.dev/docs/apps/launch/distribution/select-distribution-method). The app install flow and configuration validation use Shopify Toolkit/CLI guidance, not development database copying.
