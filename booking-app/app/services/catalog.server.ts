@@ -25,7 +25,14 @@ export const passInput = z.object({
   ...common,
   credits: z.coerce.number().int().min(1).max(1000),
   validityDays: z.coerce.number().int().min(1).max(3650),
+  validityMonths: z
+    .preprocess(
+      (v) => (v === "" || v == null ? null : v),
+      z.coerce.number().int().min(1).max(120).nullable(),
+    )
+    .optional(),
   introOnly: z.boolean().default(false),
+  saleable: z.boolean().default(true),
   serviceIds: z.array(uuid).min(1).max(200),
 });
 export async function lockShop(tx: Prisma.TransactionClient, shopId: string) {

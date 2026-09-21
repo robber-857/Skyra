@@ -12,11 +12,12 @@ const query = z
   })
   .strict();
 export function clientPassState(
-  pass: { status: string; startsAt: Date; expiresAt: Date },
+  pass: { status: string; startsAt: Date | null; expiresAt: Date | null },
   remaining: number,
   now: Date,
 ) {
   if (pass.status !== "ACTIVE") return pass.status;
+  if (!pass.startsAt || !pass.expiresAt) return "UNACTIVATED";
   if (pass.expiresAt <= now) return "EXPIRED";
   if (pass.startsAt > now) return "UPCOMING";
   if (remaining <= 0) return "EXHAUSTED";
@@ -75,8 +76,7 @@ export async function adminClients(actor: Actor, raw: unknown) {
             shopId: shop.id,
             customerId: { in: clients.map((c) => c.id) },
             status: "ACTIVE",
-            startsAt: { lte: now },
-            expiresAt: { gt: now },
+            OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
           },
         },
         _sum: { availableDelta: true, reservedDelta: true },
@@ -121,9 +121,13 @@ export async function adminClients(actor: Actor, raw: unknown) {
                 (p.balance._sum.reservedDelta || 0),
               0,
             ),
-            nextExpiry: active.length
+            nextExpiry: active.some((p) => p.expiresAt)
               ? new Date(
-                  Math.min(...active.map((p) => p.expiresAt.getTime())),
+                  Math.min(
+                    ...active.flatMap((p) =>
+                      p.expiresAt ? [p.expiresAt.getTime()] : [],
+                    ),
+                  ),
                 ).toISOString()
               : null,
           };
@@ -244,15 +248,21 @@ export async function adminClientDetail(
             used,
             remaining: available + reserved,
             status: clientPassState(p, available + reserved, now),
-            startsAt: p.startsAt.toISOString(),
-            expiresAt: p.expiresAt.toISOString(),
-            validityDays: Math.round(
-              (p.expiresAt.getTime() - p.startsAt.getTime()) / 86400000,
-            ),
-            daysLeft: Math.max(
-              0,
-              Math.ceil((p.expiresAt.getTime() - now.getTime()) / 86400000),
-            ),
+            startsAt: p.startsAt?.toISOString() ?? null,
+            expiresAt: p.expiresAt?.toISOString() ?? null,
+            validityMonths: p.validityMonths,
+            validityDays:
+              p.expiresAt && p.startsAt
+                ? Math.round(
+                    (p.expiresAt.getTime() - p.startsAt.getTime()) / 86400000,
+                  )
+                : p.validityDays,
+            daysLeft: p.expiresAt
+              ? Math.max(
+                  0,
+                  Math.ceil((p.expiresAt.getTime() - now.getTime()) / 86400000),
+                )
+              : null,
           };
         }),
         bookingCount,

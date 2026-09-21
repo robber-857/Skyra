@@ -20,11 +20,7 @@ test("Overview derives action and Pass-expiry metrics from operational records",
     role: "ADMIN",
   });
   expect(overview.metrics.attention).toBe(0);
-  expect(overview.metrics.expiringPasses).toBe(1);
-  expect(overview.metrics.expiringCredits).toBe(5);
-  expect(overview.expiringPasses[0]).toMatchObject({
-    passName: fixture.plan.name,
-    remaining: 5,
-    granted: 5,
-  });
+  expect(overview.metrics.expiringPasses).toBe(0);
+  expect(overview.metrics.expiringCredits).toBe(0);
+  expect(overview.expiringPasses).toEqual([]);
 });

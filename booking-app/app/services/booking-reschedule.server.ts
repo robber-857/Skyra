@@ -266,14 +266,23 @@ export async function rescheduleOptions(identity: Identity, raw: unknown) {
         "BOOKING_LEDGER_REVIEW",
         "This booking needs a credit ledger review.",
       );
-    if (reserve.entitlement.status !== "ACTIVE") return { options: [] };
+    if (
+      reserve.entitlement.status !== "ACTIVE" ||
+      !reserve.entitlement.expiresAt ||
+      !reserve.entitlement.startsAt
+    )
+      return { options: [] };
     const rows = await tx.classSession.findMany({
       where: {
         shopId: shop.id,
         serviceId: booking.session.serviceId,
         id: { not: booking.sessionId },
         status: "PUBLISHED",
-        startsAt: { gt: now, lt: reserve.entitlement.expiresAt },
+        startsAt: {
+          gt: now,
+          gte: reserve.entitlement.startsAt,
+          lt: reserve.entitlement.expiresAt,
+        },
         coach: { status: "ACTIVE" },
         service: { status: "ACTIVE" },
         bookings: {

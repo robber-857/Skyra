@@ -99,7 +99,9 @@ async function fixture(credits = 3) {
       shopifyCustomerGid: "gid://shopify/Customer/" + nextGid(),
     },
   });
-  const grant = (overrides: Partial<Parameters<typeof grantEntitlement>[0]> = {}) => {
+  const grant = (
+    overrides: Partial<Parameters<typeof grantEntitlement>[0]> = {},
+  ) => {
     const orderId = nextGid();
     return grantEntitlement({
       shopId: shop.id,
@@ -269,9 +271,9 @@ test("concurrent reservations cannot spend the last credit twice", async () => {
       );
     }),
   );
-  expect(attempts.filter((result) => result.status === "fulfilled")).toHaveLength(
-    1,
-  );
+  expect(
+    attempts.filter((result) => result.status === "fulfilled"),
+  ).toHaveLength(1);
   expect(
     await db.entitlementLedgerEntry.count({
       where: { entitlementId: entitlement.id, kind: "RESERVE" },
@@ -369,4 +371,84 @@ test("Intro eligibility is conservative and adjustments/revocation remain audita
       entitlementBalance(tx, f.shop.id, entitlement.id),
     ),
   ).toEqual({ availableUnits: 0, reservedUnits: 0, consumedUnits: 0 });
+});
+
+test("concurrent first reservations activate once; retries and cancellation keep the fixed calendar window", async () => {
+  const f = await fixture(5);
+  const { entitlement } = await f.grant({
+    startsAt: null,
+    expiresAt: null,
+    validityMonths: 2,
+  });
+  expect(entitlement.startsAt).toBeNull();
+  const second = await db.classSession.create({
+    data: {
+      shopId: f.shop.id,
+      serviceId: f.service.id,
+      coachId: f.session.coachId,
+      locationId: f.session.locationId,
+      startsAt: new Date(f.session.startsAt.getTime() + 86400000),
+      endsAt: new Date(f.session.endsAt.getTime() + 86400000),
+      busyStartsAt: new Date(f.session.busyStartsAt.getTime() + 86400000),
+      busyEndsAt: new Date(f.session.busyEndsAt.getTime() + 86400000),
+      timezone: f.session.timezone,
+      capacity: 8,
+      status: "PUBLISHED",
+      dedupeKey: randomUUID(),
+    },
+  });
+  const inputs = [f.session, second].map((session) => ({
+    shopId: f.shop.id,
+    entitlementId: entitlement.id,
+    customerId: f.customer.id,
+    serviceId: f.service.id,
+    sessionStartsAt: session.startsAt,
+    now: new Date(),
+    reservationKey: randomUUID(),
+    idempotencyKey: randomUUID(),
+    bookingId: randomUUID(),
+    sessionId: session.id,
+  }));
+  const result = await Promise.allSettled(
+    inputs.map((input) =>
+      db.$transaction(async (tx) => {
+        await tx.booking.create({
+          data: {
+            id: input.bookingId,
+            shopId: f.shop.id,
+            customerId: f.customer.id,
+            sessionId: input.sessionId,
+          },
+        });
+        return reserveEntitlementCredit(tx, input);
+      }),
+    ),
+  );
+  expect(result.some((r) => r.status === "fulfilled")).toBe(true);
+  const activated = await db.entitlement.findUniqueOrThrow({
+    where: { id: entitlement.id },
+  });
+  expect(activated.activationBookingId).not.toBeNull();
+  const successful = inputs[result.findIndex((r) => r.status === "fulfilled")];
+  await db.$transaction((tx) => reserveEntitlementCredit(tx, successful));
+  await db.$transaction((tx) =>
+    releaseEntitlementReservation(tx, {
+      shopId: f.shop.id,
+      entitlementId: entitlement.id,
+      reservationKey: successful.reservationKey,
+      bookingId: successful.bookingId,
+      idempotencyKey: randomUUID(),
+    }),
+  );
+  const after = await db.entitlement.findUniqueOrThrow({
+    where: { id: entitlement.id },
+  });
+  expect(after.startsAt).toEqual(activated.startsAt);
+  expect(after.expiresAt).toEqual(activated.expiresAt);
+  await expect(
+    db.entitlement.update({
+      where: { id: after.id },
+      data: { startsAt: new Date() },
+    }),
+  ).rejects.toThrow();
 });

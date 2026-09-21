@@ -1,6 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { BookingAttempt, Prisma, Shop } from "@prisma/client";
-import { DateTime } from "luxon";
 import { z } from "zod";
 import db from "../db.server";
 import { DomainError } from "../lib/errors.server";
@@ -79,15 +78,9 @@ async function readContext(
           },
         })
       : null;
-  if (input.purchaseKind === "NEW_PASS" && !plan)
+  if (input.purchaseKind === "NEW_PASS" && (!plan || !plan.saleable))
     fail("PASS_UNAVAILABLE", "This Pass is no longer eligible.");
   if (plan) {
-    if (
-      DateTime.fromJSDate(now, { zone: session.timezone })
-        .plus({ days: plan.validityDays })
-        .toMillis() <= session.startsAt.getTime()
-    )
-      fail("PASS_EXPIRES_BEFORE_CLASS", "This Pass expires before your class.");
     if (
       plan.introOnly &&
       !(await introOfferEligible(tx, shop.id, attempt.customerId!))
@@ -132,6 +125,7 @@ async function readContext(
         owner.name,
         plan?.credits,
         plan?.validityDays,
+        plan?.validityMonths,
         plan?.introOnly,
         session.service.id,
         session.service.version,
@@ -164,6 +158,7 @@ async function readContext(
       version: 1,
       credits: plan?.credits ?? 1,
       validityDays: plan?.validityDays ?? 1,
+      validityMonths: plan?.validityMonths ?? null,
       timezone: session.timezone,
       sessionStartsAt: session.startsAt.toISOString(),
       sessionEndsAt: session.endsAt.toISOString(),

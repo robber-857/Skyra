@@ -307,15 +307,27 @@ export function AdminClientDetailView({
               <dl className="client-pass-dates">
                 <div>
                   <dt>Valid from</dt>
-                  <dd>{date(p.startsAt, data.timezone)}</dd>
+                  <dd>
+                    {p.startsAt
+                      ? date(p.startsAt, data.timezone)
+                      : "First booked class"}
+                  </dd>
                 </div>
                 <div>
                   <dt>Expires</dt>
-                  <dd>{date(p.expiresAt, data.timezone)}</dd>
+                  <dd>
+                    {p.expiresAt
+                      ? date(p.expiresAt, data.timezone)
+                      : "Not activated"}
+                  </dd>
                 </div>
                 <div>
                   <dt>Validity</dt>
-                  <dd>{p.validityDays} days</dd>
+                  <dd>
+                    {p.validityMonths
+                      ? `${p.validityMonths} calendar months`
+                      : `${p.validityDays ?? "—"} days`}
+                  </dd>
                 </div>
                 <div>
                   <dt>Time remaining</dt>
@@ -324,9 +336,11 @@ export function AdminClientDetailView({
                       ? `${p.daysLeft} days`
                       : p.status === "UPCOMING"
                         ? "Starts in the future"
-                        : p.status === "EXPIRED"
-                          ? "Expired"
-                          : "Not usable"}
+                        : p.status === "UNACTIVATED"
+                          ? "Starts with first booked class"
+                          : p.status === "EXPIRED"
+                            ? "Expired"
+                            : "Not usable"}
                   </dd>
                 </div>
               </dl>

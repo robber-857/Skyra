@@ -34,6 +34,8 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build --chown=node:node /app/build ./build
 COPY --from=build --chown=node:node /app/scripts/start-render.mjs ./scripts/start-render.mjs
 
+COPY --from=build --chown=node:node /app/scripts/production-readiness.mjs ./scripts/production-readiness.mjs
+
 USER node
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["npm", "run", "start:render"]

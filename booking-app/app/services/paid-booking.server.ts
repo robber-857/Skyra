@@ -26,6 +26,7 @@ export const purchaseTerms = z.object({
   version: z.literal(1),
   credits: z.number().int().positive(),
   validityDays: z.number().int().positive(),
+  validityMonths: z.number().int().positive().nullable().optional(),
   timezone: z.string(),
   sessionStartsAt: z.string().datetime(),
   sessionEndsAt: z.string().datetime(),
@@ -162,13 +163,11 @@ export async function processPaidBookingEvent(
         return finish("PURCHASE_TIME_INVALID");
       const expires =
         hold.purchaseKind === "DROP_IN"
-          ? DateTime.fromISO(terms.sessionEndsAt)
-          : DateTime.fromJSDate(purchasedAt, { zone: terms.timezone }).plus({
-              days: terms.validityDays,
-            });
+          ? DateTime.fromISO(terms.sessionEndsAt).toJSDate()
+          : null;
       if (
-        !expires.isValid ||
-        expires.toMillis() <= purchasedAt.getTime() ||
+        (expires &&
+          (!Number.isFinite(expires.getTime()) || expires <= purchasedAt)) ||
         (hold.purchaseKind === "DROP_IN" && terms.credits !== 1)
       )
         return finish("PURCHASE_TERMS_INVALID");
@@ -196,8 +195,11 @@ export async function processPaidBookingEvent(
         productMappingId: current.productMappingId,
         sourceOrderGid: input.orderGid,
         sourceLineItemGid: input.lineItemGid,
-        startsAt: purchasedAt,
-        expiresAt: expires.toJSDate(),
+        startsAt: expires ? purchasedAt : null,
+        expiresAt: expires,
+        validityDays: terms.validityDays,
+        validityMonths: terms.validityMonths,
+        activationTimezone: terms.timezone,
         grantedUnits: terms.credits,
         idempotencyKey: `paid-grant:${input.orderGid}:${input.lineItemGid}`,
       });
@@ -232,8 +234,9 @@ export async function processPaidBookingEvent(
       else if (bookingWindow(shop, session, now) !== "OPEN")
         reason = "BOOKING_WINDOW_CLOSED";
       else if (
-        entitlement.expiresAt <= session.startsAt ||
-        entitlement.expiresAt <= now
+        entitlement.expiresAt &&
+        (entitlement.expiresAt <= session.startsAt ||
+          entitlement.expiresAt <= now)
       )
         reason = "PASS_EXPIRED";
       if (!reason && hold.passPlanId) {

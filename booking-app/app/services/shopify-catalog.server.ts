@@ -1,8 +1,13 @@
+import { bookingProductStatus } from "./commerce-capabilities.server";
 import db from "../db.server";
 import { Prisma } from "@prisma/client";
 export type GraphQL = (
   query: string,
-  options: { variables: Record<string, unknown>; tries?: number; signal?: AbortSignal },
+  options: {
+    variables: Record<string, unknown>;
+    tries?: number;
+    signal?: AbortSignal;
+  },
 ) => Promise<Response>;
 export const PRODUCT_SET = `#graphql
 mutation BookingProductSet($identifier: ProductSetIdentifiers!, $input: ProductSetInput!) {
@@ -164,12 +169,7 @@ export async function syncCatalogEvent(eventId: string, graphql: GraphQL) {
         input: {
           title: owner.name,
           handle,
-          status:
-            owner.status === "ACTIVE"
-              ? "ACTIVE"
-              : owner.status === "INACTIVE"
-                ? "ARCHIVED"
-                : "DRAFT",
+          status: bookingProductStatus(shop.domain, owner),
           productOptions: [
             { name: "Title", values: [{ name: "Default Title" }] },
           ],

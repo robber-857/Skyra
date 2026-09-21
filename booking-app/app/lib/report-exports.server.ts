@@ -42,7 +42,7 @@ export function reportCsv(report: Report, kind: "spending" | "unused") {
           row.purchased,
           row.used,
           row.remaining,
-          date(row.expiresAt),
+          row.expiresAt ? date(row.expiresAt) : "Not activated",
         ]),
       ]);
 }

@@ -70,6 +70,7 @@ export async function action({ request }: ActionFunctionArgs) {
         coachIds: form.getAll("coachIds"),
         serviceIds: form.getAll("serviceIds"),
         introOnly: form.get("introOnly") === "on",
+        saleable: form.get("legacyOnly") !== "on",
       };
       if (intent === "service") await saveService(actor, input);
       else if (intent === "pass") await savePass(actor, input);
@@ -284,6 +285,26 @@ export default function Catalog() {
                       defaultValue={pass?.validityDays || 90}
                     />
                   </Field>
+                  <Field label="Calendar months (overrides days)">
+                    <input
+                      name="validityMonths"
+                      type="number"
+                      min={1}
+                      max={120}
+                      defaultValue={pass?.validityMonths ?? ""}
+                    />
+                    <small>
+                      Validity begins on the date of the first booked class.
+                    </small>
+                  </Field>
+                  <label>
+                    <input
+                      name="legacyOnly"
+                      type="checkbox"
+                      defaultChecked={pass?.saleable === false}
+                    />{" "}
+                    Existing entitlements only (not for sale)
+                  </label>
                   <Field label="Eligible classes">
                     <select
                       name="serviceIds"
@@ -367,8 +388,10 @@ export default function Catalog() {
                       " places"
                     : record.credits +
                       " credits · " +
-                      record.validityDays +
-                      " days"}{" "}
+                      (record.validityMonths ?? record.validityDays) +
+                      (record.validityMonths
+                        ? " calendar months"
+                        : " days")}{" "}
                   · {"A$" + (record.requestedPriceCents / 100).toFixed(2)}
                 </p>
                 <div className="catalog-statuses">

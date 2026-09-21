@@ -1,3 +1,4 @@
+import { passActivationWindow } from "./pass-activation.server";
 import { Prisma, type EntitlementLedgerEntry } from "@prisma/client";
 import db from "../db.server";
 import { DomainError } from "../lib/errors.server";
@@ -116,8 +117,11 @@ export type GrantEntitlementInput = {
   productMappingId: string;
   sourceOrderGid: string;
   sourceLineItemGid: string;
-  startsAt: Date;
-  expiresAt: Date;
+  startsAt: Date | null;
+  expiresAt: Date | null;
+  validityDays?: number | null;
+  validityMonths?: number | null;
+  activationTimezone?: string;
   grantedUnits: number;
   idempotencyKey: string;
 };
@@ -133,7 +137,10 @@ export async function grantEntitlementInTransaction(
   if (
     !Number.isInteger(input.grantedUnits) ||
     input.grantedUnits <= 0 ||
-    input.expiresAt <= input.startsAt
+    (input.expiresAt && input.startsAt && input.expiresAt <= input.startsAt) ||
+    Boolean(input.expiresAt) !== Boolean(input.startsAt) ||
+    (!input.startsAt &&
+      (!input.passPlanId || !(input.validityMonths || input.validityDays)))
   )
     fail("INVALID_ENTITLEMENT", "Invalid Pass entitlement grant.", 400);
   {
@@ -174,6 +181,9 @@ export async function grantEntitlementInTransaction(
         startsAt: input.startsAt,
         expiresAt: input.expiresAt,
         grantedUnits: input.grantedUnits,
+        validityDays: input.validityDays,
+        validityMonths: input.validityMonths,
+        activationTimezone: input.activationTimezone,
       },
       update: {},
     });
@@ -182,8 +192,14 @@ export async function grantEntitlementInTransaction(
       entitlement.passPlanId !== input.passPlanId ||
       entitlement.serviceId !== (input.serviceId || null) ||
       entitlement.productMappingId !== input.productMappingId ||
-      entitlement.startsAt.getTime() !== input.startsAt.getTime() ||
-      entitlement.expiresAt.getTime() !== input.expiresAt.getTime() ||
+      (input.startsAt != null &&
+        entitlement.startsAt?.getTime() !== input.startsAt.getTime()) ||
+      (input.expiresAt != null &&
+        entitlement.expiresAt?.getTime() !== input.expiresAt.getTime()) ||
+      entitlement.validityDays !== (input.validityDays ?? null) ||
+      entitlement.validityMonths !== (input.validityMonths ?? null) ||
+      entitlement.activationTimezone !==
+        (input.activationTimezone ?? "Australia/Sydney") ||
       entitlement.grantedUnits !== input.grantedUnits
     )
       fail(
@@ -223,8 +239,13 @@ export async function eligibleEntitlements(
       shopId: input.shopId,
       customerId: input.customerId,
       status: "ACTIVE",
-      startsAt: { lte: input.now },
-      expiresAt: { gt: input.sessionStartsAt },
+      OR: [
+        { startsAt: null, expiresAt: null },
+        {
+          startsAt: { lte: input.sessionStartsAt },
+          expiresAt: { gt: input.sessionStartsAt },
+        },
+      ],
       passPlan: {
         status: "ACTIVE",
         services: {
@@ -297,7 +318,7 @@ export async function reserveEntitlementCredit(
   },
 ) {
   await lockEntitlement(tx, input.shopId, input.entitlementId);
-  const entitlement = await tx.entitlement.findUniqueOrThrow({
+  let entitlement = await tx.entitlement.findUniqueOrThrow({
     where: { id: input.entitlementId },
   });
   const ledgerInput: LedgerInput = {
@@ -325,8 +346,10 @@ export async function reserveEntitlementCredit(
     fail("ENTITLEMENT_NOT_FOUND", "Pass entitlement not found.", 404);
   if (
     entitlement.status !== "ACTIVE" ||
-    entitlement.startsAt > input.now ||
-    entitlement.expiresAt <= input.sessionStartsAt
+    (entitlement.startsAt != null &&
+      entitlement.startsAt > input.sessionStartsAt) ||
+    (entitlement.expiresAt != null &&
+      entitlement.expiresAt <= input.sessionStartsAt)
   )
     fail("ENTITLEMENT_UNAVAILABLE", "This Pass is not valid for the class.");
   const eligible = entitlement.passPlanId
@@ -349,6 +372,15 @@ export async function reserveEntitlementCredit(
   );
   if (balance.availableUnits < 1)
     fail("ENTITLEMENT_EMPTY", "This Pass has no available class credits.");
+  if (!entitlement.startsAt) {
+    entitlement = await tx.entitlement.update({
+      where: { id: entitlement.id },
+      data: {
+        ...passActivationWindow(input.sessionStartsAt, entitlement),
+        activationBookingId: input.bookingId || null,
+      },
+    });
+  }
   const entry = await appendLedgerEntry(tx, ledgerInput);
   return {
     entry,

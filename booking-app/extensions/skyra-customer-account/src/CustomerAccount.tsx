@@ -36,8 +36,8 @@ type Pass = {
   id: string;
   name: string;
   status: string;
-  startsAt: string;
-  expiresAt: string;
+  startsAt: string | null;
+  expiresAt: string | null;
   available: number;
   reserved: number;
   used: number;
@@ -842,7 +842,9 @@ function Overview({
                   </s-text>
                 )}
                 <s-text>
-                  Expires {shortDate(activePass.expiresAt, account.timezone)}
+                  {activePass.expiresAt
+                    ? `Expires ${shortDate(activePass.expiresAt, account.timezone)}`
+                    : "Activates on first booked class"}
                 </s-text>
                 <s-button onClick={() => open("passes")}>View passes</s-button>
               </s-stack>
@@ -997,7 +999,9 @@ function Passes({ account }: { account: Account }) {
                 {pass.used} credit{pass.used === 1 ? "" : "s"} used
               </s-text>
               <s-text>
-                Valid until {shortDate(pass.expiresAt, account.timezone)}
+                {pass.expiresAt
+                  ? `Valid until ${shortDate(pass.expiresAt, account.timezone)}`
+                  : "Activates on first booked class"}
               </s-text>
               <s-text>
                 Eligible: {pass.eligibleClasses.filter(Boolean).join(", ")}

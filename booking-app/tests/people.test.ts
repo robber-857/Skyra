@@ -33,6 +33,11 @@ test("coach pages isolate shops, retain every active approval option and use sta
         status: id === ids[16] ? "INACTIVE" : "ACTIVE",
       })),
   });
+  // The fixture coach can itself sort last; explicitly deactivate the last ID.
+  await db.coach.update({
+    where: { id: ids[16] },
+    data: { status: "INACTIVE" },
+  });
   const foreign = await paidFixture();
   const pages = await Promise.all(
     [1, 2, 3].map((p) => coachListData(actor, p)),

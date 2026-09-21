@@ -128,6 +128,8 @@ model PassPlan {
   name                String
   credits             Int
   validityDays        Int
+  validityMonths      Int?
+  saleable            Boolean @default(true)
   introOnly           Boolean           @default(false)
   status              String            @default("DRAFT")
   requestedPriceCents Int
@@ -371,10 +373,16 @@ model Entitlement {
   passPlanId        String?                  @db.Uuid
   serviceId         String?                  @db.Uuid
   productMappingId  String                   @db.Uuid
-  sourceOrderGid    String
-  sourceLineItemGid String
-  startsAt          DateTime                 @db.Timestamptz
-  expiresAt         DateTime                 @db.Timestamptz
+  sourceOrderGid    String?
+  sourceLineItemGid String?
+  startsAt          DateTime?                @db.Timestamptz
+  expiresAt         DateTime?                @db.Timestamptz
+  sourceSystem      String @default("SHOPIFY")
+  externalKey       String?
+  validityDays      Int?
+  validityMonths    Int?
+  activationTimezone String @default("Australia/Sydney")
+  activationBookingId String? @db.Uuid
   grantedUnits      Int
   status            String                   @default("ACTIVE")
   createdAt         DateTime                 @default(now()) @db.Timestamptz
@@ -386,6 +394,7 @@ model Entitlement {
 
   @@unique([shopId, id])
   @@unique([shopId, sourceOrderGid, sourceLineItemGid])
+  @@unique([shopId, sourceSystem, externalKey])
   @@index([shopId, customerId, status, expiresAt])
 }
 
@@ -522,4 +531,33 @@ model BookingReschedule {
   createdAt      DateTime @default(now()) @db.Timestamptz
 
   @@unique([shopId, idempotencyKey])
+}
+
+// Contains source hashes and internal IDs only. Raw migration records stay outside Git.
+model MigrationBatch {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  sourceSystem String
+  externalKey String
+  inputHash String
+  status String
+  attempts Int @default(1)
+  counts Json @default("{}")
+  errorCode String?
+  actorId String
+  createdAt DateTime @default(now()) @db.Timestamptz
+  completedAt DateTime? @db.Timestamptz
+  @@unique([shopId, sourceSystem, externalKey])
+}
+
+model MigrationSource {
+  id String @id @default(uuid()) @db.Uuid
+  shopId String @db.Uuid
+  sourceSystem String
+  entityType String
+  externalKey String
+  inputHash String
+  targetId String @db.Uuid
+  batchId String @db.Uuid
+  @@unique([shopId, sourceSystem, entityType, externalKey])
 }

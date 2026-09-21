@@ -83,7 +83,7 @@ test("the development store owner can enable online booking with an audit", asyn
   vi.stubEnv("SKYRA_BOOKING_OWNED_PASSES_ENABLED", "true");
 
   expect(await releaseRequest(true)).toEqual({
-    message: "Development-store online booking enabled.",
+    message: "Online booking enabled.",
   });
   expect(mocks.update).toHaveBeenCalledWith({
     where: { id: actor.shopId },
@@ -94,7 +94,7 @@ test("the development store owner can enable online booking with an audit", asyn
   expect(mocks.audit).toHaveBeenCalledWith(
     expect.anything(),
     actor,
-    "DEVELOPMENT_BOOKING_ENABLED",
+    "ONLINE_BOOKING_ENABLED",
     actor.shopId,
     approvedShop.rules,
     { ...approvedShop.rules, onlineBookingsEnabled: true },
@@ -109,4 +109,29 @@ test("another store cannot use the development release control", async () => {
   });
   expect(await releaseRequest(true)).toMatchObject({ code: "FORBIDDEN" });
   expect(mocks.update).not.toHaveBeenCalled();
+});
+
+test("production Admin remains gated and can close online bookings during emergency stop", async () => {
+  const production = "mf0n6s-zg.myshopify.com";
+  mocks.adminContext.mockResolvedValue({
+    actor,
+    shop: { ...approvedShop, domain: production },
+  });
+  vi.stubEnv("SKYRA_BOOKING_PRODUCTION_SHOP", production);
+  expect(await releaseRequest(true)).toMatchObject({
+    code: "RELEASE_GATE_CLOSED",
+  });
+  vi.stubEnv("SKYRA_BOOKING_PRODUCTION_RELEASE_APPROVED", "true");
+  vi.stubEnv("SKYRA_BOOKING_PRODUCTION_CHECKOUT_ENABLED", "true");
+  vi.stubEnv("SKYRA_BOOKING_PRODUCTION_OWNED_PASSES_ENABLED", "true");
+  expect(await releaseRequest(true)).toEqual({
+    message: "Online booking enabled.",
+  });
+  vi.stubEnv("SKYRA_BOOKING_EMERGENCY_STOP", "true");
+  expect(await releaseRequest(true)).toMatchObject({
+    code: "RELEASE_GATE_CLOSED",
+  });
+  expect(await releaseRequest(false)).toEqual({
+    message: "Online booking disabled.",
+  });
 });

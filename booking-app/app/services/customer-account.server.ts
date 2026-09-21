@@ -111,11 +111,13 @@ export async function customerAccountData(actor: BookingActor, raw: unknown) {
               id: e.id,
               name: e.passPlan?.name || e.service?.name || "Class credit",
               status:
-                e.status === "ACTIVE" && e.expiresAt <= now
+                e.status === "ACTIVE" &&
+                e.expiresAt != null &&
+                e.expiresAt <= now
                   ? "EXPIRED"
                   : e.status,
-              startsAt: e.startsAt.toISOString(),
-              expiresAt: e.expiresAt.toISOString(),
+              startsAt: e.startsAt?.toISOString() ?? null,
+              expiresAt: e.expiresAt?.toISOString() ?? null,
               ...balance,
               eligibleClasses: e.passPlan?.services.map(
                 (s) => s.service.name,

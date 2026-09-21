@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "build": "react-router build",
-    "build:worker": "esbuild scripts/worker.ts --bundle --platform=node --format=esm --packages=external --outfile=build/worker/index.js",
+    "build:worker": "esbuild scripts/worker.ts --bundle --platform=node --format=esm --packages=external --outfile=build/worker/index.js && esbuild scripts/import-mindbody.ts --bundle --platform=node --format=esm --packages=external --outfile=build/ops/import-mindbody.js",
     "dev": "shopify app dev",
     "dev:stack": "concurrently --kill-others --names app,worker \"react-router dev\" \"tsx scripts/worker.ts\"",
     "config:link": "shopify app config link",
@@ -33,7 +33,8 @@
     "preview:purchasability": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/dev-store-purchasability.ps1",
     "preview:theme": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/dev-theme.ps1",
     "preview:app": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/dev-app.ps1",
-    "typecheck:customer": "tsc --project extensions/skyra-customer-account/tsconfig.json"
+    "typecheck:customer": "tsc --project extensions/skyra-customer-account/tsconfig.json",
+    "migration:mindbody": "tsx scripts/import-mindbody.ts"
   },
   "type": "module",
   "engines": {

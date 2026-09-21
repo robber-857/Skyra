@@ -15,7 +15,7 @@ import { DomainError, publicError } from "../lib/errors.server";
 import {
   commerceCapabilities,
   developmentReleaseReady,
-  isDevelopmentBookingShop,
+  isBookingReleaseTarget,
 } from "../services/commerce-capabilities.server";
 import { Feedback, Field } from "../components/admin-ui";
 
@@ -40,7 +40,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       typeof rules.freeCancellationHours === "number"
         ? rules.freeCancellationHours
         : null,
-    developmentReleaseTarget: isDevelopmentBookingShop(shop.domain),
+    bookingReleaseTarget: isBookingReleaseTarget(shop.domain),
     checkoutGateOpen: capabilities.checkoutAvailable,
     ownedPassesGateOpen: capabilities.ownedPassesAvailable,
     onlineBookingsEnabled: rules.onlineBookingsEnabled === true,
@@ -85,13 +85,13 @@ export async function action({ request }: ActionFunctionArgs) {
       if (actor.role !== "ADMIN")
         throw new DomainError(
           "FORBIDDEN",
-          "Only the store owner can change the development booking release.",
+          "Only the store owner can change the booking release.",
           403,
         );
-      if (!isDevelopmentBookingShop(shop.domain))
+      if (!isBookingReleaseTarget(shop.domain))
         throw new DomainError(
           "FORBIDDEN",
-          "Development booking controls are unavailable for this store.",
+          "Booking release controls are unavailable for this store.",
           403,
         );
       const enabled =
@@ -99,7 +99,7 @@ export async function action({ request }: ActionFunctionArgs) {
       if (enabled && !developmentReleaseReady(shop.domain))
         throw new DomainError(
           "RELEASE_GATE_CLOSED",
-          "Open both Render development gates before enabling online bookings.",
+          "Open both environment release gates before enabling online bookings.",
           409,
         );
       await db.$transaction(async (tx) => {
@@ -128,9 +128,7 @@ export async function action({ request }: ActionFunctionArgs) {
         await audit(
           tx,
           actor,
-          enabled
-            ? "DEVELOPMENT_BOOKING_ENABLED"
-            : "DEVELOPMENT_BOOKING_DISABLED",
+          enabled ? "ONLINE_BOOKING_ENABLED" : "ONLINE_BOOKING_DISABLED",
           actor.shopId,
           before,
           after,
@@ -138,8 +136,8 @@ export async function action({ request }: ActionFunctionArgs) {
       });
       return {
         message: enabled
-          ? "Development-store online booking enabled."
-          : "Development-store online booking disabled.",
+          ? "Online booking enabled."
+          : "Online booking disabled.",
       };
     }
     const input = z
@@ -236,12 +234,12 @@ export default function Settings() {
           </ul>
         </section>
       )}
-      {data.developmentReleaseTarget && (
+      {data.bookingReleaseTarget && (
         <section className="panel">
-          <h2>Development booking release</h2>
+          <h2>Booking release</h2>
           <p className="muted">
-            These controls apply only to skyra-booking-dev.myshopify.com.
-            Production stores stay blocked in code.
+            Production requires its own approved release and capability gates.
+            Emergency stop closes all new transactions.
           </p>
           <ul>
             <li>
@@ -271,8 +269,8 @@ export default function Settings() {
               }
             >
               {data.onlineBookingsEnabled
-                ? "Disable development bookings"
-                : "Enable development bookings"}
+                ? "Disable online bookings"
+                : "Enable online bookings"}
             </button>
           </Form>
         </section>

@@ -101,7 +101,7 @@ export async function bookingReports(actor: Actor, raw: unknown) {
             available: number;
             reserved: number;
           }[]
-        >`SELECT COUNT(*)::int AS passes, COUNT(DISTINCT b."customerId")::int AS customers, COALESCE(SUM(b.available),0)::float8 AS available, COALESCE(SUM(b.reserved),0)::float8 AS reserved FROM (SELECT e.id,e."customerId",SUM(l."availableDelta") AS available,SUM(l."reservedDelta") AS reserved FROM "Entitlement" e JOIN "EntitlementLedgerEntry" l ON l."entitlementId"=e.id AND l."shopId"=e."shopId" WHERE e."shopId"=${shop.id}::uuid AND e.status='ACTIVE' AND e."startsAt"<=${now} AND e."expiresAt">${now} GROUP BY e.id,e."customerId" HAVING SUM(l."availableDelta")>0 OR SUM(l."reservedDelta")>0) b`,
+        >`SELECT COUNT(*)::int AS passes, COUNT(DISTINCT b."customerId")::int AS customers, COALESCE(SUM(b.available),0)::float8 AS available, COALESCE(SUM(b.reserved),0)::float8 AS reserved FROM (SELECT e.id,e."customerId",SUM(l."availableDelta") AS available,SUM(l."reservedDelta") AS reserved FROM "Entitlement" e JOIN "EntitlementLedgerEntry" l ON l."entitlementId"=e.id AND l."shopId"=e."shopId" WHERE e."shopId"=${shop.id}::uuid AND e.status='ACTIVE' AND (e."expiresAt" IS NULL OR e."expiresAt">${now}) GROUP BY e.id,e."customerId" HAVING SUM(l."availableDelta")>0 OR SUM(l."reservedDelta")>0) b`,
         tx.webhookReceipt.count({
           where: {
             shopId: shop.id,
@@ -130,9 +130,9 @@ export async function bookingReports(actor: Actor, raw: unknown) {
             available: number;
             reserved: number;
             remaining: number;
-            expiresAt: Date;
+            expiresAt: Date | null;
           }[]
-        >`SELECT e.id AS "entitlementId", c.id AS "customerId", COALESCE(NULLIF(TRIM(c."preferredName"), ''), NULLIF(TRIM(c."shopifyName"), ''), NULLIF(c.email, ''), 'Unnamed client') AS "customerName", COALESCE(p.name,s.name,'Class credit') AS "passName", e."grantedUnits"::int AS purchased, COALESCE(SUM(l."consumedDelta"),0)::int AS used, COALESCE(SUM(l."availableDelta"),0)::int AS available, COALESCE(SUM(l."reservedDelta"),0)::int AS reserved, COALESCE(SUM(l."availableDelta" + l."reservedDelta"),0)::int AS remaining, e."expiresAt" FROM "Entitlement" e JOIN "CustomerProfile" c ON c.id=e."customerId" AND c."shopId"=e."shopId" LEFT JOIN "PassPlan" p ON p.id=e."passPlanId" AND p."shopId"=e."shopId" LEFT JOIN "Service" s ON s.id=e."serviceId" AND s."shopId"=e."shopId" JOIN "EntitlementLedgerEntry" l ON l."entitlementId"=e.id AND l."shopId"=e."shopId" WHERE e."shopId"=${shop.id}::uuid AND e.status='ACTIVE' AND e."startsAt"<=${now} AND e."expiresAt">${now} AND (${customerId}::uuid IS NULL OR c.id=${customerId}::uuid) AND (${search}='' OR strpos(lower(COALESCE(c."preferredName",'')), lower(${search}))>0 OR strpos(lower(COALESCE(c."shopifyName",'')), lower(${search}))>0 OR strpos(lower(COALESCE(c.email,'')), lower(${search}))>0) GROUP BY e.id,c.id,c."preferredName",p.name,s.name,e."grantedUnits",e."expiresAt" HAVING SUM(l."availableDelta" + l."reservedDelta")>0 ORDER BY e."expiresAt" ASC,e.id ASC`,
+        >`SELECT e.id AS "entitlementId", c.id AS "customerId", COALESCE(NULLIF(TRIM(c."preferredName"), ''), NULLIF(TRIM(c."shopifyName"), ''), NULLIF(c.email, ''), 'Unnamed client') AS "customerName", COALESCE(p.name,s.name,'Class credit') AS "passName", e."grantedUnits"::int AS purchased, COALESCE(SUM(l."consumedDelta"),0)::int AS used, COALESCE(SUM(l."availableDelta"),0)::int AS available, COALESCE(SUM(l."reservedDelta"),0)::int AS reserved, COALESCE(SUM(l."availableDelta" + l."reservedDelta"),0)::int AS remaining, e."expiresAt" FROM "Entitlement" e JOIN "CustomerProfile" c ON c.id=e."customerId" AND c."shopId"=e."shopId" LEFT JOIN "PassPlan" p ON p.id=e."passPlanId" AND p."shopId"=e."shopId" LEFT JOIN "Service" s ON s.id=e."serviceId" AND s."shopId"=e."shopId" JOIN "EntitlementLedgerEntry" l ON l."entitlementId"=e.id AND l."shopId"=e."shopId" WHERE e."shopId"=${shop.id}::uuid AND e.status='ACTIVE' AND (e."expiresAt" IS NULL OR e."expiresAt">${now}) AND (${customerId}::uuid IS NULL OR c.id=${customerId}::uuid) AND (${search}='' OR strpos(lower(COALESCE(c."preferredName",'')), lower(${search}))>0 OR strpos(lower(COALESCE(c."shopifyName",'')), lower(${search}))>0 OR strpos(lower(COALESCE(c.email,'')), lower(${search}))>0) GROUP BY e.id,c.id,c."preferredName",p.name,s.name,e."grantedUnits",e."expiresAt" HAVING SUM(l."availableDelta" + l."reservedDelta")>0 ORDER BY e."expiresAt" ASC,e.id ASC`,
       ]);
       const counts = Object.fromEntries(
         states.map((s) => [s.status, s._count._all]),
@@ -165,6 +165,7 @@ export async function bookingReports(actor: Actor, raw: unknown) {
           credits: unusedRows.reduce((sum, row) => sum + row.remaining, 0),
           expiringIn30Days: unusedRows.reduce(
             (sum, row) =>
+              row.expiresAt != null &&
               row.expiresAt <= new Date(now.getTime() + 30 * 86400000)
                 ? sum + row.remaining
                 : sum,
@@ -172,7 +173,7 @@ export async function bookingReports(actor: Actor, raw: unknown) {
           ),
           rows: unusedRows.map((row) => ({
             ...row,
-            expiresAt: row.expiresAt.toISOString(),
+            expiresAt: row.expiresAt?.toISOString() ?? null,
           })),
         },
       };

@@ -11,3 +11,12 @@ assets/site/studio-hero-wide.png
 PRODUCT.md
 Skyra 内部开发 PRD.pdf
 Skyra_网站升级项目报价单.pdf
+
+# Private Mindbody migration inputs/exports must stay outside this repository.
+__pycache__/
+Skyra_Mindbody_*.xlsx
+*Visits Remaining Report*.xlsx
+*ScheduleAtAGlance Report*.xlsx
+*Mailing_List.xls
+production-mapping*.json
+mindbody-manifest*.json

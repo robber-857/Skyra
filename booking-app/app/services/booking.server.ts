@@ -435,17 +435,10 @@ export async function createSeatHold(actor: BookingActor, raw: unknown) {
       if (
         !eligible ||
         eligible.passPlan.status !== "ACTIVE" ||
+        !eligible.passPlan.saleable ||
         !purchaseMappingReady(mapping, eligible.passPlan)
       )
         fail("PASS_UNAVAILABLE", "This Pass is not available for this class.");
-      const validUntil = DateTime.fromJSDate(now, { zone: session.timezone })
-        .plus({ days: eligible.passPlan.validityDays })
-        .toMillis();
-      if (session.startsAt.getTime() >= validUntil)
-        fail(
-          "PASS_EXPIRES_BEFORE_CLASS",
-          "This Pass would expire before the class.",
-        );
       if (
         eligible.passPlan.introOnly &&
         !(await introOfferEligible(tx, shop.id, attempt.customerId))
@@ -656,21 +649,17 @@ export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
       },
     });
     const passes = plans.flatMap((plan) => {
+      if (!plan.saleable) return [];
       if (plan.introOnly && !canUseIntro) return [];
       const mapping = mappings.find((m) => m.ownerId === plan.id);
-      if (
-        !purchaseMappingReady(mapping, plan) ||
-        DateTime.fromJSDate(now, { zone: session.timezone })
-          .plus({ days: plan.validityDays })
-          .toJSDate() < session.startsAt
-      )
-        return [];
+      if (!purchaseMappingReady(mapping, plan)) return [];
       return [
         {
           id: plan.id,
           name: plan.name,
           credits: plan.credits,
           validityDays: plan.validityDays,
+          validityMonths: plan.validityMonths,
           priceCents: plan.requestedPriceCents,
           currency: "AUD",
           kind: "NEW_PASS" as const,
@@ -709,7 +698,7 @@ export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
       name: item.name,
       kind: "OWNED_PASS" as const,
       availableUnits: item.availableUnits,
-      expiresAt: item.expiresAt.toISOString(),
+      expiresAt: item.expiresAt?.toISOString() ?? null,
       priceCents: 0,
       currency: "AUD",
     }));

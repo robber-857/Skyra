@@ -105,7 +105,7 @@ test("directory and profiles isolate shops, reject Coaches and derive reserved/r
     reserved: 1,
     used: 0,
     remaining: 5,
-    status: "ACTIVE",
+    status: "UPCOMING",
     validityDays: 30,
   });
   expect(detail.bookings).toHaveLength(1);

@@ -271,12 +271,14 @@ export function AdminReportsView({
                 </thead>
                 <tbody>
                   {data.unusedPasses.rows.map((row) => {
-                    const days = Math.ceil(
-                      DateTime.fromISO(row.expiresAt).diff(
-                        DateTime.fromISO(data.asOf),
-                        "days",
-                      ).days,
-                    );
+                    const days = row.expiresAt
+                      ? Math.ceil(
+                          DateTime.fromISO(row.expiresAt).diff(
+                            DateTime.fromISO(data.asOf),
+                            "days",
+                          ).days,
+                        )
+                      : Infinity;
                     return (
                       <tr key={row.entitlementId}>
                         <td>
@@ -298,7 +300,9 @@ export function AdminReportsView({
                           <span
                             className={`status-pill ${days <= 7 ? "danger" : days <= 30 ? "warn" : ""}`}
                           >
-                            {date(row.expiresAt)}
+                            {row.expiresAt
+                              ? date(row.expiresAt)
+                              : "Not activated"}
                           </span>
                         </td>
                       </tr>

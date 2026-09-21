@@ -472,16 +472,9 @@ test("database foreign keys prohibit a hold with a different attempt customer or
   expect(a.token).toHaveLength(43);
 });
 
-test("a Pass must cover the class date and Intro is limited to first-time customers", async () => {
+test("new Pass validity begins with the future class and Intro is limited to first-time customers", async () => {
   const f = await fixture(),
     a = await f.start();
-  await db.passPlan.update({
-    where: { id: f.pass.id },
-    data: { validityDays: 1 },
-  });
-  await expect(f.hold(a.token)).rejects.toMatchObject({
-    code: "PASS_EXPIRES_BEFORE_CLASS",
-  });
   await db.passPlan.update({
     where: { id: f.pass.id },
     data: { validityDays: 90, introOnly: true },
@@ -619,7 +612,7 @@ test("Only eligible active synchronized Passes are shown and Intro requires a fi
     where: { id: f.pass.id },
     data: { introOnly: false },
   });
-  for (const change of [{ status: "DRAFT" }, { validityDays: 1 }]) {
+  for (const change of [{ status: "DRAFT" }]) {
     await db.passPlan.update({ where: { id: f.pass.id }, data: change });
     expect((await bookingPassOptions(f.actor(), { token })).passes).toEqual([]);
     await db.passPlan.update({
@@ -884,4 +877,18 @@ test("Drop-in hold validation rejects unavailable mappings and invalid purchase 
       data: { purchaseKind: "NEW_PASS", passPlanId: f.pass.id },
     }),
   ).rejects.toThrow();
+});
+
+test("one-day new Pass can be purchased for a future class because activation starts on that class date", async () => {
+  const f = await fixture();
+  await selectablePass(f);
+  await db.passPlan.update({
+    where: { id: f.pass.id },
+    data: { validityDays: 1 },
+  });
+  const a = await f.start();
+  expect(
+    (await bookingPassOptions(f.actor(), { token: a.token })).passes,
+  ).toHaveLength(1);
+  expect((await f.hold(a.token)).purchaseKind).toBe("NEW_PASS");
 });

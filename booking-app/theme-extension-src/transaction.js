@@ -39,12 +39,12 @@ window.SkyraBookingTransaction = function ({
     ...data.passes,
   ];
   const terms = (option) =>
-    kind(option) === "OWNED_PASS" ? option.availableUnits + " credits available · Expires " + format(option.expiresAt, {day:"numeric",month:"short",year:"numeric"}) : kind(option) === "DROP_IN"
+    kind(option) === "OWNED_PASS" ? option.availableUnits + " credits available · " + (option.expiresAt ? "Expires " + format(option.expiresAt, {day:"numeric",month:"short",year:"numeric"}) : "Activates on first booked class") : kind(option) === "DROP_IN"
       ? "One booking · This class only"
       : option.credits +
         " classes · Valid for " +
-        option.validityDays +
-        " days";
+        (option.validityMonths ?? option.validityDays) +
+        (option.validityMonths ? " calendar months from first class" : " days from first class");
   const format = (value, options) =>
     new Intl.DateTimeFormat("en-AU", { timeZone: timezone, ...options }).format(
       new Date(value),
