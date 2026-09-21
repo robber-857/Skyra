@@ -1,5 +1,9 @@
 # Skyra Booking System
 
+2026-09-21 代码实施及生产操作入口：[Production implementation and operator runbook](production-implementation-2026-09-21.md)。正式付款和公开 Booking 仍为 No-Go，安装与真实 UAT 必须单独验证。
+
+2026-09-21 最新入口：正式上线步骤、production store gate、Resend、主题切换和回滚见 [上线状态、迁移与正式部署](launch-status-2026-09-20.md)。全年 Mindbody Visits/Sales 与最新 Schedule 已确认 20 条当前/未来 Pass 余额记录和 8 条未来 Reserved Booking；旧三份不完整/过时报表已删除。三笔 $299 SKYRA Lifestyle 已确认为连续三个月、每月 12 次；数据侧只需在 cutoff 更新当天到期或变化的余额。详细基线和对账规则见 [Mindbody 数据迁移审计与执行方案](mindbody-data-migration-2026-09-21.md)。原始客户文件不得加入 Git。
+
 2026-09-18 最新规则：No-show 消费原 Booking 预留的 1 次课，不退 Pass credit，也不自动退 Drop-in 付款。此规则覆盖下文 2026-09-16 的退回课次决定；历史已退课次保留原账本、不追扣。Recent bookings 每页 8 条、前后翻页与页码跳转，邮件状态说明见 [Booking 列表、邮件与 No-show](booking-list-and-no-show-2026-09-18.md)。
 
 ## 最新交接入口（2026-09-16）
@@ -61,6 +65,8 @@ My account 原先使用相对 /account，本地预览把 Shopify 认证请求送
 | `wireframes.html`           | Customer、Admin、Coach 三端可点击低保真原型；Home 与 Programs 复用同一个 Booking section 状态机；Admin 保持六个日常入口 |
 | `data-model.md`             | 核心表、关系、约束、状态和数据所有权                                                                                    |
 | `implementation-backlog.md` | 当前唯一执行计划：MVP/P1/P2 范围、开发顺序、文件迁移和验收任务                                                          |
+| `launch-status-2026-09-20.md` | 当前正式部署顺序、生产关口、Resend、主题切换、上线判断与回滚                                                          |
+| `mindbody-data-migration-2026-09-21.md` | Mindbody 导出审计、数据缺口、客户/Pass/未来 Booking 迁移步骤与对账规则                                         |
 | `coach-admin-notifications-reports-2026-09-16.md` | Coach/Admin 通知、Overview、Reports 数据口径、验证证据与未完成邮件/部署工作 |
 
 ## 核心实现原则
