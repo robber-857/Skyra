@@ -36,6 +36,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return {
     ...(await scheduleData(actor.shopId, day)),
     ...(await catalogData(actor.shopId)),
+    editId: new URL(request.url).searchParams.get("edit"),
     requestId: crypto.randomUUID(),
   };
 }
@@ -80,8 +81,11 @@ export default function Schedule() {
   const busy = useNavigation().state !== "idle";
   const [open, setOpen] = useState(false);
   const [serviceId, setServiceId] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editServiceId, setEditServiceId] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(data.editId);
+  const [editServiceId, setEditServiceId] = useState(
+    data.sessions.find((session) => session.id === data.editId)?.serviceId ||
+      "",
+  );
   const [coachFilter, setCoachFilter] = useState("");
   const selected = data.services.find((x) => x.id === serviceId);
   const coachIds = selected?.coaches.map((x) => x.coachId) || [];
@@ -103,26 +107,13 @@ export default function Schedule() {
   const localStart = (value: Date | string, zone = data.timezone) =>
     DateTime.fromJSDate(new Date(value), { zone });
 
-  const openEditor = (session: (typeof data.sessions)[number]) => {
-    setOpen(false);
-    setEditingId(session.id);
-    setEditServiceId(session.serviceId);
-    requestAnimationFrame(() =>
-      document.getElementById("schedule-editor")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      }),
-    );
-  };
-
   const sessionButton = (session: (typeof data.sessions)[number]) => {
     const start = localStart(session.startsAt, session.timezone);
     return (
-      <button
-        type="button"
+      <Link
         className={`calendar-event ${session.status === "DRAFT" ? "draft" : "published"}`}
-        onClick={() => openEditor(session)}
-        aria-label={`Edit ${session.service.name}, ${start.toFormat("cccc h:mm a")}`}
+        to={`/app/schedule/${session.id}`}
+        aria-label={`View details for ${session.service.name}, ${start.toFormat("cccc h:mm a")}`}
       >
         <span className="calendar-event-time">{start.toFormat("HH:mm")}</span>
         <strong>{session.service.name}</strong>
@@ -136,9 +127,9 @@ export default function Schedule() {
           {session.coach.name}
         </span>
         <span>
-          {session.occupied}/{session.capacity} places · {session.status}
+          {session.enrolled}/{session.capacity} enrolled · {session.status}
         </span>
-      </button>
+      </Link>
     );
   };
 
@@ -148,8 +139,8 @@ export default function Schedule() {
         <div>
           <h1>Weekly Schedule</h1>
           <p className="muted">
-            See the whole week, then click any class to edit it. Times shown in{" "}
-            {data.timezone}.
+            Click any class to view session details and enrolled students. Times
+            shown in {data.timezone}.
           </p>
         </div>
         <button
@@ -167,8 +158,11 @@ export default function Schedule() {
         className="schedule-purpose"
         aria-label="Weekly schedule purpose"
       >
-        <strong>This page answers three questions</strong>
-        <span>Which class runs? When does it run? Who teaches it?</span>
+        <strong>Your week at a glance</strong>
+        <span>
+          Classes, coaches and enrolments. Open a session to see who is
+          attending.
+        </span>
       </section>
 
       <div className="schedule-toolbar">
@@ -241,7 +235,7 @@ export default function Schedule() {
               {week.plus({ days: 6 }).toFormat("d MMM yyyy")}
             </h2>
             <p className="muted">
-              {published} published · {drafts} draft · Click a class to edit
+              {published} published · {drafts} draft · Click a class for details
             </p>
           </div>
           {coachFilter && (

@@ -374,7 +374,10 @@ export async function scheduleData(shopId: string, day: string) {
       service: true,
       coach: true,
       location: true,
-      bookings: { where: { status: "CONFIRMED" }, select: { id: true } },
+      bookings: {
+        where: { status: { in: ["CONFIRMED", "ATTENDED", "NO_SHOW"] } },
+        select: { status: true },
+      },
       holds: {
         where: { status: "ACTIVE", expiresAt: { gt: new Date() } },
         select: { id: true },
@@ -384,7 +387,9 @@ export async function scheduleData(shopId: string, day: string) {
   });
   const sessions = rows.map(({ bookings, holds, ...session }) => ({
     ...session,
-    occupied: bookings.length + holds.length,
+    enrolled: bookings.length,
+    occupied:
+      bookings.filter((b) => b.status === "CONFIRMED").length + holds.length,
   }));
   return { sessions, week: range.label, timezone: shop.timezone };
 }
