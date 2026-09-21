@@ -1,6 +1,6 @@
 import { DateTime } from "luxon";
 import { useRef } from "react";
-import { Form, Link } from "react-router";
+import { Form, Link, useNavigation } from "react-router";
 import type { bookingReports } from "../services/booking-reports.server";
 
 type ReportData = Awaited<ReturnType<typeof bookingReports>>;
@@ -16,14 +16,19 @@ export function AdminReportsView({
   error: string | null;
   warning?: string | null;
 }) {
+  const busy = useNavigation().state !== "idle";
   const datePickerRef = useRef<HTMLDetailsElement>(null);
   const query = new URLSearchParams();
   if (data) {
     query.set("range", data.range.range);
     query.set("from", data.range.from);
     query.set("to", data.range.to);
+    if (data.range.search) query.set("q", data.range.search);
     if (data.range.customerId) query.set("customer", data.range.customerId);
   }
+  const clearQuery = new URLSearchParams(query);
+  clearQuery.delete("q");
+  clearQuery.delete("customer");
   const exportLink = (type: "spending" | "unused" | "both") => {
     const params = new URLSearchParams(query);
     params.set("type", type);
@@ -81,19 +86,33 @@ export function AdminReportsView({
             <button>Apply dates</button>
           </div>
         </details>
-        <select
-          name="customer"
-          aria-label="Customer"
-          defaultValue={data?.range.customerId || ""}
-          onChange={(event) => event.currentTarget.form?.requestSubmit()}
-        >
-          <option value="">All customers</option>
-          {data?.customers.map((customer) => (
-            <option key={customer.id} value={customer.id}>
-              {customer.name}
-            </option>
-          ))}
-        </select>
+        {data?.range.customerId && (
+          <input type="hidden" name="customer" value={data.range.customerId} />
+        )}
+        <div className="report-client-search">
+          <label className="field">
+            <span className="visually-hidden">
+              Search clients by name or email
+            </span>
+            <input
+              type="search"
+              name="q"
+              placeholder="Search clients by name or email"
+              aria-label="Search clients by name or email"
+              maxLength={160}
+              defaultValue={data?.range.search || ""}
+              key={data?.range.search || ""}
+            />
+          </label>
+          <button type="submit" disabled={busy}>
+            {busy ? "Searching…" : "Search"}
+          </button>
+          {(data?.range.search || data?.range.customerId) && (
+            <Link className="button" to={`?${clearQuery}`}>
+              Clear search
+            </Link>
+          )}
+        </div>
         <span className="toolbar-spacer" />
         {data && (
           <Link className="button" reloadDocument to={exportLink("both")}>
@@ -101,6 +120,13 @@ export function AdminReportsView({
           </Link>
         )}
       </Form>
+      {(data?.range.search || data?.range.customerId) && (
+        <p className="muted" role="status">
+          {data.range.search
+            ? `Showing clients matching “${data.range.search}”.`
+            : "Showing one selected client."}
+        </p>
+      )}
       {error && (
         <p role="alert" className="feedback error">
           {error}
@@ -179,7 +205,11 @@ export function AdminReportsView({
               </table>
             </div>
             {!data.spending.rows.length && (
-              <p className="empty">No recorded purchases in this period.</p>
+              <p className="empty">
+                {data.range.search
+                  ? "No matching clients have recorded purchases in this period."
+                  : "No recorded purchases in this period."}
+              </p>
             )}
             <p className="report-source">
               Source: Booking purchase records for the selected dates (
@@ -278,7 +308,11 @@ export function AdminReportsView({
               </table>
             </div>
             {!data.unusedPasses.rows.length && (
-              <p className="empty">No active Passes have unused classes.</p>
+              <p className="empty">
+                {data.range.search
+                  ? "No matching clients have active Passes with unused classes."
+                  : "No active Passes have unused classes."}
+              </p>
             )}
             <p className="report-source">
               Source: the Pass credit ledger. This is today’s balance,

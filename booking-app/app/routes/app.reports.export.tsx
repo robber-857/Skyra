@@ -10,7 +10,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       .enum(["spending", "unused", "both"])
       .parse(url.searchParams.get("type"));
   const raw = Object.fromEntries(
-    ["range", "from", "to", "customer"].flatMap((key) => {
+    ["range", "from", "to", "customer", "q"].flatMap((key) => {
       const value = url.searchParams.get(key);
       return value ? [[key, value]] : [];
     }),
