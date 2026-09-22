@@ -23,6 +23,12 @@ export const serviceInput = z
     coachIds: z.array(uuid).max(100),
   })
   .superRefine((input, ctx) => {
+    if (input.status === "ACTIVE" && input.requestedPriceCents <= 0)
+      ctx.addIssue({
+        code: "custom",
+        path: ["requestedPriceCents"],
+        message: "Set a price greater than A$0.00 before activating a class.",
+      });
     if (input.status !== "DRAFT" && input.coachIds.length === 0)
       ctx.addIssue({
         code: "custom",

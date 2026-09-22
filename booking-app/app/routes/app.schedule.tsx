@@ -21,6 +21,12 @@ import {
 } from "../services/schedule.server";
 import { publicError } from "../lib/errors.server";
 import { Feedback, Field, Status } from "../components/admin-ui";
+import {
+  SCHEDULE_MIN_DATE,
+  SCHEDULE_MAX_DATE,
+  SCHEDULE_MIN_LOCAL_START,
+  SCHEDULE_MAX_LOCAL_START,
+} from "../lib/schedule-range";
 
 const periods = [
   { key: "morning", label: "Morning", start: 0, end: 12 },
@@ -87,12 +93,51 @@ export default function Schedule() {
       "",
   );
   const [coachFilter, setCoachFilter] = useState("");
+  const activeCoachIds = new Set(
+    data.coaches
+      .filter((coach) => coach.status === "ACTIVE")
+      .map((coach) => coach.id),
+  );
+  const readyServices = data.services.filter(
+    (service) =>
+      service.status === "ACTIVE" &&
+      service.requestedPriceCents > 0 &&
+      service.coaches.some((assignment) =>
+        activeCoachIds.has(assignment.coachId),
+      ),
+  );
+  const pendingServices = data.services.filter(
+    (service) =>
+      service.status !== "INACTIVE" && !readyServices.includes(service),
+  );
+  const setupReason = (service: (typeof data.services)[number]) =>
+    [
+      service.requestedPriceCents <= 0 && "price needed",
+      !service.coaches.some((assignment) =>
+        activeCoachIds.has(assignment.coachId),
+      ) && "assign a coach",
+      service.status !== "ACTIVE" && "activate when ready",
+    ]
+      .filter(Boolean)
+      .join(" · ");
   const selected = data.services.find((x) => x.id === serviceId);
   const coachIds = selected?.coaches.map((x) => x.coachId) || [];
   const editing = data.sessions.find((x) => x.id === editingId);
   const editService = data.services.find((x) => x.id === editServiceId);
   const editCoachIds = editService?.coaches.map((x) => x.coachId) || [];
   const week = DateTime.fromISO(data.week, { zone: data.timezone });
+  const firstWeek = DateTime.fromISO(SCHEDULE_MIN_DATE)
+    .startOf("week")
+    .toISODate()!;
+  const lastWeek = DateTime.fromISO(SCHEDULE_MAX_DATE)
+    .startOf("week")
+    .toISODate()!;
+  const dateWithinRange = (date: string) =>
+    date < SCHEDULE_MIN_DATE
+      ? SCHEDULE_MIN_DATE
+      : date > SCHEDULE_MAX_DATE
+        ? SCHEDULE_MAX_DATE
+        : date;
   const days = Array.from({ length: 7 }, (_, index) =>
     week.plus({ days: index }),
   );
@@ -160,38 +205,75 @@ export default function Schedule() {
       >
         <strong>Your week at a glance</strong>
         <span>
-          Classes, coaches and enrolments. Open a session to see who is
-          attending.
+          Configure a class and its eligible coaches in Classes &amp; Passes,
+          then choose a coach, date and time here. Published sessions feed the
+          website Booking section when online booking is open.
         </span>
       </section>
 
+      {pendingServices.length > 0 && (
+        <details className="panel" aria-label="Classes awaiting setup">
+          <summary>{pendingServices.length} classes awaiting setup</summary>
+          <p className="muted">
+            Your class catalogue is already here. Complete the price and coach
+            assignment, then set the class to ACTIVE before scheduling.
+          </p>
+          <ul>
+            {pendingServices.map((service) => (
+              <li key={service.id}>
+                <Link to={`/app/catalog?edit=${service.id}`}>
+                  {service.name}
+                </Link>
+                {" — "}
+                {setupReason(service)}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
       <div className="schedule-toolbar">
         <div className="week-bar">
-          <Link
-            className="button"
-            to={"?week=" + week.minus({ weeks: 1 }).toISODate()}
-          >
-            Previous week
-          </Link>
+          {data.week > firstWeek ? (
+            <Link
+              className="button"
+              to={
+                "?week=" +
+                dateWithinRange(week.minus({ weeks: 1 }).toISODate()!)
+              }
+            >
+              Previous week
+            </Link>
+          ) : (
+            <button disabled>Previous week</button>
+          )}
           <Form method="get" className="week-picker">
             <label>
               <span className="visually-hidden">Week starting date</span>
               <input
                 type="date"
                 name="week"
-                defaultValue={data.week}
+                min={SCHEDULE_MIN_DATE}
+                max={SCHEDULE_MAX_DATE}
+                defaultValue={dateWithinRange(data.week)}
                 key={data.week}
                 required
               />
             </label>
             <button>Go</button>
           </Form>
-          <Link
-            className="button"
-            to={"?week=" + week.plus({ weeks: 1 }).toISODate()}
-          >
-            Next week
-          </Link>
+          {data.week < lastWeek ? (
+            <Link
+              className="button"
+              to={
+                "?week=" + dateWithinRange(week.plus({ weeks: 1 }).toISODate()!)
+              }
+            >
+              Next week
+            </Link>
+          ) : (
+            <button disabled>Next week</button>
+          )}
           <label className="coach-filter">
             <span className="visually-hidden">Filter by coach</span>
             <select
@@ -247,7 +329,10 @@ export default function Schedule() {
 
         {data.sessions.length === 0 ? (
           <p className="empty">
-            No sessions this week. Add a class to start planning.
+            No sessions this week.{" "}
+            {readyServices.length
+              ? "Add a session to start planning."
+              : "Complete a class in Classes & Passes to start planning."}
           </p>
         ) : (
           <>
@@ -359,10 +444,8 @@ export default function Schedule() {
                   {data.services
                     .filter(
                       (service) =>
-                        service.status === "ACTIVE" &&
-                        ["CLASS", "APPOINTMENT", "COURSE"].includes(
-                          service.kind,
-                        ),
+                        readyServices.includes(service) ||
+                        service.id === editing.serviceId,
                     )
                     .map((service) => (
                       <option key={service.id} value={service.id}>
@@ -391,7 +474,11 @@ export default function Schedule() {
               <Field label="Coach">
                 <select name="coachId" required defaultValue={editing.coachId}>
                   {data.coaches
-                    .filter((coach) => editCoachIds.includes(coach.id))
+                    .filter(
+                      (coach) =>
+                        coach.status === "ACTIVE" &&
+                        editCoachIds.includes(coach.id),
+                    )
                     .map((coach) => (
                       <option key={coach.id} value={coach.id}>
                         {coach.name}
@@ -405,6 +492,8 @@ export default function Schedule() {
                 <input
                   type="datetime-local"
                   name="localStart"
+                  min={SCHEDULE_MIN_LOCAL_START}
+                  max={SCHEDULE_MAX_LOCAL_START}
                   required
                   defaultValue={localStart(
                     editing.startsAt,
@@ -447,6 +536,14 @@ export default function Schedule() {
       {open && (
         <section className="panel schedule-editor">
           <h2>New session</h2>
+          {readyServices.length === 0 && (
+            <p className="muted">
+              No classes are ready to schedule yet.{" "}
+              <Link to="/app/catalog">
+                Assign coaches and confirm prices in Classes &amp; Passes.
+              </Link>
+            </p>
+          )}
           <Form method="post">
             <input type="hidden" name="intent" value="add" />
             <input type="hidden" name="requestId" value={data.requestId} />
@@ -459,31 +556,27 @@ export default function Schedule() {
                   onChange={(event) => setServiceId(event.target.value)}
                 >
                   <option value="">Choose a class</option>
-                  {data.services
-                    .filter(
-                      (service) =>
-                        service.status === "ACTIVE" &&
-                        ["CLASS", "APPOINTMENT", "COURSE"].includes(
-                          service.kind,
-                        ),
-                    )
-                    .map((service) => (
-                      <option key={service.id} value={service.id}>
-                        {service.name} ·{" "}
-                        {service.kind === "APPOINTMENT"
-                          ? "Private"
-                          : service.kind === "COURSE"
-                            ? "Workshop"
-                            : "Group"}
-                      </option>
-                    ))}
+                  {readyServices.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.name} ·{" "}
+                      {service.kind === "APPOINTMENT"
+                        ? "Private"
+                        : service.kind === "COURSE"
+                          ? "Workshop"
+                          : "Group"}
+                    </option>
+                  ))}
                 </select>
               </Field>
               <Field label="Coach">
                 <select name="coachId" required key={serviceId} defaultValue="">
                   <option value="">Choose an eligible coach</option>
                   {data.coaches
-                    .filter((coach) => coachIds.includes(coach.id))
+                    .filter(
+                      (coach) =>
+                        coach.status === "ACTIVE" &&
+                        coachIds.includes(coach.id),
+                    )
                     .map((coach) => (
                       <option key={coach.id} value={coach.id}>
                         {coach.name}
@@ -501,8 +594,10 @@ export default function Schedule() {
                 <input
                   type="datetime-local"
                   name="localStart"
+                  min={SCHEDULE_MIN_LOCAL_START}
+                  max={SCHEDULE_MAX_LOCAL_START}
                   required
-                  defaultValue={`${data.week}T10:00`}
+                  defaultValue={`${dateWithinRange(data.week)}T10:00`}
                 />
               </Field>
               <Field label="Repeat weekly">
@@ -515,7 +610,10 @@ export default function Schedule() {
               </Field>
             </div>
             <div className="actions">
-              <button className="primary" disabled={busy}>
+              <button
+                className="primary"
+                disabled={busy || readyServices.length === 0}
+              >
                 Save draft
               </button>
               <button type="button" onClick={() => setOpen(false)}>

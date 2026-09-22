@@ -3,8 +3,48 @@ import { DateTime } from "luxon";
 import db from "../db.server";
 import { DomainError } from "../lib/errors.server";
 import { localInstant, weekRange } from "../lib/time";
+import {
+  isScheduleDateInRange,
+  SCHEDULE_MIN_DATE,
+  SCHEDULE_MAX_DATE,
+} from "../lib/schedule-range";
 import { audit, lockShop } from "./catalog.server";
 import { requireOperations, type Actor } from "./authorization";
+function assertScheduleStart(startsAt: Date, timezone: string) {
+  const day = DateTime.fromJSDate(startsAt, { zone: timezone }).toISODate();
+  if (!day || !isScheduleDateInRange(day))
+    throw new DomainError(
+      "SCHEDULE_DATE_OUT_OF_RANGE",
+      `Session dates must be between ${SCHEDULE_MIN_DATE} and ${SCHEDULE_MAX_DATE}.`,
+    );
+}
+
+function scheduleWeekRange(day: string, timezone: string) {
+  const range = weekRange(day, timezone);
+  const first = DateTime.fromJSDate(range.start, {
+    zone: timezone,
+  }).toISODate()!;
+  const last = DateTime.fromJSDate(range.end, { zone: timezone })
+    .minus({ days: 1 })
+    .toISODate()!;
+  // Boundary weeks may include December 2025 or January 2100. The selected
+  // week is valid whenever at least one of its dates is inside the range.
+  if (first > SCHEDULE_MAX_DATE || last < SCHEDULE_MIN_DATE)
+    throw new DomainError(
+      "SCHEDULE_DATE_OUT_OF_RANGE",
+      `Choose a week within ${SCHEDULE_MIN_DATE} to ${SCHEDULE_MAX_DATE}.`,
+    );
+  return range;
+}
+
+function requireServicePrice(priceCents: number) {
+  if (priceCents <= 0)
+    throw new DomainError(
+      "SERVICE_PRICE_REQUIRED",
+      "Set the class price in Classes & Passes before publishing its sessions.",
+    );
+}
+
 const slotInput = z.object({
   serviceId: z.string().uuid(),
   coachId: z.string().uuid(),
@@ -51,6 +91,7 @@ export async function addSessions(actor: Actor, raw: unknown) {
         );
       const zone = service.location.timezone;
       const first = localInstant(input.localStart, zone);
+      assertScheduleStart(first, zone);
       if (first <= new Date())
         throw new DomainError(
           "PAST_SESSION",
@@ -62,6 +103,7 @@ export async function addSessions(actor: Actor, raw: unknown) {
           .plus({ weeks: i })
           .toFormat("yyyy-MM-dd'T'HH:mm");
         const startsAt = localInstant(value, zone);
+        assertScheduleStart(startsAt, zone);
         const endsAt = new Date(
           startsAt.getTime() + service.durationMin * 60000,
         );
@@ -211,6 +253,9 @@ export async function updateSession(actor: Actor, raw: unknown) {
 
     const zone = service.location.timezone;
     const startsAt = localInstant(input.localStart, zone);
+    assertScheduleStart(startsAt, zone);
+    if (current.status === "PUBLISHED")
+      requireServicePrice(service.requestedPriceCents);
     if (startsAt <= new Date())
       throw new DomainError(
         "PAST_SESSION",
@@ -288,7 +333,7 @@ export async function publishWeek(actor: Actor, day: string) {
     const shop = await tx.shop.findUniqueOrThrow({
       where: { id: actor.shopId },
     });
-    const range = weekRange(day, shop.timezone);
+    const range = scheduleWeekRange(day, shop.timezone);
     const drafts = await tx.classSession.findMany({
       where: {
         shopId: actor.shopId,
@@ -298,6 +343,8 @@ export async function publishWeek(actor: Actor, day: string) {
       include: { service: true, coach: true },
     });
     for (const session of drafts) {
+      assertScheduleStart(session.startsAt, session.timezone);
+      requireServicePrice(session.service.requestedPriceCents);
       if (
         session.startsAt <= new Date() ||
         session.service.status !== "ACTIVE" ||
@@ -363,7 +410,7 @@ export async function cancelDraft(actor: Actor, id: string) {
 }
 export async function scheduleData(shopId: string, day: string) {
   const shop = await db.shop.findUniqueOrThrow({ where: { id: shopId } });
-  const range = weekRange(day, shop.timezone);
+  const range = scheduleWeekRange(day, shop.timezone);
   const rows = await db.classSession.findMany({
     where: {
       shopId,
@@ -402,7 +449,7 @@ export async function copyPreviousWeek(actor: Actor, day: string) {
       const shop = await tx.shop.findUniqueOrThrow({
         where: { id: actor.shopId },
       });
-      const target = weekRange(day, shop.timezone);
+      const target = scheduleWeekRange(day, shop.timezone);
       const previous = DateTime.fromJSDate(target.start, {
         zone: shop.timezone,
       })
@@ -431,6 +478,7 @@ export async function copyPreviousWeek(actor: Actor, day: string) {
           .plus({ weeks: 1 })
           .toFormat("yyyy-MM-dd'T'HH:mm");
         const startsAt = localInstant(local, source.timezone);
+        assertScheduleStart(startsAt, source.timezone);
         const endsAt = new Date(
           startsAt.getTime() + source.service.durationMin * 60000,
         );

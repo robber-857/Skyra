@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Form,
+  Link,
   useActionData,
   useLoaderData,
   useNavigation,
@@ -33,7 +34,13 @@ const PAGE_SIZE = 8;
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { actor, shop } = await adminContext(request);
-  return { ...(await catalogData(actor.shopId)), domain: shop.domain };
+  const data = await catalogData(actor.shopId);
+  const edit = new URL(request.url).searchParams.get("edit");
+  return {
+    ...data,
+    domain: shop.domain,
+    editId: data.services.find((service) => service.id === edit)?.id ?? null,
+  };
 }
 export async function action({ request }: ActionFunctionArgs) {
   const { actor, admin, shop } = await adminContext(request);
@@ -57,7 +64,11 @@ export async function action({ request }: ActionFunctionArgs) {
     }
     if (intent === "retry") await retrySync(actor, String(form.get("id")));
     else {
-      const price = String(form.get("price"));
+      const enteredPrice = String(form.get("price") ?? "").trim();
+      const price =
+        !enteredPrice && intent === "service" && form.get("status") === "DRAFT"
+          ? "0"
+          : enteredPrice;
       if (!/^\d+(\.\d{1,2})?$/.test(price))
         return {
           error: "Enter an AUD price with no more than two decimal places.",
@@ -94,8 +105,8 @@ export default function Catalog() {
   }, [data.mappings, revalidator]);
   const busy = useNavigation().state !== "idle";
   const [tab, setTab] = useState<"service" | "pass">("service");
-  const [edit, setEdit] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
+  const [edit, setEdit] = useState<string | null>(data.editId);
+  const [open, setOpen] = useState(Boolean(data.editId));
   const [page, setPage] = useState(1);
   const service = data.services.find((x) => x.id === edit);
   const pass = data.passes.find((x) => x.id === edit);
@@ -120,7 +131,9 @@ export default function Catalog() {
         <div>
           <h1>Classes &amp; Passes</h1>
           <p className="muted">
-            Define what you offer. Assign dates and coaches in Weekly Schedule.
+            Your class and Pass catalogue. Confirm a class price and eligible
+            coaches, set it to ACTIVE, then{" "}
+            <Link to="/app/schedule">schedule dates and times</Link>.
           </p>
         </div>
         <button
@@ -167,13 +180,21 @@ export default function Catalog() {
               <Field label="Price (AUD)">
                 <input
                   name="price"
-                  required
+                  required={tab === "pass"}
                   inputMode="decimal"
                   defaultValue={
-                    item ? (item.requestedPriceCents / 100).toFixed(2) : ""
+                    item && (tab === "pass" || item.requestedPriceCents > 0)
+                      ? (item.requestedPriceCents / 100).toFixed(2)
+                      : ""
                   }
                 />
               </Field>
+              {tab === "service" && (
+                <p className="muted">
+                  Price can stay blank in a draft. A price above A$0 is required
+                  before activating or publishing a class.
+                </p>
+              )}
               <Field label="Status">
                 <select name="status" defaultValue={item?.status || "DRAFT"}>
                   <option>DRAFT</option>
@@ -239,11 +260,13 @@ export default function Catalog() {
                         service?.coaches.map((x) => x.coachId) || []
                       }
                     >
-                      {data.coaches.map((x) => (
-                        <option key={x.id} value={x.id}>
-                          {x.name}
-                        </option>
-                      ))}
+                      {data.coaches
+                        .filter((x) => x.status === "ACTIVE")
+                        .map((x) => (
+                          <option key={x.id} value={x.id}>
+                            {x.name}
+                          </option>
+                        ))}
                     </select>
                     <small>
                       Drafts can be unassigned. Assign a coach before
@@ -394,7 +417,10 @@ export default function Catalog() {
                       (record.validityMonths
                         ? " calendar months"
                         : " days")}{" "}
-                  · {"A$" + (record.requestedPriceCents / 100).toFixed(2)}
+                  ·{" "}
+                  {"durationMin" in record && record.requestedPriceCents <= 0
+                    ? "Price pending"
+                    : "A$" + (record.requestedPriceCents / 100).toFixed(2)}
                 </p>
                 <div className="catalog-statuses">
                   <Status>{record.status}</Status>

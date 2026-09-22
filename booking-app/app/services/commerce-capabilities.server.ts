@@ -27,6 +27,21 @@ export function isBookingReleaseTarget(shopDomain?: string | null) {
   );
 }
 
+export function publicScheduleAvailable(
+  shopDomain: string,
+  onlineBookingsEnabled: unknown,
+) {
+  // Match the fixed domain first so a missing production target cannot bypass
+  // the release check. Other stores retain their existing schedule behavior.
+  if (shopDomain.trim().toLowerCase() !== PRODUCTION_BOOKING_SHOP) return true;
+  return (
+    isProductionBookingShop(shopDomain) &&
+    enabled("SKYRA_BOOKING_PRODUCTION_RELEASE_APPROVED") &&
+    onlineBookingsEnabled === true &&
+    !enabled("SKYRA_BOOKING_EMERGENCY_STOP")
+  );
+}
+
 export function commerceCapabilities(shopDomain?: string | null) {
   if (enabled("SKYRA_BOOKING_EMERGENCY_STOP"))
     return { checkoutAvailable: false, ownedPassesAvailable: false };

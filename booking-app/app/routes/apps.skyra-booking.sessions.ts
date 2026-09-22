@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import { DateTime } from "luxon";
 import db from "../db.server";
 import { authenticate } from "../shopify.server";
+import { publicScheduleAvailable } from "../services/commerce-capabilities.server";
 
 import {
   classAvailability,
@@ -45,6 +46,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
       { error: "Booking is unavailable for this store." },
       { status: 404 },
     );
+  }
+
+  if (
+    !publicScheduleAvailable(
+      shop.domain,
+      (shop.rules as Record<string, unknown> | null)?.onlineBookingsEnabled,
+    )
+  ) {
+    return json({
+      timezone: shop.timezone,
+      generatedAt: new Date().toISOString(),
+      sessions: [],
+    });
   }
 
   const clock = await databaseNow(db);

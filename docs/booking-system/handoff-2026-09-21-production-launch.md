@@ -2,6 +2,8 @@
 
 > 2026-09-21 本次实现更新：独立正式店 gate、首次课程激活/日历月、Mindbody 幂等 importer 与本地测试已推进。以 [实现记录与操作手册](production-implementation-2026-09-21.md) 的最新证据为准；以下“当前尚无 importer/只允许开发店”描述属于本轮开始前的交接基线。正式安装、真实 UAT、最终 cutoff 和公开放行仍需逐项验收。
 
+> 2026-09-22 更新：正式店已完成全量 286 位 Mindbody 注册客户及源表剩余权益、已有预约的迁移。店主接受已使用快照，后续购买自行核对；已应用 manifest 保持冻结，不再改 cutoff 重导。后续由 Admin 用现有 20 门课程配置老师、价格和具体课次，无需完整未来 Mindbody 课表导出。排课日期选择范围为 2026-01-01 至 2099-12-31，不自动生成多年课次。以下旧 delta/未导入描述仅保留为历史计划。最新证据见 [正式迁移记录](mindbody-production-import-2026-09-22.md) 和 [Admin 排课准备](admin-scheduling-preparation-2026-09-22.md)；真实登录、付款/webhook、Resend 与公开放行仍须验收。
+
 ## 当前结论
 
 现在可以开始把 Skyra Booking 安装和配置到 Shopify 正式店，但暂时不能开放真实付款和公开预约入口。
