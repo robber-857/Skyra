@@ -235,7 +235,6 @@ export default function Catalog() {
                     <select
                       name="coachIds"
                       multiple
-                      required
                       defaultValue={
                         service?.coaches.map((x) => x.coachId) || []
                       }
@@ -246,7 +245,10 @@ export default function Catalog() {
                         </option>
                       ))}
                     </select>
-                    <small>Select one or more coaches.</small>
+                    <small>
+                      Drafts can be unassigned. Assign a coach before
+                      activating.
+                    </small>
                   </Field>
                   <Field label="Level">
                     <input

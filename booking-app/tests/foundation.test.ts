@@ -433,3 +433,31 @@ test("Coach role cannot publish or copy a week", async () => {
     copyPreviousWeek({ ...actor, role: "COACH" }, "2030-07-08"),
   ).rejects.toMatchObject({ code: "FORBIDDEN" });
 });
+
+test("an unassigned draft can be saved but cannot activate until a coach is assigned", async () => {
+  const draft = await saveService(actor, {
+    ...input(),
+    status: "DRAFT",
+    coachIds: [],
+  });
+  expect(await db.serviceCoach.count({ where: { serviceId: draft.id } })).toBe(
+    0,
+  );
+  await expect(
+    saveService(actor, {
+      ...input(),
+      id: draft.id,
+      version: draft.version,
+      coachIds: [],
+    }),
+  ).rejects.toThrow();
+  expect(
+    (await db.service.findUniqueOrThrow({ where: { id: draft.id } })).status,
+  ).toBe("DRAFT");
+  const active = await saveService(actor, {
+    ...input(),
+    id: draft.id,
+    version: draft.version,
+  });
+  expect(active.status).toBe("ACTIVE");
+});

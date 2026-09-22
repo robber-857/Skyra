@@ -43,6 +43,21 @@ class PrepareTests(unittest.TestCase):
             mv=next(p for p in result["passes"] if p["passKey"]=="legacy-restricted-mv")
             self.assertEqual(mv["serviceKind"],"COURSE")
             self.assertTrue(mv["legacyOnly"])
+    def test_named_mv_project_keeps_restricted_course_scope(self):
+        source=self.source()
+        source["Current Pass balances"][3]["F"]="Skyra K-Pop MV Project ( Synthetic Project)"
+        with patch.object(module,"read_workbook",return_value=source):
+            cutoff=datetime.fromisoformat("2026-09-22T00:00:00+10:00")
+            mapping=module.prepare(None,cutoff,None,"synthetic")
+            self.assertIn("legacy-restricted-mv",mapping["passPlans"])
+            mapping.update(shopId="synthetic-shop",locationId="synthetic-location",legacyMappingsConfirmed=True)
+            for kind in ["customers","passPlans","services","coaches"]:
+                mapping[kind]={k:"synthetic-"+str(i) for i,k in enumerate(mapping[kind])}
+            result=module.prepare(None,cutoff,mapping,"synthetic")
+            mv=next(p for p in result["passes"] if p["passKey"]=="legacy-restricted-mv")
+            self.assertEqual(mv["serviceKind"],"COURSE")
+            self.assertTrue(mv["legacyOnly"])
+            self.assertEqual((mv["available"],mv["consumed"]),(4,1))
     def test_missing_mapping_blocks(self):
         with patch.object(module,"read_workbook",return_value=self.source()):
             with self.assertRaises(ValueError):

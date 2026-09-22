@@ -28,7 +28,8 @@ def label(row):
     name = row["F"]
     if "1:1 Private Aerial" in name:
         return {11:"legacy-private-10",5:"legacy-private-5"}[int(float(row["I"]))]
-    if name == "Skyra K-Pop MV Project": return "legacy-restricted-mv"
+    if name == "Skyra K-Pop MV Project" or (name.startswith("Skyra K-Pop MV Project (") and name.endswith(")")):
+        return "legacy-restricted-mv"
     return name
 
 def prepare(workbook, cutoff, mapping, batch_key):

@@ -1,3 +1,6 @@
+import { z } from "zod";
+import { DomainError } from "../lib/errors.server";
+import { audit, lockShop } from "./catalog.server";
 import db from "../db.server";
 import { requireOperations, type Actor } from "./authorization";
 export async function coachListData(actor: Actor, requestedPage = 1) {
@@ -32,4 +35,42 @@ export async function coachListData(actor: Actor, requestedPage = 1) {
     coachOptions,
     pagination: { page, pageSize, totalCount, totalPages },
   };
+}
+
+export const coachPhoneInput = z
+  .string()
+  .trim()
+  .max(40)
+  .regex(
+    /^[+\d\s().-]*$/,
+    "Enter a phone number using digits and phone punctuation.",
+  );
+export async function saveCoachPhone(
+  actor: Actor,
+  coachId: string,
+  raw: unknown,
+) {
+  requireOperations(actor);
+  const phone = coachPhoneInput.parse(raw) || null;
+  return db.$transaction(async (tx) => {
+    await lockShop(tx, actor.shopId);
+    const before = await tx.coach.findFirst({
+      where: { id: coachId, shopId: actor.shopId },
+    });
+    if (!before) throw new DomainError("NOT_FOUND", "Coach not found.", 404);
+    if (before.phone === phone) return before;
+    const after = await tx.coach.update({
+      where: { id: before.id },
+      data: { phone },
+    });
+    await audit(
+      tx,
+      actor,
+      "COACH_PHONE_UPDATED",
+      before.id,
+      { phone: before.phone },
+      { phone },
+    );
+    return after;
+  });
 }

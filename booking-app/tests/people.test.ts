@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, test } from "vitest";
 import { randomUUID } from "node:crypto";
 import db from "../app/db.server";
 import { paidFixture } from "./paid-fixture";
-import { coachListData } from "../app/services/people.server";
+import { coachListData, saveCoachPhone } from "../app/services/people.server";
 beforeAll(() => {
   if (new URL(process.env.DATABASE_URL!).pathname !== "/skyra_booking_test")
     throw Error("Dedicated test database required");
@@ -76,4 +76,35 @@ test("coach pages isolate shops, retain every active approval option and use sta
     totalCount: 0,
     totalPages: 1,
   });
+});
+
+test("coach phone updates are scoped, audited and do not grant login access", async () => {
+  const f = await paidFixture();
+  const actor = {
+    shopId: f.shop.id,
+    actorId: randomUUID(),
+    role: "ADMIN" as const,
+  };
+  const phone = "+61 400 000 001";
+  const saved = await saveCoachPhone(actor, f.coach.id, phone);
+  expect(saved.phone).toBe(phone);
+  expect(saved.loginEmail).toBeNull();
+  expect(saved.notificationEmail).toBe(f.coach.notificationEmail);
+  await saveCoachPhone(actor, f.coach.id, phone);
+  expect(
+    await db.auditLog.count({
+      where: { entityId: f.coach.id, action: "COACH_PHONE_UPDATED" },
+    }),
+  ).toBe(1);
+  const foreign = await paidFixture();
+  await expect(
+    saveCoachPhone(actor, foreign.coach.id, phone),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  await expect(
+    saveCoachPhone({ ...actor, role: "COACH" }, f.coach.id, phone),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  await expect(
+    saveCoachPhone(actor, f.coach.id, "not a phone"),
+  ).rejects.toThrow();
+  expect((await saveCoachPhone(actor, f.coach.id, "")).phone).toBeNull();
 });

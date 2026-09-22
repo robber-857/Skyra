@@ -11,16 +11,25 @@ const common = {
   status: z.enum(["DRAFT", "ACTIVE", "INACTIVE"]),
   requestedPriceCents: z.coerce.number().int().min(0).max(10000000),
 };
-export const serviceInput = z.object({
-  ...common,
-  kind: z.enum(["CLASS", "APPOINTMENT", "COURSE"]).default("CLASS"),
-  description: z.string().max(4000).default(""),
-  level: z.string().max(80).default(""),
-  durationMin: z.coerce.number().int().min(5).max(480),
-  capacity: z.coerce.number().int().min(1).max(200),
-  locationId: uuid,
-  coachIds: z.array(uuid).min(1).max(100),
-});
+export const serviceInput = z
+  .object({
+    ...common,
+    kind: z.enum(["CLASS", "APPOINTMENT", "COURSE"]).default("CLASS"),
+    description: z.string().max(4000).default(""),
+    level: z.string().max(80).default(""),
+    durationMin: z.coerce.number().int().min(5).max(480),
+    capacity: z.coerce.number().int().min(1).max(200),
+    locationId: uuid,
+    coachIds: z.array(uuid).max(100),
+  })
+  .superRefine((input, ctx) => {
+    if (input.status !== "DRAFT" && input.coachIds.length === 0)
+      ctx.addIssue({
+        code: "custom",
+        path: ["coachIds"],
+        message: "Assign at least one coach before activating a class.",
+      });
+  });
 export const passInput = z.object({
   ...common,
   credits: z.coerce.number().int().min(1).max(1000),

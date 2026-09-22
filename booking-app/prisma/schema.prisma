@@ -63,6 +63,7 @@ model Coach {
   shopId            String         @db.Uuid
   name              String
   notificationEmail String?
+  phone             String?
   loginEmail        String?
   loginVerifiedAt   DateTime? @db.Timestamptz
   status            String         @default("ACTIVE")

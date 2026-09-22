@@ -11,7 +11,11 @@ import {
   type ActionFunctionArgs,
 } from "react-router";
 import db from "../db.server";
-import { coachListData } from "../services/people.server";
+import {
+  coachListData,
+  coachPhoneInput,
+  saveCoachPhone,
+} from "../services/people.server";
 import { adminContext } from "../services/context.server";
 import { audit, lockShop } from "../services/catalog.server";
 import { publicError } from "../lib/errors.server";
@@ -63,6 +67,14 @@ export async function action({ request }: ActionFunctionArgs) {
   const { actor } = await adminContext(request);
   try {
     const form = await request.formData();
+    if (form.get("intent") === "coach-phone") {
+      await saveCoachPhone(
+        actor,
+        z.string().uuid().parse(form.get("coachId")),
+        form.get("phone"),
+      );
+      return { message: "Coach phone saved." };
+    }
     if (form.get("intent") === "review-coach-account") {
       const result = await reviewCoachAccount(
         actor,
@@ -150,6 +162,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const input = z
       .object({
         name: z.string().trim().min(2).max(100),
+        phone: coachPhoneInput.default(""),
         notificationEmail: z
           .string()
           .trim()
@@ -168,6 +181,7 @@ export async function action({ request }: ActionFunctionArgs) {
           shopId: actor.shopId,
           ...input,
           notificationEmail: input.notificationEmail || null,
+          phone: input.phone || null,
         },
       });
       await audit(tx, actor, "COACH_CREATED", coach.id, null, coach);
@@ -304,6 +318,9 @@ export default function People() {
                 placeholder="coach@example.com"
               />
             </Field>
+            <Field label="Phone">
+              <input name="phone" type="tel" maxLength={40} />
+            </Field>
             <Field label="Buffer before (minutes)">
               <input
                 name="bufferBeforeMin"
@@ -385,6 +402,22 @@ export default function People() {
                 after
               </p>
               <div className="coach-email-settings">
+                <Form method="post" className="coach-email-setting">
+                  <input type="hidden" name="intent" value="coach-phone" />
+                  <input type="hidden" name="coachId" value={coach.id} />
+                  <label className="field">
+                    <span>Phone for {coach.name}</span>
+                    <input
+                      name="phone"
+                      type="tel"
+                      maxLength={40}
+                      defaultValue={coach.phone || ""}
+                    />
+                  </label>
+                  <div className="actions">
+                    <button disabled={busy}>Save phone</button>
+                  </div>
+                </Form>
                 {canBindLogin && coach.status === "ACTIVE" && (
                   <Form method="post" className="coach-email-setting">
                     <input
