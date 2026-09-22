@@ -178,57 +178,21 @@
           <p class="about-careers__note">Skyra Studio is a founder-led space shaped by long-term vision and considered design.</p>
         </div>
 
-        <form class="about-application" novalidate data-application-form>
-          <h3>Apply now</h3>
-          <div class="about-application__grid">
-            <div class="about-field">
-              <label class="about-visually-hidden" for="application-name">Name</label>
-              <input id="application-name" name="name" type="text" autocomplete="name" placeholder="Name" />
-            </div>
-            <div class="about-field">
-              <label class="about-visually-hidden" for="application-phone">Phone</label>
-              <input id="application-phone" name="phone" type="tel" autocomplete="tel" placeholder="Phone" />
-            </div>
-            <div class="about-field about-field--wide">
-              <label class="about-visually-hidden" for="application-email">Email</label>
-              <input
-                id="application-email"
-                name="email"
-                type="email"
-                autocomplete="email"
-                placeholder="Email*"
-                required
-                aria-describedby="application-status"
-                data-application-email
-              />
-            </div>
-            <div class="about-field about-field--wide">
-              <label class="about-visually-hidden" for="application-message">Message</label>
-              <textarea id="application-message" name="message" rows="3" placeholder="Message"></textarea>
-            </div>
-            <div class="about-field about-field--wide about-field--file">
-              <span class="about-field__label" id="application-file-label">Resume or supporting file</span>
-              <input
-                class="about-file-input"
-                id="application-file"
-                name="attachment"
-                type="file"
-                accept=".pdf,.doc,.docx"
-                aria-labelledby="application-file-label"
-                data-application-file
-              />
-              <label class="about-file-control" for="application-file">
-                <span class="about-file-button">Choose file</span>
-                <span class="about-file-name" data-application-file-name>No file chosen</span>
-              </label>
-            </div>
-          </div>
-          <button class="about-submit" type="submit" data-application-submit>
-            <span>Submit application</span>
-          </button>
-          <p class="about-application__status" id="application-status" role="status" hidden data-application-status></p>
-          <p class="about-application__privacy">Application preview only. Your details and file stay on this device.</p>
-        </form>
+        <div class="about-application">
+          {% if section.blocks.size > 0 %}
+            {% for block in section.blocks %}
+              {% if block.type == '@app' %}
+                {% render block %}
+              {% endif %}
+            {% endfor %}
+          {% else %}
+            <h3>Apply now</h3>
+            <p>Email your application and resume to <a href="mailto:hello@skyrastudio.com.au">hello@skyrastudio.com.au</a>.</p>
+            {% if request.design_mode %}
+              <p class="about-application__privacy">Add a Shopify Forms block here and enter the Careers form ID.</p>
+            {% endif %}
+          {% endif %}
+        </div>
       </section>
     </main>
     <footer class="site-footer">
@@ -285,6 +249,8 @@
 {% schema %}
 {
   "name": "Skyra about",
+  "max_blocks": 1,
+  "blocks": [{ "type": "@app" }],
   "settings": [
     { "type": "link_list", "id": "menu", "label": "Main menu", "default": "main-menu" },
     { "type": "url", "id": "programs_link", "label": "Programs page" },

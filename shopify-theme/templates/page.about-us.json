@@ -4,8 +4,32 @@
       "type": "skyra-about-us",
       "settings": {
         "menu": "main-menu"
-      }
+      },
+      "blocks": {
+        "skyra_careers_form": {
+          "type": "shopify://apps/forms/blocks/inline/8744a304-fcb1-4347-b211-bb6b4759a76a",
+          "settings": {
+            "form_id": "1164437",
+            "text_color": "#2d2b29",
+            "button_background_color": "#d18b2d",
+            "button_label_color": "#2d2b29",
+            "links_color": "#aa681a",
+            "errors_color": "#E02229",
+            "text_alignment": "left",
+            "form_alignment": "left",
+            "padding_top": 0,
+            "padding_bottom": 0,
+            "padding_right": 0,
+            "padding_left": 0
+          }
+        }
+      },
+      "block_order": [
+        "skyra_careers_form"
+      ]
     }
   },
-  "order": ["main"]
+  "order": [
+    "main"
+  ]
 }

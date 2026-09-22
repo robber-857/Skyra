@@ -67,50 +67,20 @@
             <p>We'd love to hear from you.<br />Send us a message and we'll get back to you soon.</p>
           </header>
 
-          <form class="contact-form" novalidate data-contact-form>
-            <div class="contact-form__grid">
-              <div class="contact-field">
-                <label class="contact-visually-hidden" for="contact-name">Name</label>
-                <input id="contact-name" name="name" type="text" autocomplete="name" placeholder="Name" />
-              </div>
-              <div class="contact-field">
-                <label class="contact-visually-hidden" for="contact-phone">Phone</label>
-                <input id="contact-phone" name="phone" type="tel" autocomplete="tel" placeholder="Phone" />
-              </div>
-              <div class="contact-field contact-field--wide">
-                <label class="contact-visually-hidden" for="contact-email">Email</label>
-                <input
-                  id="contact-email"
-                  name="email"
-                  type="email"
-                  autocomplete="email"
-                  placeholder="Email*"
-                  required
-                  aria-describedby="contact-form-status"
-                  data-contact-email
-                />
-              </div>
-              <div class="contact-field contact-field--wide">
-                <label class="contact-visually-hidden" for="contact-interest">I'm interested in</label>
-                <textarea
-                  id="contact-interest"
-                  name="interest"
-                  rows="3"
-                  placeholder="I'm interested in"
-                ></textarea>
-              </div>
-              <div class="contact-field contact-field--wide">
-                <label class="contact-visually-hidden" for="contact-notes">Other notes</label>
-                <textarea id="contact-notes" name="notes" rows="3" placeholder="Other notes"></textarea>
-              </div>
-            </div>
-
-            <button class="contact-submit" type="submit" data-contact-submit>
-              <span>Send</span>
-            </button>
-            <p class="contact-form__status" id="contact-form-status" role="status" hidden data-contact-status></p>
-            <p class="contact-form__note">Preview form only. No message will be sent or stored yet.</p>
-          </form>
+          <div class="contact-form">
+            {% if section.blocks.size > 0 %}
+              {% for block in section.blocks %}
+                {% if block.type == '@app' %}
+                  {% render block %}
+                {% endif %}
+              {% endfor %}
+            {% else %}
+              <p>Send your enquiry to <a href="mailto:hello@skyrastudio.com.au">hello@skyrastudio.com.au</a>.</p>
+              {% if request.design_mode %}
+                <p class="contact-form__note">Add a Shopify Forms block here and enter the Contact form ID.</p>
+              {% endif %}
+            {% endif %}
+          </div>
 
           <div class="contact-location">
             <span class="contact-location__mark" aria-hidden="true">S</span>
@@ -178,6 +148,8 @@
 {% schema %}
 {
   "name": "Skyra contact",
+  "max_blocks": 1,
+  "blocks": [{ "type": "@app" }],
   "settings": [
     { "type": "link_list", "id": "menu", "label": "Main menu", "default": "main-menu" },
     { "type": "url", "id": "programs_link", "label": "Programs page" },
