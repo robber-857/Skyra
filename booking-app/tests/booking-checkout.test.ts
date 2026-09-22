@@ -312,10 +312,12 @@ test("the configured development shop uses one reusable native Cart handoff", as
     expect(f.cartCreate).not.toHaveBeenCalled();
     f.input.idempotencyKey = randomUUID();
     expect(await f.run()).toEqual(first);
-    expect(await db.bookingCheckout.count({ where: { shopId: f.shop.id } })).toBe(
+    expect(
+      await db.bookingCheckout.count({ where: { shopId: f.shop.id } }),
+    ).toBe(1);
+    expect(await db.bookingHold.count({ where: { shopId: f.shop.id } })).toBe(
       1,
     );
-    expect(await db.bookingHold.count({ where: { shopId: f.shop.id } })).toBe(1);
   } finally {
     await db.shop.update({
       where: { id: f.shop.id },
@@ -800,4 +802,91 @@ test("invalid cart responses log schema paths without Cart data", async () => {
   expect(logged).toContain("cart.checkoutUrl");
   expect(logged).not.toContain("cart-secret-must-not-be-logged");
   errorLog.mockRestore();
+});
+import { resumeBookingCheckout } from "../app/services/booking-checkout-resume.server";
+import { bookingResult } from "../app/services/booking-result.server";
+
+test("refresh and replacement attempts resume the same cart without another hold or extended deadline", async () => {
+  const f = await fixture();
+  await f.run();
+  await db.classSession.update({
+    where: { id: f.session.id },
+    data: { capacity: 2 },
+  });
+  const second = await startAttempt(f.actor, {
+    sessionId: f.session.id,
+    surface: "HOME",
+  });
+  const before = await db.bookingHold.findFirstOrThrow({
+    where: { shopId: f.shop.id },
+  });
+  const result = await bookingResult(f.actor, { token: second.token });
+  expect(result).toMatchObject({
+    status: "AWAITING_PAYMENT",
+    resumeAvailable: true,
+  });
+  expect(JSON.stringify(result)).not.toContain("test-secret");
+  const resumed = await resumeBookingCheckout(
+    f.actor,
+    { token: second.token },
+    f.cartRead,
+  );
+  expect(resumed.checkoutUrl).toBe(f.cart.checkoutUrl);
+  expect(f.cartCreate).toHaveBeenCalledTimes(1);
+  expect(await db.bookingHold.count({ where: { shopId: f.shop.id } })).toBe(1);
+  expect(
+    (await db.bookingHold.findUniqueOrThrow({ where: { id: before.id } }))
+      .expiresAt,
+  ).toEqual(before.expiresAt);
+  await expect(
+    resumeBookingCheckout(
+      { ...f.actor, customerGid: "gid://shopify/Customer/999" },
+      { token: second.token },
+      f.cartRead,
+    ),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+});
+test.each(["EXPIRED", "RELEASED"])("cannot resume %s hold", async (status) => {
+  const f = await fixture();
+  await f.run();
+  await db.bookingHold.updateMany({
+    where: { shopId: f.shop.id },
+    data: { status },
+  });
+  await expect(
+    resumeBookingCheckout(f.actor, { token: f.input.token }, f.cartRead),
+  ).rejects.toMatchObject({ code: "CHECKOUT_NOT_RESUMABLE" });
+  expect(f.cartRead).not.toHaveBeenCalled();
+});
+test("payment notification during cart read prevents returning checkout", async () => {
+  const f = await fixture();
+  await f.run();
+  const checkout = await f.intent();
+  const read: GraphQL = async () => {
+    await db.outboxEvent.create({
+      data: {
+        shopId: f.shop.id,
+        kind: "ORDER_PAID_RECEIVED",
+        aggregateId: checkout.id,
+        version: 1,
+        payload: { checkoutId: checkout.id },
+      },
+    });
+    return Response.json({ data: { cart: f.cart } });
+  };
+  await expect(
+    resumeBookingCheckout(f.actor, { token: f.input.token }, read),
+  ).rejects.toMatchObject({ code: "CHECKOUT_NOT_RESUMABLE" });
+  expect(await bookingResult(f.actor, { token: f.input.token })).toMatchObject({
+    status: "PROCESSING",
+  });
+});
+test("modified original cart cannot resume", async () => {
+  const f = await fixture();
+  await f.run();
+  f.cart.lines.nodes[0].quantity = 2;
+  await expect(
+    resumeBookingCheckout(f.actor, { token: f.input.token }, f.cartRead),
+  ).rejects.toMatchObject({ code: "CART_CHANGED" });
+  expect(f.cartCreate).toHaveBeenCalledTimes(1);
 });

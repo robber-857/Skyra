@@ -7,7 +7,7 @@ const resultInput = z
 // Authenticated read-only status; return URLs and browser flags never prove payment.
 export async function bookingResult(actor: BookingActor, raw: unknown) {
   const { token } = resultInput.parse(raw);
-  return withAttempt(actor, token, async (tx, attempt, shop) => {
+  return withAttempt(actor, token, async (tx, attempt, shop, now) => {
     if (!actor.customerGid || !attempt.customerId)
       throw new DomainError(
         "LOGIN_REQUIRED",
@@ -18,10 +18,21 @@ export async function bookingResult(actor: BookingActor, raw: unknown) {
       where: { ownedAttemptId: attempt.id },
     });
     if (owned) return { status: owned.status, bookingReference: owned.id };
-    const hold = await tx.bookingHold.findUnique({
-      where: { attemptId: attempt.id },
-      include: { checkout: true },
-    });
+    const hold =
+      (await tx.bookingHold.findFirst({
+        where: {
+          shopId: shop.id,
+          sessionId: attempt.sessionId,
+          customerId: attempt.customerId,
+          status: "ACTIVE",
+          expiresAt: { gt: now },
+        },
+        include: { checkout: true },
+      })) ||
+      (await tx.bookingHold.findUnique({
+        where: { attemptId: attempt.id },
+        include: { checkout: true },
+      }));
     if (!hold?.checkout)
       return { status: "NOT_CONFIRMED", bookingReference: null };
     const checkout = hold.checkout;
@@ -62,8 +73,21 @@ export async function bookingResult(actor: BookingActor, raw: unknown) {
       },
     });
     return {
-      status: review ? "NEEDS_ATTENTION" : "AWAITING_PAYMENT",
+      status:
+        review || checkout.status !== "READY"
+          ? "NEEDS_ATTENTION"
+          : hold.status !== "ACTIVE" || hold.expiresAt <= now
+            ? "PAYMENT_WINDOW_ENDED"
+            : "AWAITING_PAYMENT",
       bookingReference: null,
+      resumeAvailable:
+        !review &&
+        checkout.status === "READY" &&
+        Boolean(checkout.cartId) &&
+        checkout.handoffMode === "STOREFRONT_API" &&
+        hold.status === "ACTIVE" &&
+        hold.expiresAt > now,
+      holdExpiresAt: hold.expiresAt.toISOString(),
     };
   });
 }

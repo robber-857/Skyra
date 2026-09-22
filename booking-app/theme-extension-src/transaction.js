@@ -108,6 +108,7 @@ window.SkyraBookingTransaction = function ({
     return main;
   }
   function errorView(error, retry) {
+    if (error.code === "ALREADY_RESERVED") { void checkResult(false); return; }
     const main = frame("Choose a Pass");
     window.SkyraBookingRecovery({
       host: main,
@@ -221,6 +222,7 @@ window.SkyraBookingTransaction = function ({
       CONFIRMED:["Booking confirmed", "Your place is reserved. You can find the class details here."],
       PROCESSING:["Confirming your booking", "Your payment has been received. We are confirming your place. Check again shortly; please do not pay again."],
       AWAITING_PAYMENT:["Checking your payment", "We have not received a verified payment confirmation yet. If you have paid, check again shortly or contact Skyra Studio before making another payment."],
+      PAYMENT_WINDOW_ENDED:["Payment window ended", "Your temporary seat hold has ended. If you have not paid, return to the schedule to start again. If you have paid, check your booking status or contact Skyra Studio before paying again."],
       NEEDS_ATTENTION:["We need to check your booking", "Your place is not confirmed. Please contact Skyra Studio so we can resolve your booking. Do not make another payment for this booking."],
       NOT_CONFIRMED:["Booking not confirmed", "No place has been reserved for this attempt. Check your Pass and try again."],
       CANCELLED:["Booking cancelled", "This booking is cancelled. Contact Skyra Studio if you need help."],
@@ -232,6 +234,10 @@ window.SkyraBookingTransaction = function ({
     const main=frame(text[0]);
     main.dataset.bookingResult=data.status || "UNKNOWN";
     main.append(el("p", "skyra-booking__notice", text[1]));
+    if(data.resumeAvailable) {
+      main.append(el("p", "skyra-booking__notice", "Your place is temporarily held until " + format(data.holdExpiresAt, {hour:"numeric",minute:"2-digit"}) + ". If you have not paid, continue the existing checkout below."));
+      main.append(button("Continue payment", "skyra-booking__primary", resumePayment));
+    }
     if(data.bookingReference) main.append(el("p", "", "Booking reference: " + data.bookingReference));
     if (!["CONFIRMED","ATTENDED","CANCELLED","LATE_CANCEL","NO_SHOW"].includes(data.status))
       main.append(button("Check booking status", "skyra-booking__primary", ()=>checkResult(false, retry)));
@@ -240,6 +246,19 @@ window.SkyraBookingTransaction = function ({
     if(data.status === "NEEDS_ATTENTION") {
       const contact=el("a", "skyra-booking__back", "Contact Skyra Studio");
       contact.href="mailto:hello@skyrastudio.com.au"; main.append(contact);
+    }
+  }
+  async function resumePayment() {
+    const version=++revision;
+    frame("Opening your existing checkout").append(el("p", "skyra-booking__notice", "Checking your current payment and seat hold…"));
+    try {
+      const data=await resultRequest("/resume");
+      if(version!==revision || !root.contains(host)) return;
+      const url=new URL(data.checkoutUrl);
+      if(data.status!=="CHECKOUT_READY" || url.protocol!=="https:" || url.username || url.password) throw new Error("Invalid checkout response");
+      window.location.assign(url.href);
+    } catch(error) {
+      if(version===revision && root.contains(host)) await checkResult(false);
     }
   }
   async function checkResult(allowSelection = false, retry) {

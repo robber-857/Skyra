@@ -278,6 +278,8 @@ test("paid recovery reads only persisted payment and booking states and exposes 
   expect(await bookingResult(actor, input)).toEqual({
     status: "AWAITING_PAYMENT",
     bookingReference: null,
+    resumeAvailable: true,
+    holdExpiresAt: expect.any(String),
   });
   const event = await queuePaid(f);
   expect(await bookingResult(actor, input)).toEqual({
@@ -324,7 +326,7 @@ test("expired paid attempt preserves recovery and does not silently create an ow
     confirmOwnedBooking(f.actor, { ...f.input, token: f.token }),
   ).rejects.toMatchObject({ code: "ATTEMPT_EXPIRED" });
   expect((await bookingResult(f.actor, { token: f.token })).status).toBe(
-    "AWAITING_PAYMENT",
+    "PAYMENT_WINDOW_ENDED",
   );
 });
 test("worker failure is a customer review state, never an automatic refund", async () => {
