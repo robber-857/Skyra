@@ -1,5 +1,7 @@
 # Skyra Booking System
 
+2026-09-22 最新迁移证据见 [Mindbody 正式店导入记录](mindbody-production-import-2026-09-22.md)。已导入 18 位客户的 20 条权益及 8 条预约；账面 155 available + 8 reserved。原始个人资料和备份均在 Git 外。真实付款、公开 Booking 和邮件仍关闭，迁移成功不代表真实用户 UAT 通过。
+
 2026-09-21 代码实施及生产操作入口：[Production implementation and operator runbook](production-implementation-2026-09-21.md)。正式付款和公开 Booking 仍为 No-Go，安装与真实 UAT 必须单独验证。
 
 2026-09-21 最新入口：正式上线步骤、production store gate、Resend、主题切换和回滚见 [上线状态、迁移与正式部署](launch-status-2026-09-20.md)。全年 Mindbody Visits/Sales 与最新 Schedule 已确认 20 条当前/未来 Pass 余额记录和 8 条未来 Reserved Booking；旧三份不完整/过时报表已删除。三笔 $299 SKYRA Lifestyle 已确认为连续三个月、每月 12 次；数据侧只需在 cutoff 更新当天到期或变化的余额。详细基线和对账规则见 [Mindbody 数据迁移审计与执行方案](mindbody-data-migration-2026-09-21.md)。原始客户文件不得加入 Git。

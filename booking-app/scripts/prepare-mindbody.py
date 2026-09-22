@@ -46,6 +46,9 @@ def prepare(workbook, cutoff, mapping, batch_key):
     if not mapping.get("shopId") or not mapping.get("locationId"): raise ValueError("MISSING_PRODUCTION_MAPPING")
     for kind in ["customers","passPlans","services","coaches"]:
         if any(not mapping.get(kind,{}).get(key) for key in template[kind]): raise ValueError("MISSING_PRODUCTION_MAPPING")
+    capacities = mapping.get("serviceCapacities", {})
+    if not isinstance(capacities, dict) or any(type(value) is not int or not 1 <= value <= 200 for value in capacities.values()):
+        raise ValueError("INVALID_SERVICE_CAPACITY")
     manifest = {"version":1,"sourceSystem":"MIND_BODY","targetShop":SHOP,"shopId":mapping["shopId"],"batchKey":batch_key,"cutoff":cutoff.isoformat(),
         "customers":[{"externalKey":key,"customerId":mapping["customers"][key],"mergeApproved":key in mapping.get("approvedCustomerMerges",[])} for key in template["customers"]],
         "mappings":[{"entityType":"LOCATION","externalKey":"burwood","targetId":mapping["locationId"]}],"passes":[],"sessions":[],"bookings":[]}
@@ -79,6 +82,11 @@ def prepare(workbook, cutoff, mapping, batch_key):
         sessions[key]["capacity"]+=1
         if row.get("N")!="MATCHED" or (row["G"],row["J"]) not in matched: raise ValueError("BOOKING_PASS_UNMATCHED")
         manifest["bookings"].append({"externalKey":json.dumps([row["G"],key],ensure_ascii=False),"customerKey":row["G"],"passKey":matched[(row["G"],row["J"])],"sessionKey":key})
+    for session in sessions.values():
+        if session["serviceKey"] in capacities:
+            capacity = capacities[session["serviceKey"]]
+            if capacity < session["capacity"]: raise ValueError("SERVICE_CAPACITY_BELOW_RESERVED")
+            session["capacity"] = capacity
     manifest["sessions"]=list(sessions.values())
     for row in manifest["passes"]:
         if row["reserved"]!=sum(b["passKey"]==row["externalKey"] for b in manifest["bookings"]): raise ValueError("CUTOFF_DELTA_REQUIRED")

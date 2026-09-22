@@ -62,6 +62,59 @@ class PrepareTests(unittest.TestCase):
         with patch.object(module,"read_workbook",return_value=self.source()):
             with self.assertRaises(ValueError):
                 module.prepare(None,datetime.fromisoformat("2026-09-21T12:00:00+10:00"),{"targetShop":module.SHOP},"synthetic")
+    def scheduled_source(self):
+        source = self.source()
+        source["Current Pass balances"] = [{}] + [
+            {"A":f"synthetic-aerial-{i}","F":"5 Aerial Access","G":"46282","H":"46400","I":"5","M":"4","N":"1"}
+            for i in range(2)]
+        source["Future bookings"] = [{}] + [
+            {"A":"46291","B":"0.5","C":str(0.5+55/1440),"D":"Synthetic Aerial","E":"Synthetic Coach",
+             "G":f"synthetic-aerial-{i}","J":"5 Aerial Access","N":"MATCHED"}
+            for i in range(2)]
+        return source
+    def scheduled_mapping(self, cutoff):
+        mapping=module.prepare(None,cutoff,None,"synthetic")
+        mapping.update(shopId="synthetic-shop",locationId="synthetic-location",legacyMappingsConfirmed=True)
+        for kind in ["customers","passPlans","services","coaches"]:
+            mapping[kind]={k:"synthetic-"+str(i) for i,k in enumerate(mapping[kind])}
+        return mapping
+    def test_approved_capacity_preserves_available_seats_and_credit_balances(self):
+        with patch.object(module,"read_workbook",return_value=self.scheduled_source()):
+            cutoff=datetime.fromisoformat("2026-09-22T00:00:00+10:00")
+            mapping=self.scheduled_mapping(cutoff)
+            mapping["serviceCapacities"]={"Synthetic Aerial":6}
+            result=module.prepare(None,cutoff,mapping,"synthetic")
+            self.assertEqual(len(result["sessions"]),1)
+            self.assertEqual(result["sessions"][0]["capacity"],6)
+            self.assertEqual(len(result["bookings"]),2)
+            self.assertEqual(sum(p["available"] for p in result["passes"]),8)
+            self.assertEqual(sum(p["reserved"] for p in result["passes"]),2)
+    def test_missing_capacity_keeps_reserved_count_fallback(self):
+        with patch.object(module,"read_workbook",return_value=self.scheduled_source()):
+            cutoff=datetime.fromisoformat("2026-09-22T00:00:00+10:00")
+            mapping=self.scheduled_mapping(cutoff)
+            for capacities in [None,{}, {"Another Service":6}]:
+                with self.subTest(capacities=capacities):
+                    if capacities is not None: mapping["serviceCapacities"]=capacities
+                    result=module.prepare(None,cutoff,mapping,"synthetic")
+                    self.assertEqual(result["sessions"][0]["capacity"],2)
+    def test_invalid_capacity_is_rejected(self):
+        with patch.object(module,"read_workbook",return_value=self.scheduled_source()):
+            cutoff=datetime.fromisoformat("2026-09-22T00:00:00+10:00")
+            mapping=self.scheduled_mapping(cutoff)
+            invalid=[None,[],6]+[{"Synthetic Aerial":value} for value in [None,True,False,0,-1,201,6.0,"6"]]
+            for capacities in invalid:
+                with self.subTest(capacities=capacities):
+                    mapping["serviceCapacities"]=capacities
+                    with self.assertRaisesRegex(ValueError,"^INVALID_SERVICE_CAPACITY$"):
+                        module.prepare(None,cutoff,mapping,"synthetic")
+    def test_capacity_below_reserved_is_rejected(self):
+        with patch.object(module,"read_workbook",return_value=self.scheduled_source()):
+            cutoff=datetime.fromisoformat("2026-09-22T00:00:00+10:00")
+            mapping=self.scheduled_mapping(cutoff)
+            mapping["serviceCapacities"]={"Synthetic Aerial":1}
+            with self.assertRaisesRegex(ValueError,"^SERVICE_CAPACITY_BELOW_RESERVED$"):
+                module.prepare(None,cutoff,mapping,"synthetic")
     def test_private_outputs_cannot_enter_repository(self):
         with self.assertRaises(ValueError): module.outside(scripts/"private.json")
 
