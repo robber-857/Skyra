@@ -125,3 +125,54 @@ test("sandbox recipient cannot be redirected and blocked sends never reach provi
   vi.stubEnv("SKYRA_MAIL_TEST_RECIPIENT", "invalid");
   expect(transactionalMailRecipientAllowed("tester@example.com")).toBe(false);
 });
+
+test("owner-adjusted fixed discount requires the exact configured payable amount", () => {
+  enable();
+  vi.stubEnv(
+    "SKYRA_BOOKING_UAT_DISCOUNT",
+    JSON.stringify({
+      ...config,
+      payableCents: 50,
+      discountType: "fixed_amount",
+    }),
+  );
+  const adjusted = {
+    ...order,
+    subtotalCents: 50,
+    finalCents: 50,
+    totalDiscountsCents: 21950,
+    discountCodes: [
+      { code: config.code, amountCents: 21950, type: "fixed_amount" },
+    ],
+  };
+  expect(exactProductionUatDiscount(shop, adjusted, line, checkout)).toBe(true);
+  expect(exactProductionUatDiscount(shop, order, line, checkout)).toBe(false);
+  for (const patch of [
+    { finalCents: 49 },
+    { subtotalCents: 51 },
+    { totalDiscountsCents: 21949 },
+    { customerGid: "gid://shopify/Customer/124" },
+    { discountCodes: [{ ...adjusted.discountCodes[0], type: "percentage" }] },
+  ]) {
+    expect(
+      exactProductionUatDiscount(
+        shop,
+        { ...adjusted, ...patch },
+        line,
+        checkout,
+      ),
+    ).toBe(false);
+  }
+});
+
+test.each([0, -1, 0.5, 22000, 22001])(
+  "invalid configured payable %s fails closed",
+  (payableCents) => {
+    enable();
+    vi.stubEnv(
+      "SKYRA_BOOKING_UAT_DISCOUNT",
+      JSON.stringify({ ...config, payableCents }),
+    );
+    expect(exactProductionUatDiscount(shop, order, line, checkout)).toBe(false);
+  },
+);
