@@ -6,6 +6,7 @@ import { log } from "../lib/log.server";
 import {
   sendTransactionalMail,
   transactionalMailReady,
+  transactionalMailRecipientAllowed,
   type TransactionalMail,
   type MailOutcome,
 } from "./transactional-mail.server";
@@ -74,7 +75,7 @@ export async function deliverInternalBookingMail(
     notification.recipientId,
     resolveCustomer,
   );
-  if (!to) return;
+  if (!to || !transactionalMailRecipientAllowed(to)) return;
   await deliverBookingNotification(id, async (input) => {
     const result = await send({
       to,

@@ -9,6 +9,8 @@ import {
   isDevelopmentBookingShop,
 } from "./commerce-capabilities.server";
 
+import { exactProductionUatDiscount } from "./production-uat-discount.server";
+
 export const DEVELOPMENT_FREE_DISCOUNT_CODE = "SKYRAUATFREE915";
 
 const shopifyGid = (type: "Order" | "LineItem" | "Customer") =>
@@ -175,7 +177,7 @@ function validationCodes(
     productGid: string;
     variantGid: string;
     priceCents: number;
-    hold: { customer: { shopifyCustomerGid: string } };
+    hold: { purchaseKind: string; customer: { shopifyCustomerGid: string } };
   } | null,
 ) {
   const codes: string[] = [];
@@ -208,7 +210,11 @@ function validationCodes(
     testDiscount?.code === DEVELOPMENT_FREE_DISCOUNT_CODE &&
     testDiscount.amountCents === expected &&
     testDiscount.type === "percentage";
-  if (!fullAmount && !exactDevelopmentFreeOrder)
+  if (
+    !fullAmount &&
+    !exactDevelopmentFreeOrder &&
+    !exactProductionUatDiscount(shopDomain, order, line, checkout)
+  )
     codes.push("AMOUNT_MISMATCH");
   if (order.financialStatus !== "paid") codes.push("NOT_PAID");
   if (order.cancelled) codes.push("ORDER_CANCELLED");

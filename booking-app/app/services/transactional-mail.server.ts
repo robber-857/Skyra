@@ -22,11 +22,25 @@ export function transactionalMailReady() {
   );
 }
 
+// During provider sandbox UAT, leave other recipients queued until full mail launch.
+export function transactionalMailRecipientAllowed(to: string) {
+  const testRecipient = process.env.SKYRA_MAIL_TEST_RECIPIENT;
+  return (
+    !testRecipient ||
+    (z.email().safeParse(testRecipient).success &&
+      to.trim().toLowerCase() === testRecipient.trim().toLowerCase())
+  );
+}
+
 export async function sendTransactionalMail(
   mail: TransactionalMail,
   send: typeof fetch = fetch,
 ): Promise<MailOutcome> {
-  if (!transactionalMailReady() || !z.email().safeParse(mail.to).success)
+  if (
+    !transactionalMailReady() ||
+    !z.email().safeParse(mail.to).success ||
+    !transactionalMailRecipientAllowed(mail.to)
+  )
     return { status: "FAILED" };
   try {
     const response = await send("https://api.resend.com/emails", {
