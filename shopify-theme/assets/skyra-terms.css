@@ -1,0 +1,11 @@
+.skyra-terms-main { width: min(880px, calc(100% - 48px)); margin: 60px auto 88px; }
+.skyra-terms-heading { padding-bottom: 32px; border-bottom: 1px solid #d9c5ad; margin-bottom: 36px; }
+.skyra-terms-heading > p { font-size: .75rem; letter-spacing: .18em; color: #865a30; }
+.skyra-terms-heading h1 { margin: 12px 0 0; font-family: Georgia, 'Times New Roman', serif; font-size: clamp(2.4rem, 5vw, 4rem); font-weight: 400; line-height: 1.1; }
+.skyra-terms-content { color: #36322d; font-size: 1rem; line-height: 1.8; overflow-wrap: anywhere; }
+.skyra-terms-content h2 { margin: 2.2em 0 .7em; font-size: 1.3rem; line-height: 1.4; font-weight: 600; }
+.skyra-terms-content p { margin: 0 0 1em; }
+.skyra-terms-content ul { margin: 0 0 1.2em; padding-left: 1.4em; list-style: disc; }
+.skyra-terms-content li { margin-bottom: .4em; }
+.skyra-terms-back { margin-top: 32px; }
+@media (max-width: 760px) { .skyra-terms-main { width: calc(100% - 40px); margin: 36px auto 56px; } .skyra-terms-content { font-size: .95rem; } }

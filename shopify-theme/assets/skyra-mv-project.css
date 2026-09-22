@@ -1,0 +1,12 @@
+.mv-project-page .mv-past { margin-top: 40px; margin-bottom: 40px; padding: 40px 28px; }
+.mv-project-page .past-projects { width: 100%; margin: 28px 0 0; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.mv-project-page .past-project { min-width: 0; margin: 0; overflow: hidden; border: 0; border-radius: 12px; background: transparent; }
+.mv-project-page .past-projects img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; object-position: center; opacity: 1; }
+.mv-project-page .past-projects:focus-visible { outline: 2px solid var(--commerce-accent); outline-offset: 5px; }
+@media (max-width: 760px) {
+  .mv-project-page .mv-past { width: 100%; margin-block: 40px; padding: 48px 10px; }
+  .mv-project-page .mv-past .panel-heading { padding-inline: 6px; }
+  .mv-project-page .past-projects { display: flex; width: 100%; margin: 32px 0 0; padding: 0 0 8px; gap: 10px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: thin; scrollbar-color: #b88655 #f5eadb; }
+  .mv-project-page .past-project { flex: 0 0 calc((100% - 10px) / 2); scroll-snap-align: start; }
+  .mv-project-page .past-projects img { height: auto; aspect-ratio: 1; }
+}

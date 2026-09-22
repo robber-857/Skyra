@@ -1,8 +1,8 @@
 {{ 'skyra.css' | asset_url | stylesheet_tag }}
 {{ 'skyra-commerce.css' | asset_url | stylesheet_tag }}
-{{ 'skyra-mv-project.css' | asset_url | stylesheet_tag }}
+{{ 'skyra-terms.css' | asset_url | stylesheet_tag }}
 <script src="{{ 'skyra-site.js' | asset_url }}" defer="defer"></script>
-<div class="skyra-home commerce-page mv-project-page" data-section-id="{{ section.id }}">
+<div class="skyra-home commerce-page skyra-terms-page" data-section-id="{{ section.id }}">
     <a class="skip-link" href="#main">Skip to content</a>
 
     <header class="site-header site-header--complete" data-header>
@@ -24,7 +24,7 @@
           <a href="{{ routes.cart_url }}" aria-label="View shopping cart">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.8 5.2h2l1.7 9.2h9.2l2-6.6H7"></path><circle cx="9.3" cy="18.5" r="1"></circle><circle cx="16.2" cy="18.5" r="1"></circle></svg>
           </a>
-          <a href="{% render 'skyra-account-url' %}" aria-label="Member account">
+          <a href="{{ routes.account_url }}" aria-label="Member account">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.4"></circle><path d="M5.8 19.2c.8-3.3 3-5 6.2-5s5.4 1.7 6.2 5"></path></svg>
           </a>
         </nav>
@@ -43,71 +43,16 @@
           </div>
           <div class="primary-nav__meta">
             <a href="{{ routes.collections_url }}">Online store</a>
-            <a href="{% render 'skyra-account-url' %}">Member account</a>
+            <a href="{{ routes.account_url }}">Member account</a>
           </div>
         </div>
       </nav>
     </header>
-<main id="main" class="commerce-main">
-      <section class="mv-hero reveal" aria-labelledby="mv-title">
-        <div class="mv-hero__copy">
-          <p class="mv-kicker">A small-group choreo experience designed to perform on camera</p>
-          <h1 id="mv-title">Welcome to<br />SKYRA MV Project</h1>
-          <ul>
-            <li><span aria-hidden="true">✓</span>Each project includes guided rehearsals, structured preparation and a professional filmed outcome.</li>
-            <li><span aria-hidden="true">✓</span>This is a focused creative process with a clear final result.</li>
-            <li><span aria-hidden="true">✓</span>Projects suit participants who value commitment, collaboration and completion.</li>
-          </ul>
-        </div>
-        <div class="mv-film" aria-hidden="true">
-          <img src="{{ 'skyra-mv-hero-background.png' | asset_url }}" alt="" width="1448" height="1086" />
-        </div>
-      </section>
-
-      <section class="mv-upcoming commerce-panel reveal" aria-labelledby="upcoming-title">
-        <header class="panel-heading"><span aria-hidden="true">✦</span><h2 id="upcoming-title">Upcoming MV Projects</h2></header>
-        <div class="mv-featured-grid">
-          <article class="mv-product-card">
-            <img src="{{ 'skyra-mv-thriller-card.png' | asset_url }}" alt="Thriller MV project artwork" width="244" height="154" />
-            <div><h3>MV Project (Thriller)</h3><p>From <s>$319.00</s> <strong>$299.00</strong></p></div>
-          </article>
-          <article class="mv-product-card">
-            <img src="{{ 'skyra-mv-attitude-card.png' | asset_url }}" alt="Dance team performing in the Attitude MV project" width="246" height="154" />
-            <div><h3>MV Project (Attitude)</h3><p>From <s>$319.00</s> <strong>$299.00</strong></p></div>
-          </article>
-        </div>
-        <a class="outline-button" href="{{ routes.collections_url }}">View all products <span aria-hidden="true">→</span></a>
-      </section>
-
-      <section class="mv-products commerce-panel reveal" aria-labelledby="products-title">
-        <nav class="mv-product-nav" aria-label="Product categories"><a href="#products-title" aria-current="page">All products</a><a href="#upcoming-title">Skyra MV Project</a></nav>
-        <div class="mv-product-results">
-          <div class="mv-products-heading"><h2 id="products-title">All Products</h2><a href="{{ routes.collections_url }}">Newest <span aria-hidden="true">⌄</span></a></div>
-          <div class="mv-featured-grid">
-            <article class="mv-product-card"><img src="{{ 'skyra-mv-attitude-card.png' | asset_url }}" alt="Dance team performing in the Attitude MV project" width="246" height="154" loading="lazy" /><div><h3>MV Project (Attitude)</h3><p><s>$319.00</s> <strong>$299.00</strong></p><a href="{{ routes.collections_url }}">More options</a></div></article>
-            <article class="mv-product-card"><img src="{{ 'skyra-mv-thriller-card.png' | asset_url }}" alt="Thriller MV project artwork" width="244" height="154" loading="lazy" /><div><h3>MV Project (Thriller)</h3><p><s>$319.00</s> <strong>$299.00</strong></p><a href="{{ routes.collections_url }}">More options</a></div></article>
-          </div>
-        </div>
-      </section>
-
-      <section class="mv-past commerce-panel reveal" aria-labelledby="past-title">
-        <header class="panel-heading"><span aria-hidden="true">✦</span><h2 id="past-title">Past Projects</h2></header>
-        <div class="past-projects" role="region" aria-label="Past projects gallery. Swipe or use arrow keys to browse all six photos." tabindex="0">
-          <figure class="past-project"><img src="{{ 'skyra-mv-past-01.jpg' | asset_url }}" alt="That&#x27;s a No No dance project" width="2276" height="1280" loading="lazy" /></figure>
-          <figure class="past-project"><img src="{{ 'skyra-mv-past-02.jpg' | asset_url }}" alt="Whole Different Animal dance project" width="2276" height="1280" loading="lazy" /></figure>
-          <figure class="past-project"><img src="{{ 'skyra-mv-past-03.jpg' | asset_url }}" alt="Aerial yoga practice at Skyra Studio" width="1280" height="1707" loading="lazy" /></figure>
-          <figure class="past-project"><img src="{{ 'skyra-mv-past-04.jpg' | asset_url }}" alt="Golden dance project" width="2250" height="1280" loading="lazy" /></figure>
-          <figure class="past-project"><img src="{{ 'skyra-mv-past-05.jpg' | asset_url }}" alt="Bang Bang dance project" width="2276" height="1280" loading="lazy" /></figure>
-          <figure class="past-project"><img src="{{ 'skyra-mv-past-06.jpg' | asset_url }}" alt="Lemonade dance project" width="2224" height="1279" loading="lazy" /></figure>
-        </div>
-      </section>
-
-      <section class="mv-terms commerce-panel reveal" aria-labelledby="terms-title">
-        <span class="mv-terms__icon" aria-hidden="true">▤</span>
-        <div><h2 id="terms-title">Terms and Conditions</h2><p>Please review our terms before enrolling in any MV Project.</p></div>
-        <a class="outline-button" href="/pages/term-conditions">View terms &amp; conditions <span aria-hidden="true">→</span></a>
-      </section>
-    </main>
+<main id="main" class="skyra-terms-main">
+  <header class="skyra-terms-heading"><p>SKYRA STUDIO</p><h1>{{ page.title | escape }}</h1></header>
+  <article class="skyra-terms-content">{{ page.content }}</article>
+  <a class="outline-button skyra-terms-back" href="{{ section.settings.mv_project_link | default: '/pages/mv-project' }}">Back to MV Project <span aria-hidden="true">&rarr;</span></a>
+</main>
     <footer class="site-footer">
       <div class="footer-main">
         <div class="footer-brand">
@@ -138,7 +83,7 @@
           <div class="footer-group">
             <p class="footer-heading">Account</p>
             <a href="{{ routes.collections_url }}">Online store</a>
-            <a href="{% render 'skyra-account-url' %}">Member account</a>
+            <a href="{{ routes.account_url }}">Member account</a>
           </div>
         </nav>
 
@@ -161,7 +106,7 @@
 </div>
 {% schema %}
 {
-  "name": "Skyra MV project",
+  "name": "Skyra terms",
   "settings": [
     { "type": "link_list", "id": "menu", "label": "Main menu", "default": "main-menu" },
     { "type": "url", "id": "programs_link", "label": "Programs page" },
@@ -175,7 +120,7 @@
     { "type": "url", "id": "facebook_url", "label": "Facebook URL" },
     { "type": "url", "id": "tiktok_url", "label": "TikTok URL" }
   ],
-  "presets": [{ "name": "Skyra MV project" }],
+  "presets": [{ "name": "Skyra terms" }],
   "enabled_on": { "templates": ["page"] }
 }
 {% endschema %}
