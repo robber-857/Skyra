@@ -1,6 +1,6 @@
 # Skyra Booking 上线状态、迁移与正式部署（更新 2026-09-21）
 
-2026-09-22 最新迁移证据见 [Mindbody 正式店导入记录](mindbody-production-import-2026-09-22.md)。已导入 18 位客户的 20 条权益及 8 条预约；账面 155 available + 8 reserved。原始个人资料和备份均在 Git 外。真实付款、公开 Booking 和邮件仍关闭，迁移成功不代表真实用户 UAT 通过。
+2026-09-22 最新迁移证据见 [Mindbody 正式店导入记录](mindbody-production-import-2026-09-22.md)。已同步 Mailing List 全部 286 位注册客户，其中 18 位持有 20 条权益及 8 条预约；账面 155 available + 8 reserved。完整未来课表仍缺包含零预约课次的来源。原始个人资料和备份均在 Git 外。真实付款、公开 Booking 和邮件仍关闭，迁移成功不代表真实用户 UAT 通过。
 
 > 2026-09-21 本次实现更新：独立正式店 gate、首次课程激活/日历月、Mindbody 幂等 importer 与本地测试已推进。以 [实现记录与操作手册](production-implementation-2026-09-21.md) 的最新证据为准；以下“当前尚无 importer/只允许开发店”描述属于本轮开始前的交接基线。正式安装、真实 UAT、最终 cutoff 和公开放行仍需逐项验收。
 

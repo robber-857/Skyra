@@ -44,4 +44,24 @@ Do not regenerate or edit this applied manifest to retry it. The importer applie
 
 The production release-approval, checkout and owned-Pass environment flags remain false. `SKYRA_MAIL_ENABLED` is absent and therefore disabled by runtime code, rather than explicitly configured false. The web and worker processes inherit the same service environment. `Shop.rules.onlineBookingsEnabled` remains false. No real payments, customer login UAT, transactional mail delivery or public Booking release is claimed by this migration.
 
-Next gates remain: complete the unbooked future timetable and unresolved draft coach/price decisions; verify authenticated Customer Account, controlled payment/orders-paid reconciliation, Coach/Admin workflows and real Resend delivery. Keep the public entry closed until those pass. The additional customers without current balances and duplicate-email groups were not imported or merged in this step.
+Next gates remain: complete the unbooked future timetable and unresolved draft coach/price decisions; verify authenticated Customer Account, controlled payment/orders-paid reconciliation, Coach/Admin workflows and real Resend delivery. Keep the public entry closed until those pass. The first balance-import step included only 18 customers. The full registered-customer follow-up below supersedes that customer-coverage limit; no identities were merged.
+
+
+## Full registered-customer follow-up (2026-09-22 05:03 UTC)
+
+The owner explicitly requires every registered Mailing List customer, including those without remaining credits. All **286 distinct Mindbody source customer IDs** are now represented in Shopify and Booking. This follow-up imported **268 new profiles**, with **zero failures and zero duplicates skipped**; the original 18 balance customers were excluded from the CSV. Shopify and Booking each contain 289 profiles, including three pre-existing records outside the Mailing List mapping.
+
+The private CSV was independently checked against the current 21-profile Shopify snapshot before submission. Repeated/placeholder contact fields and two existing-account email collisions were left unset in new login/contact fields, with all original source fields retained in the Admin Note. Every source identity was kept separate. Twelve new profiles have no verified login email yet; seven have neither a usable email nor phone. Their records exist and are listed in a private owner review report. There were no automatic identity merges, existing-customer overwrites, marketing opt-ins or Pass grants.
+
+- CSV SHA-256: `1e73de8de4f017971f3561c29ffc004f32725f3d9ada760126e3bcfe4c368ff0`.
+- Official customer query was validated against Shopify Admin GraphQL 2026-07 with `read_customers`. SDK session handling was used when the expiring offline access token needed renewal.
+- Shopify post-import read-back verified all 268 source tags, names, emails, phones, original notes and non-subscribed marketing states. All 286 source IDs map one-to-one to 286 distinct Shopify customer IDs; the original 18 profile records were unchanged.
+- Booking Admin synchronization completed in three batches of 100, 100 and 89. Read-back verified all 286 Shopify-to-Booking customer mappings and all contacts; no new customer's record has an entitlement.
+- Re-ran the full read-only balance/session/booking comparison. The original 20 entitlements, 28 ledger entries, 6 sessions and 8 bookings retain exactly the same IDs, dates, scopes and balances (155 available / 8 reserved / 31 consumed). Stable snapshot SHA-256 remains `28f912ac3e7f2f33d2b7180062b83e98472e712abfb6a8a65a19bc25cc48aba6`; booking notifications remain zero.
+- Source contact data, reports, CSV, Shopify snapshots and full identity maps remain outside Git. Operational output is ignored. Temporary database network access was removed after each operation.
+
+### Complete timetable is still unavailable
+
+The supplied ScheduleAtAGlance file is a per-customer reservation/attendance report: **430 rows**, all containing a customer, grouped into **121 sessions** across 11 services and 5 coaches. Actual dates span June 30 through September 27, despite the broader requested report dates in its filename. Its eight future Reserved rows correspond exactly to the six imported future sessions; none of those source-backed future sessions is missing.
+
+The file contains no zero-reservation session records and no evidence of the schedule after September 27. It cannot establish a complete timetable, weekly recurrence or cancellation history. No extra future sessions were invented from the historical 115 sessions. A complete session-level future export including empty classes, dates/start times, services and coaches is required before full timetable import can be completed. Aerial group sessions remain 55 minutes / capacity 6, Dance 60 minutes / capacity 15, as approved by the owner. Public booking and payment gates remain closed.
