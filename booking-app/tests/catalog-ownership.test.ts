@@ -9,6 +9,7 @@ import {
 import {
   authenticatedStorefrontClient,
   STOREFRONT_CHECKOUT_SCOPE,
+  STOREFRONT_SELLING_PLAN_SCOPE,
   STOREFRONT_PRODUCT_SCOPE,
 } from "../app/services/storefront-access.server";
 
@@ -348,20 +349,27 @@ test("authenticated Storefront uses the approved offline SDK context and forward
   expect(f.load).toHaveBeenCalledWith("test.myshopify.com");
   expect(f.graphql).toHaveBeenCalledWith(OWNERSHIP_READ, options);
 });
-test("checkout Storefront requires both product read and checkout write scopes", async () => {
+test("checkout Storefront requires product, checkout, and selling-plan read scopes", async () => {
   const f = storefrontFixture();
-  const client = authenticatedStorefrontClient(
-    f.context.session.shop,
-    f.load,
-    [STOREFRONT_PRODUCT_SCOPE, STOREFRONT_CHECKOUT_SCOPE],
+  const client = authenticatedStorefrontClient(f.context.session.shop, f.load, [
+    STOREFRONT_PRODUCT_SCOPE,
+    STOREFRONT_CHECKOUT_SCOPE,
+    STOREFRONT_SELLING_PLAN_SCOPE,
+  ]);
+  await expect(client(OWNERSHIP_READ, { variables: {} })).rejects.toMatchObject(
+    {
+      code: "STOREFRONT_ACCESS_REQUIRED",
+    },
   );
-  await expect(client(OWNERSHIP_READ, { variables: {} })).rejects.toMatchObject({
-    code: "STOREFRONT_ACCESS_REQUIRED",
-  });
   f.context.session.scope = [
     STOREFRONT_PRODUCT_SCOPE,
     STOREFRONT_CHECKOUT_SCOPE,
   ].join(",");
+  await expect(client(OWNERSHIP_READ, { variables: {} })).rejects.toMatchObject(
+    { code: "STOREFRONT_ACCESS_REQUIRED" },
+  );
+  expect(f.graphql).not.toHaveBeenCalled();
+  f.context.session.scope += "," + STOREFRONT_SELLING_PLAN_SCOPE;
   await client(OWNERSHIP_READ, { variables: {} });
   expect(f.graphql).toHaveBeenCalledTimes(1);
 });

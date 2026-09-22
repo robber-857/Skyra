@@ -3,6 +3,9 @@ import type { GraphQL } from "./shopify-catalog.server";
 
 export const STOREFRONT_PRODUCT_SCOPE = "unauthenticated_read_product_listings";
 export const STOREFRONT_CHECKOUT_SCOPE = "unauthenticated_write_checkouts";
+export const STOREFRONT_SELLING_PLAN_SCOPE =
+  "unauthenticated_read_selling_plans";
+
 type StorefrontContext = {
   session: { shop: string; isOnline: boolean; scope?: string };
   storefront: { graphql: GraphQL };

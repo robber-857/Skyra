@@ -7,6 +7,7 @@ import {
   authenticatedStorefrontClient,
   STOREFRONT_CHECKOUT_SCOPE,
   STOREFRONT_PRODUCT_SCOPE,
+  STOREFRONT_SELLING_PLAN_SCOPE,
 } from "../services/storefront-access.server";
 import { unauthenticated } from "../shopify.server";
 
@@ -30,7 +31,11 @@ export function action({ request }: ActionFunctionArgs) {
       storefront: authenticatedStorefrontClient(
         domain,
         unauthenticated.storefront,
-        [STOREFRONT_PRODUCT_SCOPE, STOREFRONT_CHECKOUT_SCOPE],
+        [
+          STOREFRONT_PRODUCT_SCOPE,
+          STOREFRONT_CHECKOUT_SCOPE,
+          STOREFRONT_SELLING_PLAN_SCOPE,
+        ],
       ),
     }));
   });
