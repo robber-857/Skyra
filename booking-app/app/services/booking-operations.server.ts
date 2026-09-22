@@ -1,4 +1,5 @@
 import db from "../db.server";
+import { clientName } from "./client-identity";
 import { requireOperations, type Actor } from "./authorization";
 export async function bookingOperationsData(
   actor: Actor,
@@ -49,6 +50,11 @@ export async function bookingOperationsData(
         id: true,
         status: true,
         createdAt: true,
+        customerId: true,
+        customerComment: true,
+        customer: {
+          select: { preferredName: true, shopifyName: true, email: true },
+        },
         session: {
           select: {
             startsAt: true,
@@ -93,7 +99,10 @@ export async function bookingOperationsData(
     select: { aggregateId: true, payload: true, lastError: true },
   });
   return {
-    bookings,
+    bookings: bookings.map(({ customer, ...booking }) => ({
+      ...booking,
+      customerName: clientName(customer),
+    })),
     pagination: { page, pageSize, totalCount, totalPages },
     notifications,
     notificationPagination: {

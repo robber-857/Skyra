@@ -18,13 +18,23 @@ import {
   staffBookingDetail,
   staffChangeBooking,
 } from "../services/booking-lifecycle.server";
+import { refreshClientContacts } from "../services/client-contacts.server";
 import { publicError } from "../lib/errors.server";
 import { BookingActions } from "../components/booking-actions";
 import { Feedback, Status } from "../components/admin-ui";
 export const headers = () => ({ "Cache-Control": "private, no-store" });
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { actor } = await adminContext(request);
-  const detail = await staffBookingDetail(actor, params.id!);
+  const { actor, admin } = await adminContext(request);
+  let detail = await staffBookingDetail(actor, params.id!);
+  let warning: string | null = null;
+  try {
+    await refreshClientContacts(actor, admin.graphql, [
+      detail.booking.customerId,
+    ]);
+    detail = await staffBookingDetail(actor, params.id!);
+  } catch (error) {
+    warning = publicError(error).error;
+  }
   let options: Awaited<ReturnType<typeof rescheduleOptions>>["options"] = [];
   let optionsError: string | null = null;
   if (
@@ -46,6 +56,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   return {
     ...detail,
+    warning,
     options,
     optionsError,
     idempotencyKey: randomUUID(),
@@ -83,11 +94,17 @@ export default function BookingDetail() {
     idempotencyKey,
     options,
     optionsError,
+    warning,
   } = useLoaderData<typeof loader>();
   return (
     <main className="workspace">
       <Link to="/app/bookings">Back to bookings</Link>
       <h1>{b.session.service.name}</h1>
+      {warning && (
+        <p className="feedback error" role="alert">
+          {warning}
+        </p>
+      )}
       <Feedback result={useActionData<typeof action>()} />
       <section className="panel">
         <h2>Booking details</h2>
@@ -116,14 +133,17 @@ export default function BookingDetail() {
           {b.session.coach.name} · {b.session.location.name}
         </p>
         <p className="muted">Booking {b.id}</p>
-        <p className="muted">Customer reference {b.customerId}</p>
+        <p>
+          <strong>Client: </strong>
+          <Link to={`/app/clients/${b.customerId}`}>{b.customerName}</Link>
+        </p>
         <Status>{b.status}</Status>
-        {b.customerComment && (
-          <div className="booking-comment">
-            <h3>Customer note for this booking</h3>
-            <p>{b.customerComment}</p>
-          </div>
-        )}
+        <div className="booking-comment">
+          <h3>Customer note for this booking</h3>
+          <p className="client-note">
+            {b.customerComment || "No note provided for this booking."}
+          </p>
+        </div>
         {b.checkedInAt && (
           <p>
             Checked in at{" "}

@@ -7,14 +7,28 @@ import {
 import { DateTime } from "luxon";
 import { adminContext } from "../services/context.server";
 import { bookingOperationsData } from "../services/booking-operations.server";
+import { refreshClientContacts } from "../services/client-contacts.server";
+import { publicError } from "../lib/errors.server";
 import { Status } from "../components/admin-ui";
 export async function loader({ request }: LoaderFunctionArgs) {
-  const { actor } = await adminContext(request);
+  const { actor, admin } = await adminContext(request);
   const params = new URL(request.url).searchParams;
-  return bookingOperationsData(actor, Number(params.get("bookingPage") || 1), {
-    notificationPage: Number(params.get("notificationPage") || 1),
-    notificationKind: params.get("notificationKind") || "ALL",
-  });
+  const load = () =>
+    bookingOperationsData(actor, Number(params.get("bookingPage") || 1), {
+      notificationPage: Number(params.get("notificationPage") || 1),
+      notificationKind: params.get("notificationKind") || "ALL",
+    });
+  let data = await load();
+  let warning: string | null = null;
+  try {
+    await refreshClientContacts(actor, admin.graphql, [
+      ...new Set(data.bookings.map((b) => b.customerId)),
+    ]);
+    data = await load();
+  } catch (error) {
+    warning = publicError(error).error;
+  }
+  return { ...data, warning };
 }
 export const headers = () => ({ "Cache-Control": "private, no-store" });
 export default function Bookings() {
@@ -36,6 +50,11 @@ export default function Bookings() {
   return (
     <main className="workspace bookings-workspace">
       <h1>Bookings</h1>
+      {data.warning && (
+        <p className="feedback error" role="alert">
+          {data.warning}
+        </p>
+      )}
       <section className="panel">
         <h2>Needs attention</h2>
         <p className="muted">
@@ -79,7 +98,16 @@ export default function Bookings() {
                     zone: item.session.timezone,
                   }).toFormat("d LLL yyyy · h:mm a")}
                 </p>
-                <p className="muted">{item.id}</p>
+                <p>
+                  <strong>Client: </strong>
+                  <Link to={`/app/clients/${item.customerId}`}>
+                    {item.customerName}
+                  </Link>
+                </p>
+                <p className="client-note">
+                  <strong>Booking note: </strong>
+                  {item.customerComment || "No note provided."}
+                </p>
                 <Link to={`/app/bookings/${item.id}`}>Manage booking</Link>
               </div>
               <Status>{item.status}</Status>

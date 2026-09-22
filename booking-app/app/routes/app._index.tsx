@@ -7,6 +7,9 @@ import {
   type LoaderFunctionArgs,
 } from "react-router";
 import db from "../db.server";
+import { clientName } from "../services/client-identity";
+import { refreshClientContacts } from "../services/client-contacts.server";
+import { publicError } from "../lib/errors.server";
 import { BookingNotificationList } from "../components/booking-notification-list";
 import { adminContext } from "../services/context.server";
 import { adminOverview } from "../services/admin-overview.server";
@@ -16,7 +19,13 @@ import {
 } from "../services/in-app-notifications.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const { actor, shop } = await adminContext(request);
+  const { actor, shop, admin } = await adminContext(request);
+  let warning: string | null = null;
+  try {
+    await refreshClientContacts(actor, admin.graphql);
+  } catch (error) {
+    warning = publicError(error).error;
+  }
   const [overview, notifications, noShowLogs] = await Promise.all([
     adminOverview(actor),
     adminNotifications(actor),
@@ -35,7 +44,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
     select: {
       id: true,
       customerId: true,
-      customer: { select: { preferredName: true } },
+      customer: {
+        select: { preferredName: true, shopifyName: true, email: true },
+      },
       entitlementLedgerEntries: {
         where: { kind: { in: ["RELEASE", "CONSUME"] } },
         select: { kind: true },
@@ -53,6 +64,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   });
   return {
     overview,
+    warning,
     notifications,
     rulesApproved: Boolean(shop.rulesApprovedAt),
     noShowAlerts: noShowLogs.flatMap((entry) => {
@@ -65,9 +77,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
           bookingId: booking.id,
           creditReturned:
             booking.entitlementLedgerEntries[0].kind === "RELEASE",
-          customerName:
-            booking.customer.preferredName ||
-            `Customer ${booking.customerId.slice(-8)}`,
+          customerName: clientName(booking.customer),
           className: booking.session.service.name,
           coachName: booking.session.coach.name,
           startsAt: booking.session.startsAt.toISOString(),
@@ -103,6 +113,11 @@ export default function Overview() {
         <Link to="/app/settings">Settings</Link>
       </header>
 
+      {data.warning && (
+        <p className="feedback error" role="alert">
+          {data.warning}
+        </p>
+      )}
       <nav className="workflow-strip" aria-label="Admin workflow">
         <Link to="/app/catalog">
           <strong>1 · Define</strong>
@@ -218,7 +233,9 @@ export default function Overview() {
                 {overview.expiringPasses.map((pass) => (
                   <tr key={pass.entitlementId}>
                     <td>
-                      <strong>{pass.customerName}</strong>
+                      <Link to={`/app/clients/${pass.customerId}`}>
+                        <strong>{pass.customerName}</strong>
+                      </Link>
                       <small>{pass.passName}</small>
                     </td>
                     <td>

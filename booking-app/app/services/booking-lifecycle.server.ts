@@ -1,3 +1,4 @@
+import { clientName } from "./client-identity";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import db from "../db.server";
@@ -374,6 +375,9 @@ export async function staffBookingDetail(actor: Actor, id: string) {
   const booking = await db.booking.findFirst({
     where: { shopId: actor.shopId, id },
     include: {
+      customer: {
+        select: { preferredName: true, shopifyName: true, email: true },
+      },
       session: { include: { service: true, coach: true, location: true } },
       entitlementLedgerEntries: { orderBy: { createdAt: "asc" } },
     },
@@ -391,7 +395,7 @@ export async function staffBookingDetail(actor: Actor, id: string) {
     },
   });
   return {
-    booking,
+    booking: { ...booking, customerName: clientName(booking.customer) },
     timeline,
     rescheduledFrom:
       moves.find((m) => m.newBookingId === id)?.oldBookingId || null,
