@@ -28,3 +28,16 @@ Target: `mf0n6s-zg.myshopify.com`, branch `bookingdev`.
 - Public session and booking-attempt response code selects coach ID/name only; private contact fields are not included.
 
 Runtime synchronization evidence will be recorded separately after deployment and read-back. Courses remain DRAFT and public checkout/booking gates remain closed. Source comparison and tests are not production migration or real-user UAT.
+
+## Production synchronization read-back (2026-09-22 03:59 UTC)
+
+- Application commit `76fb7099c373ea33a04e71ddad9ab057ab7bc1df` passed [CI](https://github.com/robber-857/Skyra/actions/runs/35684545146) and Render deploy `dep-daovlcf40ujc73brkrsg` is live.
+- Production read-back: 20 services, all DRAFT; 7 Aerial group definitions (55 minutes / 6), 10 Dance definitions (60 minutes / 15), 2 private appointment definitions (55 minutes / 1), and 1 workshop draft.
+- All 20 mappings are SYNCED and Shopify products are DRAFT. Zero sync errors and zero Product/Variant IDs shared with another shop.
+- Six coach records contain six notification email addresses and three supplied phone numbers. Existing three coaches were matched to their original records, not duplicated. Authenticated Shopify Admin UI confirms the same six email fields and three populated phone fields.
+- Nine course drafts still need coach assignments. Workshop and private group pricing remain unresolved and their unsold drafts hold a zero placeholder; do not activate these before pricing is confirmed.
+- The owner confirmed the missing-email MV customer is the corresponding teacher and authorized using that teacher email for customer login. The private customer mapping records this override; original spreadsheets remain untouched.
+- At verification, production has zero CustomerProfiles, Entitlements and Bookings. No credit import has been performed or claimed.
+- Online booking is false. Live Render release approval, checkout, owned-Pass and mail-enabled flags are all false.
+- A pre-sync database export was created outside Git; archive contents and SHA-256 were checked. A restore drill was not performed. Temporary operator network access was removed after each operation.
+- Local remote-DB calls initially exceeded the default 5-second service transaction timeout and rolled back. The operator-only Prisma client used a longer timeout for the successful retry; deployed runtime transaction settings were not widened.
