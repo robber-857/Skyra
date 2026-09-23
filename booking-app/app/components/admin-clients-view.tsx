@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { DateTime } from "luxon";
 import { Form, Link, useNavigate, useNavigation } from "react-router";
 import type {
@@ -183,9 +184,11 @@ export function AdminClientsView({
 export function AdminClientDetailView({
   data,
   warning,
+  creditForm,
 }: {
   data: Awaited<ReturnType<typeof adminClientDetail>>;
   warning: string | null;
+  creditForm?: ReactNode;
 }) {
   const c = data.client;
   const navigate = useNavigate(),
@@ -262,6 +265,7 @@ export function AdminClientDetailView({
           </p>
         )}
       </section>
+      {creditForm}
       <section className="panel" aria-labelledby="client-passes-title">
         <div className="report-block-head">
           <h2 id="client-passes-title">Passes &amp; class credits</h2>
@@ -283,6 +287,12 @@ export function AdminClientDetailView({
                   {state(p.status)}
                 </span>
               </div>
+              {p.sourceSystem === "MANUAL_CASH" && (
+                <p className="muted">
+                  Cash payment{p.cashAmount ? " · A$" + p.cashAmount : ""}
+                  {p.cashReason ? " · " + p.cashReason : ""}
+                </p>
+              )}
               <div className="summary client-pass-summary">
                 <div>
                   <strong>

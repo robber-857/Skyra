@@ -5,7 +5,14 @@ import { DomainError } from "../lib/errors.server";
 
 type Tx = Prisma.TransactionClient;
 type LedgerKind =
-  "GRANT" | "RESERVE" | "CONSUME" | "RELEASE" | "ADJUST" | "EXPIRE" | "REVOKE";
+  | "RESTORE"
+  | "GRANT"
+  | "RESERVE"
+  | "CONSUME"
+  | "RELEASE"
+  | "ADJUST"
+  | "EXPIRE"
+  | "REVOKE";
 
 export type EntitlementBalance = {
   availableUnits: number;
@@ -246,17 +253,26 @@ export async function eligibleEntitlements(
           expiresAt: { gt: input.sessionStartsAt },
         },
       ],
-      passPlan: {
-        status: "ACTIVE",
-        services: {
-          some: {
-            shopId: input.shopId,
-            serviceId: input.serviceId,
-          },
+      AND: [
+        {
+          OR: [
+            {
+              passPlan: {
+                status: "ACTIVE",
+                services: {
+                  some: {
+                    shopId: input.shopId,
+                    serviceId: input.serviceId,
+                  },
+                },
+              },
+            },
+            { passPlanId: null, serviceId: input.serviceId },
+          ],
         },
-      },
+      ],
     },
-    include: { passPlan: true, ledgerEntries: true },
+    include: { passPlan: true, service: true, ledgerEntries: true },
     orderBy: [{ expiresAt: "asc" }, { createdAt: "asc" }],
   });
   return entitlements.flatMap((entitlement) => {
@@ -273,7 +289,10 @@ export async function eligibleEntitlements(
           {
             id: entitlement.id,
             passPlanId: entitlement.passPlanId,
-            name: entitlement.passPlan!.name,
+            name:
+              entitlement.passPlan?.name ||
+              entitlement.service?.name ||
+              "Class credit",
             grantedUnits: entitlement.grantedUnits,
             expiresAt: entitlement.expiresAt,
             ...balance,
@@ -568,3 +587,40 @@ export const revokeEntitlement = (
   tx: Tx,
   input: Parameters<typeof closeEntitlement>[1],
 ) => closeEntitlement(tx, input, "REVOKE");
+
+// Compensate the original consumption without rewriting payment or ledger history.
+export async function restoreConsumedCredit(
+  tx: Tx,
+  input: {
+    shopId: string;
+    entitlementId: string;
+    reservationKey: string;
+    bookingId?: string;
+    idempotencyKey: string;
+    reason: string;
+  },
+) {
+  await lockEntitlement(tx, input.shopId, input.entitlementId);
+  const consumed = await tx.entitlementLedgerEntry.findFirst({
+    where: {
+      shopId: input.shopId,
+      entitlementId: input.entitlementId,
+      reservationKey: input.reservationKey,
+      bookingId: input.bookingId,
+      kind: "CONSUME",
+    },
+  });
+  if (!consumed || !input.bookingId)
+    fail("CONSUMPTION_NOT_FOUND", "Used booking credit not found.");
+  const entry = await appendLedgerEntry(tx, {
+    ...input,
+    kind: "RESTORE",
+    availableDelta: 1,
+    reservedDelta: 0,
+    consumedDelta: -1,
+  });
+  return {
+    entry,
+    balance: await entitlementBalance(tx, input.shopId, input.entitlementId),
+  };
+}

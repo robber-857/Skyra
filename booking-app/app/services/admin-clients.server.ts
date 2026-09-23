@@ -181,6 +181,18 @@ export async function adminClientDetail(
           service: { select: { name: true } },
         },
       });
+      const cashGrants = await tx.auditLog.findMany({
+        where: {
+          shopId: shop.id,
+          entityId: {
+            in: passes
+              .filter((p) => p.sourceSystem === "MANUAL_CASH")
+              .map((p) => p.id),
+          },
+          action: "CASH_CREDITS_GRANTED",
+        },
+        select: { entityId: true, after: true },
+      });
       const ledger = await tx.entitlementLedgerEntry.groupBy({
         by: ["entitlementId"],
         where: {
@@ -239,7 +251,12 @@ export async function adminClientDetail(
           const available = sum?.availableDelta || 0,
             reserved = sum?.reservedDelta || 0,
             used = sum?.consumedDelta || 0;
+          const cashRecord = cashGrants.find((g) => g.entityId === p.id)
+            ?.after as { amount?: string; reason?: string } | undefined;
           return {
+            sourceSystem: p.sourceSystem,
+            cashAmount: cashRecord?.amount ?? null,
+            cashReason: cashRecord?.reason ?? null,
             id: p.id,
             name: p.passPlan?.name || p.service?.name || "Class credit",
             granted: p.grantedUnits,

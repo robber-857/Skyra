@@ -9,6 +9,7 @@ import { coachIdentity, type CoachIdentity } from "./coach-auth.server";
 import {
   consumeEntitlementReservation,
   releaseEntitlementReservation,
+  restoreConsumedCredit,
 } from "./entitlements.server";
 import { enqueueBookingNotifications } from "./booking-notifications.server";
 export const bookingChangeInput = z
@@ -137,7 +138,18 @@ async function changeBooking(identity: Identity, raw: unknown) {
     }
     if (booking.version !== input.expectedVersion)
       fail("STALE_BOOKING", "This booking changed. Refresh before continuing.");
-    if (booking.status !== "CONFIRMED")
+    const alreadyConsumed = ["ATTENDED", "NO_SHOW", "LATE_CANCEL"].includes(
+      booking.status,
+    );
+    const canRestore =
+      identity.kind === "STAFF" &&
+      input.action === "CANCEL_WAIVE" &&
+      alreadyConsumed;
+    const attendanceCorrection =
+      ["ATTENDED", "NO_SHOW"].includes(booking.status) &&
+      ["COMPLETE", "NO_SHOW"].includes(input.action) &&
+      identity.kind !== "CUSTOMER";
+    if (booking.status !== "CONFIRMED" && !canRestore && !attendanceCorrection)
       fail("INVALID_BOOKING_STATE", "This booking has already been settled.");
     let status = booking.status;
     let checkedInAt = booking.checkedInAt;
@@ -178,7 +190,7 @@ async function changeBooking(identity: Identity, raw: unknown) {
         status = input.action === "COMPLETE" ? "ATTENDED" : "NO_SHOW";
       }
     }
-    if (status !== "CONFIRMED") {
+    if (status !== "CONFIRMED" && !attendanceCorrection) {
       const reservations = await tx.entitlementLedgerEntry.findMany({
         where: {
           shopId: booking.shopId,
@@ -192,8 +204,9 @@ async function changeBooking(identity: Identity, raw: unknown) {
           "This booking needs a credit ledger review before changing status.",
         );
       const reserve = reservations[0];
-      const settle =
-        status === "CANCELLED"
+      const settle = canRestore
+        ? restoreConsumedCredit
+        : status === "CANCELLED"
           ? releaseEntitlementReservation
           : consumeEntitlementReservation;
       await settle(tx, {
@@ -201,7 +214,9 @@ async function changeBooking(identity: Identity, raw: unknown) {
         entitlementId: reserve.entitlementId,
         reservationKey: reserve.reservationKey!,
         bookingId: booking.id,
-        idempotencyKey: "booking-settle:" + booking.id,
+        idempotencyKey:
+          (canRestore ? "booking-restore:" : "booking-settle:") + booking.id,
+        reason: input.reason,
       });
     }
     const updated = await tx.booking.update({
@@ -267,8 +282,6 @@ export async function coachChangeBooking(token: string, raw: unknown) {
   );
 }
 
-const defaultAttendanceDelayMs = 24 * 3600000;
-
 export async function settleDefaultAttendanceWork(
   options: { batchSize?: number; shopId?: string } = {},
 ) {
@@ -279,7 +292,7 @@ export async function settleDefaultAttendanceWork(
       status: "CONFIRMED",
       session: {
         status: { in: ["PUBLISHED", "COMPLETED"] },
-        endsAt: { lte: new Date(now.getTime() - defaultAttendanceDelayMs) },
+        endsAt: { lte: now },
       },
     },
     select: { id: true, shopId: true, sessionId: true },
@@ -298,8 +311,8 @@ export async function settleDefaultAttendanceWork(
         const clock = await databaseNow(tx);
         if (
           booking.status !== "CONFIRMED" ||
-          booking.session.endsAt.getTime() + defaultAttendanceDelayMs >
-            clock.getTime()
+          !["PUBLISHED", "COMPLETED"].includes(booking.session.status) ||
+          booking.session.endsAt > clock
         )
           return false;
         const reservations = await tx.entitlementLedgerEntry.findMany({
@@ -326,7 +339,7 @@ export async function settleDefaultAttendanceWork(
           data: { status: "ATTENDED", version: { increment: 1 } },
         });
         const reason =
-          "Automatically attended after the 24-hour no-show window.";
+          "Class ended; credit automatically used regardless of attendance.";
         await tx.bookingChange.create({
           data: {
             shopId: booking.shopId,

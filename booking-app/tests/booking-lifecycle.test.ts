@@ -315,9 +315,10 @@ test("staff no-show uses the reserved credit", async () => {
   ).toMatchObject({ availableUnits: 4, reservedUnits: 0, consumedUnits: 1 });
 });
 
-test("confirmed bookings auto-settle as attended after the 24-hour no-show window", async () => {
+test("confirmed bookings auto-settle immediately after class ends", async () => {
   const f = await fixture();
   await classAt(f, -26 * 3600000, -25 * 3600000);
+  await classAt(f, -3600000, -1000);
   const settlement = await settleDefaultAttendanceWork({ shopId: f.shop.id });
   expect(settlement.errors).toEqual([]);
   expect(settlement).toMatchObject({ settled: 1, failed: 0 });
@@ -443,4 +444,86 @@ test("booking history cannot be edited or removed", async () => {
   await expect(
     db.bookingChange.delete({ where: { id: change.id } }),
   ).rejects.toThrow();
+});
+
+test.each(["NEW_PASS", "DROP_IN"] as const)(
+  "%s automatic settlement and staff restoration are exactly once",
+  async (kind) => {
+    const f = await fixture(kind);
+    await classAt(f, -3600000, 60000);
+    expect(
+      (await settleDefaultAttendanceWork({ shopId: f.shop.id })).settled,
+    ).toBe(0);
+    await classAt(f, -3600000, -1000);
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        settleDefaultAttendanceWork({ shopId: f.shop.id }),
+      ),
+    );
+    expect(results.reduce((n, r) => n + r.settled, 0)).toBe(1);
+    expect(results.every((r) => r.failed === 0)).toBe(true);
+    const noShow = await coachChangeBooking(f.coachToken, {
+      ...f.input,
+      action: "NO_SHOW",
+      expectedVersion: 2,
+    });
+    expect(noShow.status).toBe("NO_SHOW");
+    expect(
+      (await entitlementBalance(db, f.shop.id, f.entitlement.id)).consumedUnits,
+    ).toBe(1);
+    const restore = {
+      ...f.input,
+      action: "CANCEL_WAIVE",
+      expectedVersion: 3,
+      idempotencyKey: randomUUID(),
+    };
+    await expect(
+      customerChangeBooking(f.customerActor, restore),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(
+      coachChangeBooking(f.coachToken, restore),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await Promise.all(
+      Array.from({ length: 5 }, () => staffChangeBooking(f.actor, restore)),
+    );
+    expect(await entitlementBalance(db, f.shop.id, f.entitlement.id)).toEqual({
+      availableUnits: kind === "NEW_PASS" ? 5 : 1,
+      reservedUnits: 0,
+      consumedUnits: 0,
+    });
+    expect(
+      await db.entitlementLedgerEntry.count({
+        where: { bookingId: f.booking.id, kind: "RESTORE" },
+      }),
+    ).toBe(1);
+    expect(
+      await db.entitlementLedgerEntry.count({
+        where: { bookingId: f.booking.id, kind: "CONSUME" },
+      }),
+    ).toBe(1);
+    expect(
+      (await settleDefaultAttendanceWork({ shopId: f.shop.id })).settled,
+    ).toBe(0);
+    expect(
+      await db.booking.findUniqueOrThrow({ where: { id: f.booking.id } }),
+    ).toMatchObject({
+      sourceOrderGid: f.booking.sourceOrderGid,
+      status: "CANCELLED",
+    });
+  },
+);
+
+test("cancelled sessions are not automatically charged", async () => {
+  const f = await fixture();
+  await classAt(f, -3600000, -1000);
+  await db.classSession.update({
+    where: { id: f.session.id },
+    data: { status: "CANCELLED" },
+  });
+  expect(
+    (await settleDefaultAttendanceWork({ shopId: f.shop.id })).settled,
+  ).toBe(0);
+  expect(
+    (await entitlementBalance(db, f.shop.id, f.entitlement.id)).reservedUnits,
+  ).toBe(1);
 });

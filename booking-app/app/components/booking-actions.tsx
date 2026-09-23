@@ -24,8 +24,12 @@ export function BookingActions({
   const start = new Date(startsAt).getTime(),
     end = new Date(endsAt).getTime(),
     clock = new Date(now).getTime();
+  const confirmedBooking = booking.status === "CONFIRMED";
+  const settled = ["ATTENDED", "NO_SHOW", "LATE_CANCEL"].includes(
+    booking.status,
+  );
   const actions = [];
-  if (!coach && clock < start && !booking.checkedInAt)
+  if (confirmedBooking && !coach && clock < start && !booking.checkedInAt)
     actions.push({
       value: "CANCEL",
       label: "Cancel under booking policy",
@@ -34,24 +38,33 @@ export function BookingActions({
           ? "Release the reserved class credit. The Pass keeps its original expiry."
           : "Late cancellation uses one class credit.",
     });
-  if (!coach)
+  if (!coach && (confirmedBooking || settled))
     actions.push({
       value: "CANCEL_WAIVE",
       label: "Cancel and release credit (staff exception)",
-      note: "Release the reserved credit regardless of the cancellation deadline. Record the reason for this exception.",
+      note: "Return the reserved or used credit. The original expiry remains unchanged; expired credits remain unusable. Record the reason for this exception.",
     });
-  if (!coach && clock >= start && clock < end && !booking.checkedInAt)
+  if (
+    confirmedBooking &&
+    !coach &&
+    clock >= start &&
+    clock < end &&
+    !booking.checkedInAt
+  )
     actions.push({
       value: "CHECK_IN",
       label: "Check in",
       note: "Record arrival. The credit remains reserved until the class is completed.",
     });
-  if (clock >= end) {
+  if (
+    clock >= end &&
+    (confirmedBooking || ["ATTENDED", "NO_SHOW"].includes(booking.status))
+  ) {
     if (!coach)
       actions.push({
         value: "COMPLETE",
         label: "Mark attended / complete",
-        note: "Settle one reserved class credit as used.",
+        note: "Record attendance. A credit already used will not be deducted again.",
       });
     if (!booking.checkedInAt)
       actions.push({
@@ -63,7 +76,7 @@ export function BookingActions({
   const [selected, setSelected] = useState(actions[0]?.value || "");
   const [confirmed, setConfirmed] = useState(false);
   const busy = useNavigation().state !== "idle";
-  if (booking.status !== "CONFIRMED")
+  if (!confirmedBooking && !settled)
     return (
       <p className="muted">
         This booking is {booking.status.toLowerCase().replaceAll("_", " ")}. No
