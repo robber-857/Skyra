@@ -1,6 +1,10 @@
 import { bookingProductStatus } from "./commerce-capabilities.server";
 import db from "../db.server";
 import { Prisma } from "@prisma/client";
+import {
+  CatalogPublicationError,
+  publishCatalogProduct,
+} from "./catalog-publication.server";
 export type GraphQL = (
   query: string,
   options: {
@@ -234,6 +238,8 @@ export async function syncCatalogEvent(eventId: string, graphql: GraphQL) {
       });
       if (verified.product?.bookingOwner?.jsonValue !== owner.id)
         throw new Error("Shopify mapping read-back failed.");
+      if (bookingProductStatus(shop.domain, owner) === "ACTIVE")
+        await publishCatalogProduct(graphql, product.id);
       await tx.productMapping.update({
         where: { id: mapping.id },
         data: {
@@ -256,7 +262,11 @@ export async function syncCatalogEvent(eventId: string, graphql: GraphQL) {
     { timeout: 60000, maxWait: 10000 },
   );
 }
-export async function recordSyncFailure(id: string) {
+export async function recordSyncFailure(id: string, error?: unknown) {
+  const message =
+    error instanceof CatalogPublicationError
+      ? error.message
+      : "Shopify sync failed. Check permissions and product structure, then retry.";
   await db.$transaction(async (tx) => {
     const initial = await tx.outboxEvent.findUniqueOrThrow({ where: { id } });
     await tx.$queryRaw`SELECT id FROM "Shop" WHERE id = ${initial.shopId}::uuid FOR UPDATE`;
@@ -269,8 +279,7 @@ export async function recordSyncFailure(id: string) {
         attempts,
         status: attempts >= 5 ? "FAILED" : "PENDING",
         availableAt: new Date(Date.now() + Math.min(300, 2 ** attempts) * 1000),
-        lastError:
-          "Shopify sync failed. Check permissions and product structure, then retry.",
+        lastError: message,
       },
     });
     await tx.productMapping.updateMany({
@@ -281,8 +290,7 @@ export async function recordSyncFailure(id: string) {
       },
       data: {
         syncStatus: "ERROR",
-        lastError:
-          "Shopify sync failed. Check permissions and product structure, then retry.",
+        lastError: message,
       },
     });
   });

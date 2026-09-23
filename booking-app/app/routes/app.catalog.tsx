@@ -87,7 +87,10 @@ export async function action({ request }: ActionFunctionArgs) {
       else if (intent === "pass") await savePass(actor, input);
       else return { error: "Unknown action." };
     }
-    return { message: "Saved. Shopify synchronization is queued." };
+    return {
+      message:
+        "Saved. Shopify synchronization is queued. Active, priced items available for sale will also be published to Online Store when checkout is enabled.",
+    };
   } catch (error) {
     return publicError(error);
   }
@@ -133,7 +136,10 @@ export default function Catalog() {
           <p className="muted">
             Your class and Pass catalogue. Confirm a class price and eligible
             coaches, set it to ACTIVE, then{" "}
-            <Link to="/app/schedule">schedule dates and times</Link>.
+            <Link to="/app/schedule">schedule dates and times</Link>. Active
+            items available for sale are automatically published to Online Store
+            during synchronization. Use Check product to verify the current sale
+            setup.
           </p>
         </div>
         <button

@@ -5,7 +5,7 @@ embedded = true
 [build]
 automatically_update_urls_on_dev = true
 [access_scopes]
-scopes = "write_products,write_metaobjects,read_metaobjects,write_metaobject_definitions,read_metaobject_definitions,write_app_proxy,unauthenticated_read_product_listings,unauthenticated_write_checkouts,unauthenticated_read_selling_plans,read_orders,read_customers"
+scopes = "write_products,read_publications,write_publications,write_metaobjects,read_metaobjects,write_metaobject_definitions,read_metaobject_definitions,write_app_proxy,unauthenticated_read_product_listings,unauthenticated_write_checkouts,unauthenticated_read_selling_plans,read_orders,read_customers"
 [auth]
 redirect_urls = ["https://skyra-booking-web.onrender.com/auth/callback"]
 [app_proxy]

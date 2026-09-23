@@ -19,7 +19,12 @@ const shopify = shopifyApp({
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
   apiVersion: ApiVersion.July26,
   scopes: [
-    ...new Set([...(process.env.SCOPES?.split(",") || []), "read_customers"]),
+    ...new Set([
+      ...(process.env.SCOPES?.split(",") || []),
+      "read_customers",
+      "read_publications",
+      "write_publications",
+    ]),
   ],
   appUrl,
   authPathPrefix: "/auth",

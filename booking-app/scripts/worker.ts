@@ -43,7 +43,7 @@ const worker = new Worker(
       const { admin } = await unauthenticated.admin(shop.domain);
       await syncCatalogEvent(event.id, admin.graphql);
     } catch (error) {
-      await recordSyncFailure(event.id);
+      await recordSyncFailure(event.id, error);
       log.warn(
         { err: error, eventId: event.id },
         "Catalogue synchronization failed",

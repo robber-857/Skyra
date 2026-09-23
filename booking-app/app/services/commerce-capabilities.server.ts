@@ -69,10 +69,12 @@ export function developmentReleaseReady(shopDomain?: string | null) {
 // products before the same explicit release gate that protects Booking checkout.
 export function bookingProductStatus(
   shopDomain: string,
-  owner: { status: string; saleable?: boolean },
+  owner: { status: string; saleable?: boolean; requestedPriceCents?: number },
 ) {
   if (owner.status === "INACTIVE") return "ARCHIVED";
   if (owner.status !== "ACTIVE" || owner.saleable === false) return "DRAFT";
+  if (owner.requestedPriceCents != null && owner.requestedPriceCents <= 0)
+    return "DRAFT";
   if (
     shopDomain === PRODUCTION_BOOKING_SHOP &&
     !commerceCapabilities(shopDomain).checkoutAvailable

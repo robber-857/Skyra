@@ -9,6 +9,15 @@ import {
 
 afterEach(() => vi.unstubAllEnvs());
 
+test("unpriced classes and passes remain draft even when active", () => {
+  expect(
+    bookingProductStatus(DEVELOPMENT_BOOKING_SHOP, {
+      status: "ACTIVE",
+      requestedPriceCents: 0,
+    }),
+  ).toBe("DRAFT");
+});
+
 describe("development commerce release gates", () => {
   test("remain closed by default", () => {
     expect(commerceCapabilities(DEVELOPMENT_BOOKING_SHOP)).toEqual({

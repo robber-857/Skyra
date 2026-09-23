@@ -15,6 +15,7 @@ import {
   type GraphQL,
 } from "../app/services/shopify-catalog.server";
 import type { Actor } from "../app/services/authorization";
+import { CatalogPublicationError } from "../app/services/catalog-publication.server";
 
 let actor: Actor;
 let other: Actor;
@@ -357,6 +358,31 @@ test("Obsolete outbox versions are skipped; latest version sync and replay are i
   };
   const graphql: GraphQL = async (query) => {
     calls++;
+    if (query.includes("query BookingOnlineStorePublications"))
+      return Response.json({
+        data: {
+          publications: {
+            nodes: [
+              { id: "gid://shopify/Publication/12", name: "Online Store" },
+            ],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      });
+    if (query.includes("mutation BookingPublishOnlineStore"))
+      return Response.json({
+        data: { publishablePublish: { userErrors: [] } },
+      });
+    if (query.includes("query BookingOnlineStorePublication("))
+      return Response.json({
+        data: {
+          product: {
+            ...product,
+            publishedAt: "2026-01-01T00:00:00Z",
+            publishedOnPublication: true,
+          },
+        },
+      });
     if (query.includes("mutation BookingProductSet"))
       return Response.json({
         data: { productSet: { product, userErrors: [] } },
@@ -387,9 +413,9 @@ test("Obsolete outbox versions are skipped; latest version sync and replay are i
   await syncCatalogEvent(events[0].id, graphql);
   expect(calls).toBe(0);
   await syncCatalogEvent(events[1].id, graphql);
-  expect(calls).toBe(7);
+  expect(calls).toBe(10);
   await syncCatalogEvent(events[1].id, graphql);
-  expect(calls).toBe(7);
+  expect(calls).toBe(10);
   expect(
     (
       await db.productMapping.findFirstOrThrow({
@@ -419,6 +445,97 @@ test("API failure records a retryable sync status without losing the saved pass"
       })
     ).syncStatus,
   ).toBe("ERROR");
+});
+
+test("Pass publication failure cannot mark sync complete, and retry safely completes it", async () => {
+  const pass = await savePass(actor, {
+    name: "Publication retry pass",
+    status: "ACTIVE",
+    credits: 5,
+    validityDays: 60,
+    requestedPriceCents: 22000,
+    serviceIds: [serviceId],
+  });
+  const event = await db.outboxEvent.findFirstOrThrow({
+    where: { aggregateId: pass.id },
+  });
+  let published = false;
+  let failPublication = true;
+  const product = {
+    id: "gid://shopify/Product/991",
+    title: pass.name,
+    status: "ACTIVE",
+    bookingOwner: { jsonValue: pass.id },
+    variants: {
+      nodes: [{ id: "gid://shopify/ProductVariant/992", price: "220.00" }],
+    },
+  };
+  const graphql: GraphQL = async (query, { variables }) => {
+    if (query.includes("mutation BookingProductSet")) {
+      expect(variables.identifier).toEqual({
+        handle: "skyra-booking-" + pass.id,
+      });
+      return Response.json({
+        data: { productSet: { product, userErrors: [] } },
+      });
+    }
+    if (query.includes("mutation BookingMetafields"))
+      return Response.json({ data: { metafieldsSet: { userErrors: [] } } });
+    if (query.includes("query BookingOnlineStorePublications"))
+      return Response.json({
+        data: {
+          publications: {
+            nodes: [
+              { id: "gid://shopify/Publication/12", name: "Online Store" },
+            ],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      });
+    if (query.includes("mutation BookingPublishOnlineStore")) {
+      if (failPublication)
+        return Response.json({ errors: [{ message: "Access denied" }] });
+      published = true;
+      return Response.json({
+        data: { publishablePublish: { userErrors: [] } },
+      });
+    }
+    if (query.includes("query BookingOnlineStorePublication("))
+      return Response.json({
+        data: {
+          product: {
+            ...product,
+            publishedOnPublication: published,
+            publishedAt: "2026-01-01T00:00:00Z",
+          },
+        },
+      });
+    return Response.json({ data: { product } });
+  };
+  const failure = await syncCatalogEvent(event.id, graphql).catch(
+    (error) => error,
+  );
+  expect(failure).toBeInstanceOf(CatalogPublicationError);
+  await recordSyncFailure(event.id, failure);
+  const mapping = await db.productMapping.findFirstOrThrow({
+    where: { ownerId: pass.id },
+  });
+  expect(mapping.syncStatus).toBe("ERROR");
+  expect(mapping.lastError).toContain("publication permissions");
+  expect(
+    (await db.outboxEvent.findUniqueOrThrow({ where: { id: event.id } }))
+      .status,
+  ).toBe("PENDING");
+  failPublication = false;
+  await syncCatalogEvent(event.id, graphql);
+  expect(published).toBe(true);
+  expect(
+    await db.productMapping.findUniqueOrThrow({ where: { id: mapping.id } }),
+  ).toMatchObject({
+    syncStatus: "SYNCED",
+    lastError: null,
+    productGid: product.id,
+  });
 });
 
 test("Copy previous week creates drafts once and preserves the source week", async () => {

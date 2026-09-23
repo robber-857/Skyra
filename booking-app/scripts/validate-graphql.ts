@@ -9,12 +9,20 @@ import {
   METAOBJECT_DEFINITION_CREATE,
   CONTENT_READ,
 } from "../app/services/shopify-catalog.server";
+import {
+  ONLINE_STORE_PUBLICATIONS,
+  PUBLISH_ONLINE_STORE,
+  ONLINE_STORE_PUBLICATION_READ,
+} from "../app/services/catalog-publication.server";
 const validator = process.env.SHOPIFY_GRAPHQL_VALIDATOR;
 if (!validator)
   throw new Error(
     "Set SHOPIFY_GRAPHQL_VALIDATOR to the installed Shopify AI Toolkit validate.mjs path.",
   );
 for (const [name, query] of Object.entries({
+  ONLINE_STORE_PUBLICATIONS,
+  PUBLISH_ONLINE_STORE,
+  ONLINE_STORE_PUBLICATION_READ,
   PRODUCT_SET,
   METAFIELDS_SET,
   MAPPING_READ,
