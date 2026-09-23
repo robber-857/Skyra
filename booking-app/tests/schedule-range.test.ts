@@ -202,8 +202,12 @@ test("boundary week views stay accessible while wholly outside weeks are rejecte
 test("copy accepts the final valid date and rolls back a week containing an outside occurrence", async () => {
   const valid = await fixture();
   await valid.add("2099-12-24T10:00");
-  expect(await copyPreviousWeek(valid.actor, "2099-12-28")).toBe(1);
-  expect(await copyPreviousWeek(valid.actor, "2099-12-28")).toBe(0);
+  expect(await copyPreviousWeek(valid.actor, "2099-12-28")).toMatchObject({
+    copied: 1,
+  });
+  expect(await copyPreviousWeek(valid.actor, "2099-12-28")).toMatchObject({
+    copied: 0,
+  });
   const copied = await db.classSession.findFirstOrThrow({
     where: { shopId: valid.shop.id, dedupeKey: { startsWith: "copy-" } },
   });
@@ -393,4 +397,193 @@ test("publishing midweek skips past and exact-start drafts without changing them
     published: 0,
     skipped: expect.arrayContaining(result.skipped),
   });
+});
+
+test.each(["CONFIRMED", "LATE_CANCEL"])(
+  "copy replaces conflicting sessions and returns %s credits once",
+  async (status) => {
+    const f = await fixture();
+    await f.add("2035-07-02T10:00");
+    await f.add("2035-07-02T12:00");
+    const [conflict] = await f.add("2035-07-09T10:15");
+    const [identical] = await f.add("2035-07-09T12:00");
+    const customer = await db.customerProfile.create({
+      data: {
+        shopId: f.shop.id,
+        shopifyCustomerGid: "gid://shopify/Customer/" + Date.now(),
+      },
+    });
+    const kept = await db.booking.create({
+      data: {
+        shopId: f.shop.id,
+        sessionId: identical.id,
+        customerId: customer.id,
+      },
+    });
+    const mapping = await db.productMapping.findFirstOrThrow({
+      where: { shopId: f.shop.id, ownerId: f.service.id },
+    });
+    const entitlement = await db.entitlement.create({
+      data: {
+        shopId: f.shop.id,
+        customerId: customer.id,
+        serviceId: f.service.id,
+        productMappingId: mapping.id,
+        sourceSystem: "MIND_BODY",
+        externalKey: randomUUID(),
+        grantedUnits: 1,
+        startsAt: new Date("2035-07-01"),
+        expiresAt: new Date("2035-08-01"),
+      },
+    });
+    await db.entitlementLedgerEntry.create({
+      data: {
+        shopId: f.shop.id,
+        entitlementId: entitlement.id,
+        kind: "OPENING_BALANCE",
+        availableDelta: 1,
+        reservedDelta: 0,
+        consumedDelta: 0,
+        idempotencyKey: randomUUID(),
+      },
+    });
+    const booking = await db.booking.create({
+      data: {
+        shopId: f.shop.id,
+        sessionId: conflict.id,
+        customerId: customer.id,
+      },
+    });
+    await db.entitlementLedgerEntry.create({
+      data: {
+        shopId: f.shop.id,
+        entitlementId: entitlement.id,
+        kind: "RESERVE",
+        availableDelta: -1,
+        reservedDelta: 1,
+        consumedDelta: 0,
+        idempotencyKey: randomUUID(),
+        reservationKey: booking.id,
+        bookingId: booking.id,
+      },
+    });
+    if (status === "LATE_CANCEL") {
+      await db.entitlementLedgerEntry.create({
+        data: {
+          shopId: f.shop.id,
+          entitlementId: entitlement.id,
+          kind: "CONSUME",
+          availableDelta: 0,
+          reservedDelta: -1,
+          consumedDelta: 1,
+          idempotencyKey: randomUUID(),
+          reservationKey: booking.id,
+          bookingId: booking.id,
+        },
+      });
+      await db.booking.update({ where: { id: booking.id }, data: { status } });
+    }
+    const holdingCustomer = await db.customerProfile.create({
+      data: {
+        shopId: f.shop.id,
+        shopifyCustomerGid: "gid://shopify/Customer/999" + Date.now(),
+      },
+    });
+    const attempt = await db.bookingAttempt.create({
+      data: {
+        shopId: f.shop.id,
+        sessionId: conflict.id,
+        customerId: holdingCustomer.id,
+        tokenHash: randomUUID(),
+        surface: "HOME",
+        status: "HOLD_ACTIVE",
+        expiresAt: new Date(Date.now() + 600000),
+      },
+    });
+    const hold = await db.bookingHold.create({
+      data: {
+        shopId: f.shop.id,
+        attemptId: attempt.id,
+        sessionId: conflict.id,
+        customerId: holdingCustomer.id,
+        purchaseKind: "DROP_IN",
+        idempotencyKey: randomUUID(),
+        expiresAt: new Date(Date.now() + 600000),
+      },
+    });
+    expect(await copyPreviousWeek(f.actor, "2035-07-09")).toMatchObject({
+      copied: 1,
+      replaced: 1,
+      preserved: 1,
+      cancelledBookings: 1,
+    });
+    expect(
+      await db.classSession.findUniqueOrThrow({ where: { id: conflict.id } }),
+    ).toMatchObject({ status: "CANCELLED" });
+    expect(
+      await db.booking.findUniqueOrThrow({ where: { id: booking.id } }),
+    ).toMatchObject({ status: "CANCELLED" });
+    expect(
+      await db.booking.findUniqueOrThrow({ where: { id: kept.id } }),
+    ).toMatchObject({ status: "CONFIRMED", sessionId: identical.id });
+    const balance = await db.entitlementLedgerEntry.aggregate({
+      where: { entitlementId: entitlement.id },
+      _sum: { availableDelta: true, reservedDelta: true, consumedDelta: true },
+    });
+    expect(balance._sum).toEqual({
+      availableDelta: 1,
+      reservedDelta: 0,
+      consumedDelta: 0,
+    });
+    expect(await copyPreviousWeek(f.actor, "2035-07-09")).toMatchObject({
+      copied: 0,
+      replaced: 0,
+      cancelledBookings: 0,
+    });
+    expect(
+      await db.entitlementLedgerEntry.count({
+        where: {
+          entitlementId: entitlement.id,
+          kind: status === "CONFIRMED" ? "RELEASE" : "RESTORE",
+        },
+      }),
+    ).toBe(1);
+    expect(
+      await db.bookingHold.findUniqueOrThrow({ where: { id: hold.id } }),
+    ).toMatchObject({ status: "RELEASED" });
+    expect(
+      await db.bookingAttempt.findUniqueOrThrow({ where: { id: attempt.id } }),
+    ).toMatchObject({ status: "EXPIRED" });
+  },
+);
+
+test("copy rolls back replacement when a conflicting booking has no refundable ledger", async () => {
+  const f = await fixture();
+  await f.add("2035-07-02T10:00");
+  await f.add("2035-07-02T12:00");
+  const [first] = await f.add("2035-07-09T10:15");
+  const [second] = await f.add("2035-07-09T12:15");
+  const customer = await db.customerProfile.create({
+    data: {
+      shopId: f.shop.id,
+      shopifyCustomerGid: "gid://shopify/Customer/" + Date.now(),
+    },
+  });
+  const booking = await db.booking.create({
+    data: { shopId: f.shop.id, sessionId: second.id, customerId: customer.id },
+  });
+  await expect(copyPreviousWeek(f.actor, "2035-07-09")).rejects.toMatchObject({
+    code: "BOOKING_LEDGER_REVIEW",
+  });
+  expect(
+    await db.classSession.findUniqueOrThrow({ where: { id: first.id } }),
+  ).toMatchObject({ status: "DRAFT" });
+  expect(
+    await db.booking.findUniqueOrThrow({ where: { id: booking.id } }),
+  ).toMatchObject({ status: "CONFIRMED" });
+  expect(
+    await db.classSession.count({
+      where: { shopId: f.shop.id, dedupeKey: { startsWith: "copy-" } },
+    }),
+  ).toBe(0);
 });

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { DateTime } from "luxon";
 import db from "../db.server";
@@ -10,6 +11,11 @@ import {
 } from "../lib/schedule-range";
 import { audit, lockShop } from "./catalog.server";
 import { requireOperations, type Actor } from "./authorization";
+import {
+  releaseEntitlementReservation,
+  restoreConsumedCredit,
+} from "./entitlements.server";
+import { enqueueBookingNotifications } from "./booking-notifications.server";
 function assertScheduleStart(startsAt: Date, timezone: string) {
   const day = DateTime.fromJSDate(startsAt, { zone: timezone }).toISODate();
   if (!day || !isScheduleDateInRange(day))
@@ -483,14 +489,18 @@ export async function copyPreviousWeek(actor: Actor, day: string) {
         include: { service: true, coach: true },
       });
       let count = 0;
+      let replaced = 0;
+      let preserved = 0;
+      let cancelledBookings = 0;
+      const createdIds = new Set<string>();
       for (const source of sources) {
-        const dedupeKey = "copy-" + source.id + "-" + target.label;
+        let dedupeKey = "copy-" + source.id + "-" + target.label;
         if (
           await tx.classSession.findUnique({
             where: { shopId_dedupeKey: { shopId: actor.shopId, dedupeKey } },
           })
         )
-          continue;
+          dedupeKey += "-" + randomUUID();
         const local = DateTime.fromJSDate(source.startsAt, {
           zone: source.timezone,
         })
@@ -524,7 +534,7 @@ export async function copyPreviousWeek(actor: Actor, day: string) {
             "INVALID_ASSIGNMENT",
             "A previous-week class or coach is no longer available.",
           );
-        const conflict = await tx.classSession.findFirst({
+        const conflicts = await tx.classSession.findMany({
           where: {
             shopId: actor.shopId,
             status: { in: ["DRAFT", "PUBLISHED"] },
@@ -542,12 +552,164 @@ export async function copyPreviousWeek(actor: Actor, day: string) {
             ],
           },
         });
-        if (conflict)
+        // Lock before inspecting bookings: checkout and booking creation use this lock too.
+        for (const conflict of [...conflicts].sort((a, b) =>
+          a.id.localeCompare(b.id),
+        )) {
+          await tx.$queryRaw`SELECT id FROM "ClassSession" WHERE id=${conflict.id}::uuid AND "shopId"=${actor.shopId}::uuid FOR UPDATE`;
+        }
+        if (conflicts.some((conflict) => createdIds.has(conflict.id)))
           throw new DomainError(
             "SCHEDULE_CONFLICT",
-            "The copied timetable conflicts with an existing coach or location booking. No sessions were copied.",
+            "The previous week's classes overlap after copying. Check their times and coach buffers.",
             409,
           );
+        // An identical target session already represents this occurrence, including its roster.
+        if (
+          conflicts.length === 1 &&
+          conflicts[0].serviceId === source.serviceId &&
+          conflicts[0].coachId === source.coachId &&
+          conflicts[0].locationId === source.locationId &&
+          conflicts[0].startsAt.getTime() === startsAt.getTime() &&
+          conflicts[0].endsAt.getTime() === endsAt.getTime()
+        ) {
+          createdIds.add(conflicts[0].id);
+          preserved++;
+          continue;
+        }
+        const conflictIds = conflicts.map((conflict) => conflict.id);
+        if (
+          conflicts.some(
+            (conflict) =>
+              conflict.startsAt < target.start ||
+              conflict.startsAt >= target.end ||
+              conflict.startsAt <= new Date(),
+          )
+        )
+          throw new DomainError(
+            "SCHEDULE_CONFLICT",
+            "A conflict is outside the target week or has already started. Choose a future week.",
+            409,
+          );
+        const bookings = await tx.booking.findMany({
+          where: {
+            shopId: actor.shopId,
+            sessionId: { in: conflictIds },
+            status: { in: ["CONFIRMED", "ATTENDED", "NO_SHOW", "LATE_CANCEL"] },
+          },
+          include: { entitlementLedgerEntries: true },
+          orderBy: { id: "asc" },
+        });
+        const reason =
+          "Previous-week timetable copied over this session; booking cancelled and credit returned.";
+        for (const booking of bookings) {
+          const reservations = booking.entitlementLedgerEntries.filter(
+            (entry) => entry.kind === "RESERVE",
+          );
+          if (reservations.length !== 1 || !reservations[0].reservationKey)
+            throw new DomainError(
+              "BOOKING_LEDGER_REVIEW",
+              "A conflicting booking needs a credit ledger review. No sessions were copied.",
+              409,
+            );
+          const reserve = reservations[0];
+          const restore = booking.status !== "CONFIRMED";
+          await (
+            restore ? restoreConsumedCredit : releaseEntitlementReservation
+          )(tx, {
+            shopId: actor.shopId,
+            entitlementId: reserve.entitlementId,
+            reservationKey: reserve.reservationKey!,
+            bookingId: booking.id,
+            idempotencyKey:
+              (restore ? "booking-restore:" : "booking-settle:") + booking.id,
+            reason,
+          });
+          await tx.booking.update({
+            where: { id: booking.id },
+            data: {
+              status: "CANCELLED",
+              checkedInAt: null,
+              version: { increment: 1 },
+            },
+          });
+          await tx.bookingChange.create({
+            data: {
+              shopId: actor.shopId,
+              bookingId: booking.id,
+              idempotencyKey: randomUUID(),
+              actorKind: "STAFF",
+              actorId: actor.actorId,
+              action: "CANCEL_WAIVE",
+              reason,
+              fromStatus: booking.status,
+              toStatus: "CANCELLED",
+            },
+          });
+          await tx.bookingNotification.updateMany({
+            where: {
+              shopId: actor.shopId,
+              bookingId: booking.id,
+              status: "PENDING",
+            },
+            data: { status: "SUPPRESSED", lastError: "NOTIFICATION_OBSOLETE" },
+          });
+          await enqueueBookingNotifications(
+            tx,
+            actor.shopId,
+            booking.id,
+            "BOOKING_CANCELLED_V1",
+          );
+          await audit(
+            tx,
+            actor,
+            "BOOKING_CANCEL_WAIVE",
+            booking.id,
+            { status: booking.status },
+            { status: "CANCELLED", reason },
+          );
+          cancelledBookings++;
+        }
+        const holds = await tx.bookingHold.findMany({
+          where: {
+            shopId: actor.shopId,
+            sessionId: { in: conflictIds },
+            status: "ACTIVE",
+          },
+        });
+        for (const hold of holds) {
+          await tx.bookingHold.update({
+            where: { id: hold.id },
+            data: { status: "RELEASED" },
+          });
+          await tx.bookingAttempt.update({
+            where: { id: hold.attemptId },
+            data: { status: "EXPIRED" },
+          });
+          await audit(
+            tx,
+            actor,
+            "HOLD_RELEASED",
+            hold.id,
+            { status: hold.status },
+            { status: "RELEASED", reason },
+          );
+        }
+        for (const conflict of conflicts) {
+          const cancelled = await tx.classSession.update({
+            where: { id: conflict.id },
+            data: { status: "CANCELLED", version: { increment: 1 } },
+          });
+          await audit(
+            tx,
+            actor,
+            "SESSION_COPY_REPLACED",
+            conflict.id,
+            conflict,
+            cancelled,
+          );
+          replaced++;
+        }
         const session = await tx.classSession.create({
           data: {
             shopId: actor.shopId,
@@ -571,9 +733,10 @@ export async function copyPreviousWeek(actor: Actor, day: string) {
           { sourceId: source.id },
           session,
         );
+        createdIds.add(session.id);
         count++;
       }
-      return count;
+      return { copied: count, replaced, preserved, cancelledBookings };
     },
     { timeout: 15000 },
   );

@@ -59,12 +59,12 @@ export async function action({ request }: ActionFunctionArgs) {
       await updateSession(actor, Object.fromEntries(form));
       return { message: "Session updated." };
     }
-    if (form.get("intent") === "copy")
+    if (form.get("intent") === "copy") {
+      const result = await copyPreviousWeek(actor, String(form.get("week")));
       return {
-        message:
-          (await copyPreviousWeek(actor, String(form.get("week")))) +
-          " draft session(s) copied.",
+        message: `${result.copied} draft session(s) copied. ${result.replaced} conflicting session(s) replaced. ${result.preserved} identical session(s) kept. ${result.cancelledBookings} booking(s) cancelled with credits returned.`,
       };
+    }
     if (form.get("intent") === "publish") {
       const publication = await publishWeek(actor, String(form.get("week")));
       return {
@@ -300,10 +300,22 @@ export default function Schedule() {
           </label>
         </div>
         <div className="schedule-actions">
-          <Form method="post">
+          <Form
+            method="post"
+            onSubmit={(event) => {
+              if (
+                !window.confirm(
+                  "Copy the previous week? Conflicting sessions will be replaced. Their bookings will be cancelled and credits returned. Identical sessions and their bookings will be kept.",
+                )
+              )
+                event.preventDefault();
+            }}
+          >
             <input type="hidden" name="intent" value="copy" />
             <input type="hidden" name="week" value={data.week} />
-            <button disabled={busy}>Copy previous week</button>
+            <button disabled={busy}>
+              Copy previous week &amp; replace conflicts
+            </button>
           </Form>
           <Form method="post">
             <input type="hidden" name="intent" value="publish" />

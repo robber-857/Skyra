@@ -540,8 +540,10 @@ test("Pass publication failure cannot mark sync complete, and retry safely compl
 
 test("Copy previous week creates drafts once and preserves the source week", async () => {
   const count = await copyPreviousWeek(actor, "2030-07-08");
-  expect(count).toBe(2);
-  expect(await copyPreviousWeek(actor, "2030-07-08")).toBe(0);
+  expect(count.copied).toBe(2);
+  expect(await copyPreviousWeek(actor, "2030-07-08")).toMatchObject({
+    copied: 0,
+  });
   expect(
     await db.classSession.count({
       where: { shopId: actor.shopId, status: "PUBLISHED" },
