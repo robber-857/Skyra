@@ -260,11 +260,7 @@ export default function Bookings() {
                   {item.lastError ? ` · ${item.lastError}` : ""}
                 </p>
               </div>
-              {item.status === "SUPPRESSED" ? (
-                <span className="muted">Preview unavailable</span>
-              ) : (
-                <Link to={`/app/notifications/${item.id}`}>Preview email</Link>
-              )}
+              <Link to={`/app/notifications/${item.id}`}>Preview email</Link>
             </article>
           ))
         ) : (

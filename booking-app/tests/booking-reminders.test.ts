@@ -87,41 +87,148 @@ test("a booking made inside 12 hours queues its reminder immediately", async () 
 });
 
 test("Customer email lookup uses the validated Customer GID and default email", async () => {
-  const graphql = vi.fn(async (query: string, options: { variables: Record<string, unknown> }) => {
-    expect(query).toBe(CUSTOMER_NOTIFICATION_EMAIL_QUERY);
-    expect(options.variables).toEqual({ id: "gid://shopify/Customer/123" });
-    return new Response(
-      JSON.stringify({
-        data: {
-          customer: {
-            id: "gid://shopify/Customer/123",
-            defaultEmailAddress: { emailAddress: "customer@example.com" },
+  const graphql = vi.fn(
+    async (query: string, options: { variables: Record<string, unknown> }) => {
+      expect(query).toBe(CUSTOMER_NOTIFICATION_EMAIL_QUERY);
+      expect(options.variables).toEqual({ id: "gid://shopify/Customer/123" });
+      return new Response(
+        JSON.stringify({
+          data: {
+            customer: {
+              id: "gid://shopify/Customer/123",
+              defaultEmailAddress: { emailAddress: "customer@example.com" },
+            },
           },
-        },
-      }),
-      { status: 200, headers: { "content-type": "application/json" } },
-    );
-  });
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    },
+  );
   await expect(
     resolveShopifyCustomerEmail(graphql, "gid://shopify/Customer/123"),
   ).resolves.toBe("customer@example.com");
 });
 
 test("Customer email lookup rejects mismatched or partial Shopify data", async () => {
-  const graphql = vi.fn(async () =>
-    new Response(
-      JSON.stringify({
-        data: {
-          customer: {
-            id: "gid://shopify/Customer/999",
-            defaultEmailAddress: { emailAddress: "wrong@example.com" },
+  const graphql = vi.fn(
+    async () =>
+      new Response(
+        JSON.stringify({
+          data: {
+            customer: {
+              id: "gid://shopify/Customer/999",
+              defaultEmailAddress: { emailAddress: "wrong@example.com" },
+            },
           },
-        },
-      }),
-      { status: 200, headers: { "content-type": "application/json" } },
-    ),
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
   );
   await expect(
     resolveShopifyCustomerEmail(graphql, "gid://shopify/Customer/123"),
   ).rejects.toThrow("invalid data");
 });
+
+test("accepted reminders remain previewable after class without resending or changing delivery history", async () => {
+  const f = await paidFixture();
+  await processPaidBookingEvent((await queuePaid(f)).id);
+  const reminder = await db.bookingNotification.findFirstOrThrow({
+    where: { shopId: f.shop.id, template: "BOOKING_REMINDER_V1" },
+  });
+  await db.bookingNotification.update({
+    where: { id: reminder.id },
+    data: { availableAt: new Date(Date.now() - 1000) },
+  });
+  const send = vi
+    .fn()
+    .mockResolvedValue({ status: "ACCEPTED", messageId: "synthetic-reminder" });
+  await deliverBookingNotification(reminder.id, send);
+  expect(send).toHaveBeenCalledTimes(1);
+  const sent = await db.bookingNotification.findUniqueOrThrow({
+    where: { id: reminder.id },
+  });
+  const startsAt = new Date(Date.now() - 2 * 60 * 60 * 1000);
+  const endsAt = new Date(Date.now() - 60 * 60 * 1000);
+  await db.classSession.update({
+    where: { id: f.session.id },
+    data: { startsAt, endsAt, busyStartsAt: startsAt, busyEndsAt: endsAt },
+  });
+  await db.booking.update({
+    where: { id: reminder.bookingId },
+    data: { status: "ATTENDED" },
+  });
+  const preview = await previewBookingNotification(f.shop.id, reminder.id);
+  expect(preview.subject).toContain("Class reminder");
+  expect(preview.html).toContain("Your class starts soon");
+  await deliverBookingNotification(reminder.id, send);
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(
+    await db.bookingNotification.findUniqueOrThrow({
+      where: { id: reminder.id },
+    }),
+  ).toEqual(sent);
+  await expect(
+    previewBookingNotification(
+      "00000000-0000-4000-8000-000000000001",
+      reminder.id,
+    ),
+  ).rejects.toMatchObject({ code: "NOTIFICATION_NOT_FOUND", status: 404 });
+});
+
+test.each(["started", "cancelled", "recipient changed"])(
+  "%s reminder can be previewed but is suppressed during delivery",
+  async (reason) => {
+    const f = await paidFixture();
+    await processPaidBookingEvent((await queuePaid(f)).id);
+    const reminder = await db.bookingNotification.findFirstOrThrow({
+      where: { shopId: f.shop.id, template: "BOOKING_REMINDER_V1" },
+    });
+    await db.bookingNotification.update({
+      where: { id: reminder.id },
+      data: {
+        availableAt: new Date(Date.now() - 1000),
+        ...(reason === "recipient changed"
+          ? { recipientId: "00000000-0000-4000-8000-000000000002" }
+          : {}),
+      },
+    });
+    if (reason === "started") {
+      const startsAt = new Date(Date.now() - 60 * 1000);
+      const endsAt = new Date(Date.now() + 60 * 60 * 1000);
+      await db.classSession.update({
+        where: { id: f.session.id },
+        data: { startsAt, endsAt, busyStartsAt: startsAt, busyEndsAt: endsAt },
+      });
+    }
+    if (reason === "cancelled")
+      await db.booking.update({
+        where: { id: reminder.bookingId },
+        data: { status: "CANCELLED" },
+      });
+    const before = await db.bookingNotification.findUniqueOrThrow({
+      where: { id: reminder.id },
+    });
+    expect(
+      (await previewBookingNotification(f.shop.id, reminder.id)).subject,
+    ).toContain("Class reminder");
+    expect(
+      await db.bookingNotification.findUniqueOrThrow({
+        where: { id: reminder.id },
+      }),
+    ).toEqual(before);
+    const send = vi.fn();
+    await deliverBookingNotification(reminder.id, send);
+    expect(send).not.toHaveBeenCalled();
+    expect(
+      await db.bookingNotification.findUniqueOrThrow({
+        where: { id: reminder.id },
+      }),
+    ).toMatchObject({
+      status: "SUPPRESSED",
+      lastError: "NOTIFICATION_OBSOLETE",
+    });
+    expect(
+      (await previewBookingNotification(f.shop.id, reminder.id)).subject,
+    ).toContain("Class reminder");
+  },
+);

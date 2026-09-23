@@ -110,10 +110,10 @@ export function renderBookingEmail(details: BookingEmailDetails) {
     : details.reminder
       ? "Your class starts soon"
       : isCoach
-      ? "A new booking for your class"
-      : details.recipientKind === "ADMIN"
-        ? "A new studio booking"
-        : "Your booking is confirmed";
+        ? "A new booking for your class"
+        : details.recipientKind === "ADMIN"
+          ? "A new studio booking"
+          : "Your booking is confirmed";
   const subject =
     `${details.cancellation ? "Booking cancelled" : details.reminder ? "Class reminder" : isOperations ? "New booking" : "Booking confirmed"}: ${details.className}`.replace(
       /[\r\n]/g,
@@ -146,7 +146,7 @@ export function renderBookingEmail(details: BookingEmailDetails) {
       ? "Your class starts in about 12 hours and your place is reserved. Free cancellation is available until 12 hours before class; after that, one class credit is used. A no-show uses one class credit; Pass credits are not returned and Drop-in payments are not refunded."
       : isOperations
         ? `This count reflects confirmed bookings when this email was prepared. Check ${isCoach ? "your schedule" : "Admin bookings"} for the latest roster.`
-      : "Your place is reserved. Free cancellation is available until 12 hours before class; late cancellation uses one class credit. Your booking is treated as attended by default. A no-show uses one class credit; Pass credits are not returned and Drop-in payments are not refunded. Original Pass expiry and eligibility still apply.";
+        : "Your place is reserved. Free cancellation is available until 12 hours before class; late cancellation uses one class credit. Your booking is treated as attended by default. A no-show uses one class credit; Pass credits are not returned and Drop-in payments are not refunded. Original Pass expiry and eligibility still apply.";
   return {
     subject,
     text: `${heading}\n\n${rows.map(([label, value]) => `${label}: ${value}`).join("\n")}\n\n${note}\n\nSkyra`,
@@ -158,27 +158,50 @@ export async function previewBookingNotification(
   shopId: string,
   notificationId: string,
 ) {
-  const notification = await db.bookingNotification.findFirstOrThrow({
+  return prepareBookingNotification(shopId, notificationId, false);
+}
+
+// Preview is read-only and remains available after class or booking changes.
+// Delivery must independently enforce eligibility before contacting the provider.
+async function prepareBookingNotification(
+  shopId: string,
+  notificationId: string,
+  forDelivery: boolean,
+) {
+  const notification = await db.bookingNotification.findFirst({
     where: { shopId, id: notificationId },
   });
-  const booking = await db.booking.findFirstOrThrow({
+  if (!notification)
+    throw new DomainError(
+      "NOTIFICATION_NOT_FOUND",
+      "Email notification not found.",
+      404,
+    );
+  const booking = await db.booking.findFirst({
     where: { shopId, id: notification.bookingId },
     include: {
       session: { include: { service: true, coach: true, location: true } },
     },
   });
+  if (!booking)
+    throw new DomainError(
+      "NOTIFICATION_NOT_FOUND",
+      "Booking for this email is unavailable.",
+      404,
+    );
   const reminder = notification.template === "BOOKING_REMINDER_V1";
-  const now = reminder ? await databaseNow(db) : null;
+  const now = forDelivery && reminder ? await databaseNow(db) : null;
   if (
-    (notification.template === "BOOKING_CANCELLED_V1"
+    forDelivery &&
+    ((notification.template === "BOOKING_CANCELLED_V1"
       ? !["CANCELLED", "LATE_CANCEL"].includes(booking.status)
       : booking.status !== "CONFIRMED") ||
-    (reminder && booking.session.startsAt <= now!) ||
-    (notification.recipientKind === "COACH"
-      ? notification.recipientId !== booking.session.coachId
-      : notification.recipientKind === "ADMIN"
-        ? notification.recipientId !== shopId
-        : notification.recipientId !== booking.customerId)
+      (reminder && booking.session.startsAt <= now!) ||
+      (notification.recipientKind === "COACH"
+        ? notification.recipientId !== booking.session.coachId
+        : notification.recipientKind === "ADMIN"
+          ? notification.recipientId !== shopId
+          : notification.recipientId !== booking.customerId))
   )
     throw new DomainError(
       "NOTIFICATION_OBSOLETE",
@@ -190,7 +213,9 @@ export async function previewBookingNotification(
   return renderBookingEmail({
     cancellation:
       notification.template === "BOOKING_CANCELLED_V1"
-        ? (booking.status as "CANCELLED" | "LATE_CANCEL")
+        ? booking.status === "LATE_CANCEL"
+          ? "LATE_CANCEL"
+          : "CANCELLED"
         : undefined,
     reminder,
     recipientKind: notification.recipientKind as "CUSTOMER" | "COACH" | "ADMIN",
@@ -245,7 +270,11 @@ export async function deliverBookingNotification(
     });
     if (shop.status !== "ACTIVE")
       throw new DomainError("NOTIFICATION_OBSOLETE", "Shop is inactive.");
-    const email = await previewBookingNotification(notification.shopId, id);
+    const email = await prepareBookingNotification(
+      notification.shopId,
+      id,
+      true,
+    );
     const result = await adapter({
       shopId: notification.shopId,
       recipientKind: notification.recipientKind,
