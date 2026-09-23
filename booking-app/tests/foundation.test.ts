@@ -295,8 +295,14 @@ test("Week publishing creates no extra Shopify mapping/outbox", async () => {
   const before = await db.outboxEvent.count({
     where: { shopId: actor.shopId },
   });
-  expect(await publishWeek(actor, "2030-07-01")).toBe(2);
-  expect(await publishWeek(actor, "2030-07-01")).toBe(0);
+  expect(await publishWeek(actor, "2030-07-01")).toMatchObject({
+    published: 2,
+    skipped: [],
+  });
+  expect(await publishWeek(actor, "2030-07-01")).toMatchObject({
+    published: 0,
+    skipped: [],
+  });
   expect(await db.outboxEvent.count({ where: { shopId: actor.shopId } })).toBe(
     before,
   );

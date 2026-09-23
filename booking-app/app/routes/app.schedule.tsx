@@ -65,12 +65,20 @@ export async function action({ request }: ActionFunctionArgs) {
           (await copyPreviousWeek(actor, String(form.get("week")))) +
           " draft session(s) copied.",
       };
-    if (form.get("intent") === "publish")
+    if (form.get("intent") === "publish") {
+      const publication = await publishWeek(actor, String(form.get("week")));
       return {
         message:
-          (await publishWeek(actor, String(form.get("week")))) +
-          " session(s) published.",
+          publication.published +
+          " session(s) published." +
+          (publication.skipped.length
+            ? " " +
+              publication.skipped.length +
+              " past session(s) skipped and kept as draft."
+            : ""),
+        skipped: publication.skipped,
       };
+    }
     if (form.get("intent") === "remove") {
       await cancelDraft(actor, String(form.get("id")));
       return { message: "Draft removed." };
@@ -308,6 +316,31 @@ export default function Schedule() {
       </div>
 
       <Feedback result={result} />
+      {result &&
+        "skipped" in result &&
+        result.skipped &&
+        result.skipped.length > 0 && (
+          <section className="panel" aria-label="Skipped sessions">
+            <h2>Skipped sessions</h2>
+            <ul>
+              {result.skipped.map((session) => (
+                <li key={session.id}>
+                  <Link to={"/app/schedule/" + session.id}>
+                    {session.className}
+                  </Link>
+                  {" · " +
+                    DateTime.fromISO(session.startsAt, {
+                      zone: session.timezone,
+                    }).toFormat("d LLL yyyy · h:mm a") +
+                    " · " +
+                    session.timezone +
+                    " — " +
+                    session.reason}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
       <section className="panel schedule-calendar-panel">
         <div className="schedule-calendar-head">

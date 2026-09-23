@@ -342,17 +342,35 @@ export async function publishWeek(actor: Actor, day: string) {
       },
       include: { service: true, coach: true },
     });
+    const now = new Date();
+    const skipped: {
+      id: string;
+      className: string;
+      startsAt: string;
+      timezone: string;
+      reason: string;
+    }[] = [];
+    let published = 0;
     for (const session of drafts) {
+      if (session.startsAt <= now) {
+        skipped.push({
+          id: session.id,
+          className: session.service.name,
+          startsAt: session.startsAt.toISOString(),
+          timezone: session.timezone,
+          reason: "Start time has passed. Kept as draft.",
+        });
+        continue;
+      }
       assertScheduleStart(session.startsAt, session.timezone);
       requireServicePrice(session.service.requestedPriceCents);
       if (
-        session.startsAt <= new Date() ||
         session.service.status !== "ACTIVE" ||
         session.coach.status !== "ACTIVE"
       )
         throw new DomainError(
           "NOT_PUBLISHABLE",
-          "This week includes a past session or inactive class/coach.",
+          `Cannot publish ${session.service.name}: the class or coach is inactive.`,
         );
       const assignment = await tx.serviceCoach.findFirst({
         where: {
@@ -378,8 +396,9 @@ export async function publishWeek(actor: Actor, day: string) {
         { status: "DRAFT" },
         { status: "PUBLISHED" },
       );
+      published += 1;
     }
-    return drafts.length;
+    return { published, skipped };
   });
 }
 export async function cancelDraft(actor: Actor, id: string) {

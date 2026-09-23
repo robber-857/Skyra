@@ -232,10 +232,16 @@ test("publishing a boundary week validates each session instead of rejecting its
   setDate("2025-12-20T00:00:00Z");
   const lower = await fixture();
   await lower.add("2026-01-01T10:00");
-  expect(await publishWeek(lower.actor, "2025-12-29")).toBe(1);
+  expect(await publishWeek(lower.actor, "2025-12-29")).toMatchObject({
+    published: 1,
+    skipped: [],
+  });
   const upper = await fixture();
   await upper.add("2099-12-31T10:00");
-  expect(await publishWeek(upper.actor, "2099-12-28")).toBe(1);
+  expect(await publishWeek(upper.actor, "2099-12-28")).toMatchObject({
+    published: 1,
+    skipped: [],
+  });
   const invalid = await fixture();
   await invalid.add("2099-12-30T10:00");
   await invalid.rawDraft("2100-01-01T10:00");
@@ -296,7 +302,10 @@ test("unknown Service price stays draft until a price and coach are supplied; ze
     localStart: "2030-07-01T10:00",
     requestId: randomUUID(),
   });
-  expect(await publishWeek(f.actor, "2030-07-01")).toBe(1);
+  expect(await publishWeek(f.actor, "2030-07-01")).toMatchObject({
+    published: 1,
+    skipped: [],
+  });
   expect(
     (await db.classSession.findUniqueOrThrow({ where: { id: session.id } }))
       .status,
@@ -350,4 +359,38 @@ test("an existing active zero-price Service cannot publish sessions or replace a
     (await db.classSession.findUniqueOrThrow({ where: { id: session.id } }))
       .startsAt,
   ).toEqual(session.startsAt);
+});
+
+test("publishing midweek skips past and exact-start drafts without changing them or duplicating publication", async () => {
+  setDate("2030-07-03T01:00:00Z"); // Wednesday 11:00 in Sydney
+  const f = await fixture();
+  const past = await f.rawDraft("2030-07-03T10:00");
+  const exact = await f.rawDraft("2030-07-03T11:00");
+  const future = await f.rawDraft("2030-07-03T18:30");
+  const result = await publishWeek(f.actor, "2030-07-01");
+  expect(result.published).toBe(1);
+  expect(result.skipped).toHaveLength(2);
+  expect(result.skipped).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        id: past.id,
+        className: f.service.name,
+        startsAt: past.startsAt.toISOString(),
+        timezone: f.location.timezone,
+      }),
+      expect.objectContaining({ id: exact.id }),
+    ]),
+  );
+  for (const row of [past, exact]) {
+    expect(
+      await db.classSession.findUniqueOrThrow({ where: { id: row.id } }),
+    ).toMatchObject({ status: "DRAFT", version: row.version });
+  }
+  expect(
+    await db.classSession.findUniqueOrThrow({ where: { id: future.id } }),
+  ).toMatchObject({ status: "PUBLISHED", version: future.version + 1 });
+  expect(await publishWeek(f.actor, "2030-07-01")).toMatchObject({
+    published: 0,
+    skipped: expect.arrayContaining(result.skipped),
+  });
 });
