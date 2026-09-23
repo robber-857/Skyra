@@ -1,4 +1,11 @@
 import { CashCreditForm } from "../components/cash-credit-form";
+import { StaffBookingForm } from "../components/staff-booking-form";
+import {
+  bookClientIntoSession,
+  staffBookingOptions,
+} from "../services/staff-booking.server";
+import { PassCreditAdjustmentForm } from "../components/pass-credit-adjustment-form";
+import { adjustClientPassCredits } from "../services/pass-credit-adjustment.server";
 import { randomUUID } from "node:crypto";
 import {
   useActionData,
@@ -32,6 +39,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     data: await adminClientDetail(actor, params.clientId, query),
     warning,
     creditOptions: await manualCreditOptions(actor),
+    bookingOptions: await staffBookingOptions(actor, params.clientId!),
     idempotencyKey: randomUUID(),
   };
 }
@@ -42,6 +50,36 @@ export async function action({ request, params }: ActionFunctionArgs) {
     throw new Response("Method not allowed", { status: 405 });
   const form = await request.formData();
   try {
+    if (form.get("intent") === "book-class") {
+      if (form.get("confirmed") !== "on")
+        return { error: "Confirm the client, class and Pass before booking." };
+      const bookingId = await bookClientIntoSession(actor, {
+        customerId: params.clientId,
+        sessionId: form.get("sessionId"),
+        entitlementId: form.get("entitlementId"),
+        reason: form.get("reason"),
+        idempotencyKey: form.get("idempotencyKey"),
+      });
+      return {
+        message: `Booking confirmed. One Pass credit reserved. Reference: ${bookingId}`,
+      };
+    }
+    if (form.get("intent") === "adjust-pass") {
+      if (form.get("confirmed") !== "on")
+        return { error: "Confirm the new Pass credit balance." };
+      await adjustClientPassCredits(actor, {
+        customerId: params.clientId,
+        entitlementId: form.get("entitlementId"),
+        available: form.get("available"),
+        expectedAvailable: form.get("expectedAvailable"),
+        reason: form.get("reason"),
+        idempotencyKey: form.get("idempotencyKey"),
+      });
+      return {
+        message:
+          "Pass credits updated. The adjustment and reason have been recorded.",
+      };
+    }
     if (form.get("confirmed") !== "on")
       return { error: "Confirm the cash payment and credit grant." };
     await grantCashCredits(actor, {
@@ -67,9 +105,22 @@ export default function Client() {
   return (
     <AdminClientDetailView
       {...data}
+      passAdjustmentForm={(pass) => (
+        <PassCreditAdjustmentForm
+          key={`${pass.id}:${data.idempotencyKey}`}
+          pass={pass}
+          idempotencyKey={data.idempotencyKey}
+        />
+      )}
       creditForm={
         <>
           <Feedback result={useActionData<typeof action>()} />
+          <StaffBookingForm
+            key={`booking:${data.idempotencyKey}`}
+            options={data.bookingOptions}
+            clientName={data.data.client.name}
+            idempotencyKey={data.idempotencyKey}
+          />
           <CashCreditForm
             key={data.idempotencyKey}
             options={data.creditOptions}

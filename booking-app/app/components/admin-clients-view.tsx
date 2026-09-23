@@ -185,10 +185,14 @@ export function AdminClientDetailView({
   data,
   warning,
   creditForm,
+  passAdjustmentForm,
 }: {
   data: Awaited<ReturnType<typeof adminClientDetail>>;
   warning: string | null;
   creditForm?: ReactNode;
+  passAdjustmentForm?: (
+    pass: Awaited<ReturnType<typeof adminClientDetail>>["passes"][number],
+  ) => ReactNode;
 }) {
   const c = data.client;
   const navigate = useNavigate(),
@@ -295,11 +299,9 @@ export function AdminClientDetailView({
               )}
               <div className="summary client-pass-summary">
                 <div>
-                  <strong>
-                    {p.remaining}
-                    <small> / {p.granted}</small>
-                  </strong>
+                  <strong>{p.remaining}</strong>
                   <span>Classes remaining</span>
+                  <small>Originally granted: {p.granted}</small>
                 </div>
                 <div>
                   <strong>{p.available}</strong>
@@ -360,6 +362,7 @@ export function AdminClientDetailView({
                   booked.
                 </p>
               )}
+              {passAdjustmentForm?.(p)}
             </article>
           ))}
         </div>
