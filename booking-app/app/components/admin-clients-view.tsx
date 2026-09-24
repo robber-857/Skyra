@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { DateTime } from "luxon";
 import { Form, Link, useNavigate, useNavigation } from "react-router";
 import type {
@@ -6,6 +6,7 @@ import type {
   adminClientDetail,
 } from "../services/admin-clients.server";
 import { Feedback } from "./admin-ui";
+import { ClientSyncButton } from "./client-sync-button";
 
 const date = (value: string, zone: string) =>
   DateTime.fromISO(value, { zone }).toFormat("d LLL yyyy");
@@ -20,6 +21,7 @@ export function AdminClientsView({
   result?: { error?: string; message?: string; nextCursor?: string | null };
 }) {
   const navigate = useNavigate();
+  const [adding, setAdding] = useState(false);
   const navigation = useNavigation(),
     busy = navigation.state !== "idle";
   const pageLink = (page: number) =>
@@ -34,23 +36,77 @@ export function AdminClientsView({
             Find a client and view their profile, Pass balances and bookings.
           </p>
         </div>
-        <Form method="post">
-          <input type="hidden" name="after" value={result?.nextCursor || ""} />
-          <button disabled={busy}>
-            {busy
-              ? "Syncing…"
-              : result?.nextCursor
-                ? "Sync next 100 clients"
-                : "Sync Shopify clients"}
+        <div className="catalog-page-controls">
+          <button
+            type="button"
+            className="primary"
+            disabled={busy}
+            aria-expanded={adding}
+            aria-controls="add-client"
+            onClick={() => setAdding(!adding)}
+          >
+            Add client
           </button>
-        </Form>
+          <ClientSyncButton />
+        </div>
       </header>
       <Feedback result={result} />
-      {result?.nextCursor && (
-        <p className="muted">
-          More Shopify clients are available. Continue syncing to include them
-          in this directory.
-        </p>
+      {adding && (
+        <section
+          className="panel"
+          id="add-client"
+          aria-labelledby="add-client-title"
+        >
+          <h2 id="add-client-title">Add client</h2>
+          <p className="muted">
+            Enter the client’s name and email. If this email already exists in
+            Shopify, their existing profile will be linked.
+          </p>
+          <Form method="post" className="form-grid">
+            <input type="hidden" name="intent" value="create" />
+            <label className="field">
+              First name
+              <input
+                name="firstName"
+                autoComplete="given-name"
+                required
+                maxLength={100}
+              />
+            </label>
+            <label className="field">
+              Last name (optional)
+              <input
+                name="lastName"
+                autoComplete="family-name"
+                maxLength={100}
+              />
+            </label>
+            <label className="field">
+              Email
+              <input
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                maxLength={254}
+              />
+            </label>
+            <div className="catalog-page-controls">
+              <button className="primary" disabled={busy}>
+                {busy && navigation.formData?.get("intent") === "create"
+                  ? "Saving…"
+                  : "Save client"}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setAdding(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </Form>
+        </section>
       )}
       {warning && (
         <p className="feedback error" role="alert">
@@ -128,7 +184,7 @@ export function AdminClientsView({
           <p className="empty">
             {data.q
               ? "No clients match this search."
-              : "No clients yet. Sync Shopify clients to add existing customers."}
+              : "No clients yet. Add a client or sync existing Shopify customers."}
           </p>
         )}
       </section>

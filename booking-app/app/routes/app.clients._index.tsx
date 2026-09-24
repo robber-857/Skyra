@@ -3,14 +3,16 @@ import {
   useActionData,
   type LoaderFunctionArgs,
   type ActionFunctionArgs,
+  redirect,
 } from "react-router";
 import { adminContext } from "../services/context.server";
 import { adminClients } from "../services/admin-clients.server";
 import {
   importShopifyClients,
   refreshClientContacts,
+  addAdminClient,
 } from "../services/client-contacts.server";
-import { publicError } from "../lib/errors.server";
+import { DomainError, publicError } from "../lib/errors.server";
 import { AdminClientsView } from "../components/admin-clients-view";
 export async function loader({ request }: LoaderFunctionArgs) {
   const { actor, admin } = await adminContext(request),
@@ -34,6 +36,17 @@ export async function action({ request }: ActionFunctionArgs) {
   const form = await request.formData(),
     after = form.get("after");
   try {
+    if (form.get("intent") === "create") {
+      const client = await addAdminClient(actor, admin.graphql, {
+        firstName: form.get("firstName"),
+        lastName: form.get("lastName"),
+        email: form.get("email"),
+      });
+      return redirect(`/app/clients/${client.id}`);
+    }
+    if (form.get("intent") !== "sync") {
+      throw new DomainError("VALIDATION", "Unknown client action.");
+    }
     return await importShopifyClients(
       actor,
       admin.graphql,

@@ -252,7 +252,7 @@ test("Shopify import upserts clients idempotently, retains profiles and returns 
   expect(await importShopifyClients(actor, graphql, {})).toMatchObject({
     nextCursor: "next-page",
   });
-  await importShopifyClients(actor, graphql, { after: "next-page" });
+  await importShopifyClients(actor, graphql, {});
   expect((await adminClients(actor, {})).total).toBe(2);
   expect((await adminClientDetail(actor, f.customer.id)).client.name).toBe(
     "Ally",
@@ -295,4 +295,86 @@ test("client pagination clamps empty/out-of-range pages and retains deterministi
     clients: [],
   });
   await expect(adminClients(actor, { page: "oops" })).rejects.toThrow();
+});
+
+test("full customer sync follows batches beyond 100 and can retry a failed batch", async () => {
+  const f = await paidFixture(),
+    actor = actorFor(f.shop.id);
+  const customers = Array.from({ length: 205 }, (_, i) =>
+    node(`gid://shopify/Customer/${30000 + i}`),
+  );
+  let fail = true;
+  const graphql = vi.fn(
+    async (
+      _query: string,
+      options?: { variables?: Record<string, unknown> },
+    ) => {
+      const offset = Number(options?.variables?.after || 0);
+      if (offset === 100 && fail) throw new Error("temporary failure");
+      const end = Math.min(offset + 100, customers.length);
+      return Response.json({
+        data: {
+          customers: {
+            nodes: customers.slice(offset, end),
+            pageInfo: {
+              hasNextPage: end < customers.length,
+              endCursor: String(end),
+            },
+          },
+        },
+      });
+    },
+  );
+  const first = await importShopifyClients(actor, graphql, {});
+  expect(first).toMatchObject({ synced: 100, nextCursor: "100" });
+  await expect(
+    importShopifyClients(actor, graphql, { after: first.nextCursor }),
+  ).rejects.toMatchObject({ code: "CUSTOMER_DATA_UNAVAILABLE" });
+  expect((await adminClients(actor, {})).total).toBe(101);
+  fail = false;
+  const second = await importShopifyClients(actor, graphql, {
+    after: first.nextCursor,
+  });
+  const last = await importShopifyClients(actor, graphql, {
+    after: second.nextCursor,
+  });
+  expect(second).toMatchObject({ synced: 100, nextCursor: "200" });
+  expect(last).toMatchObject({ synced: 5, nextCursor: null });
+  await importShopifyClients(actor, graphql, {});
+  expect((await adminClients(actor, {})).total).toBe(206);
+});
+
+test("sync rejects a stalled cursor and accepts an empty completed directory", async () => {
+  const f = await paidFixture(),
+    actor = actorFor(f.shop.id);
+  await expect(
+    importShopifyClients(
+      actor,
+      async () =>
+        Response.json({
+          data: {
+            customers: {
+              nodes: [],
+              pageInfo: { hasNextPage: true, endCursor: "stalled" },
+            },
+          },
+        }),
+      { after: "stalled" },
+    ),
+  ).rejects.toMatchObject({ code: "CUSTOMER_DATA_UNAVAILABLE" });
+  expect(
+    await importShopifyClients(
+      actor,
+      async () =>
+        Response.json({
+          data: {
+            customers: {
+              nodes: [],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        }),
+      {},
+    ),
+  ).toMatchObject({ synced: 0, nextCursor: null });
 });

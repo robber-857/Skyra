@@ -61,6 +61,116 @@ const values = (node: z.infer<typeof contact>) => ({
   email: node.defaultEmailAddress?.emailAddress || null,
   contactSyncedAt: new Date(),
 });
+
+export const findClientQuery = `#graphql
+  query FindClient($query: String!) {
+    customers(first: 100, query: $query) {
+      nodes { id firstName lastName defaultEmailAddress { emailAddress } }
+      pageInfo { hasNextPage }
+    }
+  }`;
+export const createClientMutation = `#graphql
+  mutation CreateClient($input: CustomerInput!) {
+    customerCreate(input: $input) {
+      customer { id firstName lastName defaultEmailAddress { emailAddress } }
+      userErrors { field message }
+    }
+  }`;
+
+export async function addAdminClient(
+  actor: Actor,
+  graphql: GraphQL,
+  raw: unknown,
+) {
+  await activeShop(actor);
+  const input = z
+    .object({
+      firstName: z.string().trim().min(1, "First name is required.").max(100),
+      lastName: z.string().trim().max(100),
+      email: z.string().trim().toLowerCase().email().max(254),
+    })
+    .strict()
+    .parse(raw);
+  const found = await read(graphql, findClientQuery, {
+    query: `email:"${input.email.replace(/[\\"]/g, "\\$&")}"`,
+  });
+  const matches = z
+    .object({
+      customers: z.object({
+        nodes: z.array(contact),
+        pageInfo: z.object({ hasNextPage: z.boolean() }),
+      }),
+    })
+    .safeParse(found);
+  if (!matches.success || matches.data.customers.pageInfo.hasNextPage)
+    throw unavailable();
+  const exact = matches.data.customers.nodes.filter(
+    (c) => c.defaultEmailAddress?.emailAddress.toLowerCase() === input.email,
+  );
+  if (exact.length > 1)
+    throw new DomainError(
+      "DUPLICATE_CLIENT",
+      "Multiple Shopify customers use this email. Resolve the duplicate customers in Shopify first.",
+    );
+  let customer = exact[0];
+  if (!customer) {
+    let body;
+    try {
+      const response = await graphql(createClientMutation, {
+        variables: { input },
+        signal: AbortSignal.timeout(8000),
+      });
+      body = await response.json();
+      if (!response.ok || body.errors?.length || !body.data) throw new Error();
+    } catch {
+      throw new DomainError(
+        "CLIENT_CREATE_UNAVAILABLE",
+        "Could not confirm the Shopify customer was saved. Check customer access (write_customers), then retry with the same email or sync Shopify clients.",
+        503,
+      );
+    }
+    const payload = z
+      .object({
+        customerCreate: z.object({
+          customer: contact.nullable(),
+          userErrors: z.array(z.object({ message: z.string() })),
+        }),
+      })
+      .safeParse(body.data);
+    if (!payload.success) throw unavailable();
+    if (payload.data.customerCreate.userErrors.length) {
+      throw new DomainError(
+        "CLIENT_CREATE_FAILED",
+        payload.data.customerCreate.userErrors.map((e) => e.message).join("; "),
+      );
+    }
+    if (!payload.data.customerCreate.customer) throw unavailable();
+    customer = payload.data.customerCreate.customer;
+  }
+  try {
+    return await db.customerProfile.upsert({
+      where: {
+        shopId_shopifyCustomerGid: {
+          shopId: actor.shopId,
+          shopifyCustomerGid: customer.id,
+        },
+      },
+      create: {
+        shopId: actor.shopId,
+        shopifyCustomerGid: customer.id,
+        ...values(customer),
+      },
+      update: values(customer),
+      select: { id: true },
+    });
+  } catch {
+    throw new DomainError(
+      "CLIENT_SAVE_FAILED",
+      "The customer exists in Shopify, but could not be added to Booking. Retry with the same email or sync Shopify clients.",
+      503,
+    );
+  }
+}
 export async function refreshClientContacts(
   actor: Actor,
   graphql: GraphQL,
@@ -134,7 +244,11 @@ export async function importShopifyClients(
     .safeParse(data);
   if (!parsed.success) throw unavailable();
   const { nodes, pageInfo } = parsed.data.customers;
-  if (pageInfo.hasNextPage && !pageInfo.endCursor) throw unavailable();
+  if (
+    pageInfo.hasNextPage &&
+    (!pageInfo.endCursor || pageInfo.endCursor === input.after)
+  )
+    throw unavailable();
   await db.$transaction(
     nodes.map((node) =>
       db.customerProfile.upsert({
@@ -155,6 +269,7 @@ export async function importShopifyClients(
   );
   return {
     message: `${nodes.length} Shopify clients synced.`,
+    synced: nodes.length,
     nextCursor: pageInfo.hasNextPage ? pageInfo.endCursor : null,
   };
 }

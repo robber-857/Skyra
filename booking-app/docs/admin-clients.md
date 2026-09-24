@@ -1,8 +1,11 @@
 # Admin Clients
 
 Open Skyra Booking → Clients. Existing Booking profiles appear automatically;
-Sync Shopify clients imports/refreshes 100 Shopify customers at a time, with a
-continuation button when more exist. Search matches Shopify name, preferred name
+Sync all Shopify customers automatically imports/refreshes successive batches of
+100 with one click, showing a cumulative count until all batches finish. Keep the
+page open during syncing. A failed batch can be retried from its cursor without
+repeating completed batches. Leaving or reloading the page resets progress; a new
+sync safely upserts existing customers. Search matches Shopify name, preferred name
 or email. A client name opens their profile, Pass history and 10 latest bookings.
 Reports customer names also open the profile; the report dropdown still filters.
 Directory pages show 10 clients, with Previous/Next, current / total page count
@@ -31,6 +34,12 @@ explicit field allowlists. Uninstall or removal of read_customers clears the
 Shopify name/email cache.
 
 ## Shopify permission
+
+Add client creates a Shopify customer from first name, optional last name and
+email, or links the existing exact email match. It opens the resulting Booking
+profile and preserves existing profile content. Creating customers requires
+write_customers in both the app release and runtime scopes; the owner may need
+to approve the updated installation permissions.
 
 The app release adds read_customers. A store owner may need to accept the updated
 installation permissions when reopening the app. Skyra Booking must also have
