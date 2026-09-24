@@ -441,6 +441,7 @@ export async function coachRoster(token: string, id: string) {
           customer: {
             select: {
               preferredName: true,
+              shopifyName: true,
               avatarBytes: true,
               avatarMimeType: true,
               signature: true,
@@ -468,6 +469,10 @@ export async function coachRoster(token: string, id: string) {
         ...booking,
         customer: {
           preferredName: customer.preferredName,
+          displayName:
+            customer.preferredName.trim() ||
+            customer.shopifyName.trim() ||
+            "Name unavailable",
           avatarDataUrl:
             customer.avatarBytes && customer.avatarMimeType
               ? `data:${customer.avatarMimeType};base64,${Buffer.from(

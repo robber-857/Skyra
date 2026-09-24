@@ -404,6 +404,25 @@ test("Coach roster is scoped and contains no Shopify identity, order, price or e
     code: "COACH_LOGIN_REQUIRED",
   });
 });
+test("Coach roster uses customer names instead of internal IDs when preferred name is empty", async () => {
+  const f = await fixture();
+  for (const [preferredName, shopifyName, expected] of [
+    ["", "Alice Chen", "Alice Chen"],
+    ["   ", "  Alice Chen  ", "Alice Chen"],
+    [" Ally ", "Alice Chen", "Ally"],
+    ["", "", "Name unavailable"],
+  ]) {
+    await db.customerProfile.update({
+      where: { id: f.customer.id },
+      data: { preferredName, shopifyName, email: "private@example.com" },
+    });
+    const roster = await coachRoster(f.coachToken, f.session.id);
+    expect(roster.session.bookings[0].customer.displayName).toBe(expected);
+    expect(JSON.stringify(roster)).not.toContain("private@example.com");
+    expect(JSON.stringify(roster)).not.toContain("gid://shopify");
+  }
+});
+
 test("missing ledger fails closed and rolls back status and notification changes", async () => {
   const f = await fixture();
   const customer = await db.customerProfile.create({

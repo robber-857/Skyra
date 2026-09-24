@@ -98,7 +98,7 @@ export default function Roster() {
       <section className="panel">
         <h2>Registrations</h2>
         <p className="muted">
-          Use the booking reference to match a registration.
+          Customers registered for this session are listed below.
         </p>
         {s.bookings.map((b) => (
           <article className="roster-booking" key={b.id}>
@@ -111,23 +111,18 @@ export default function Roster() {
                 />
               ) : (
                 <span className="coach-customer-avatar" aria-hidden="true">
-                  {(b.customer.preferredName || "C").charAt(0).toUpperCase()}
+                  {b.customer.displayName.charAt(0).toUpperCase()}
                 </span>
               )}
               <div>
-                <h3>
-                  {b.customer.preferredName ||
-                    `Customer ${b.customerId.slice(-8)}`}
-                </h3>
+                <h3>{b.customer.displayName}</h3>
                 <p className="muted">Booking {b.id}</p>
               </div>
             </div>
             <Status>{b.status}</Status>
             <section
               className="coach-training-profile"
-              aria-label={`Training profile for ${
-                b.customer.preferredName || "customer"
-              }`}
+              aria-label={`Training profile for ${b.customer.displayName}`}
             >
               <h4>Training profile</h4>
               {b.customer.signature && (
