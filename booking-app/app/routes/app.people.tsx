@@ -112,7 +112,7 @@ export async function action({ request }: ActionFunctionArgs) {
       );
       return {
         message:
-          "Login email authorized. The coach can activate/sign in by email once mail delivery is configured. Changing or clearing this email revokes existing access.",
+          "Login email authorization saved. This does not send an email. The coach must request a sign-in link on the coach sign-in page. Changing or clearing this email revokes existing access.",
       };
     }
     if (form.get("intent") === "coach-test-login") {
@@ -437,7 +437,16 @@ export default function People() {
                       </span>
                     </div>
                     <p className="muted">
-                      Grants portal access after email verification.
+                      Authorizing saves access permission without sending an
+                      email. The coach must request a link on the{" "}
+                      <a
+                        href="/coach/login"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        coach sign-in page
+                      </a>{" "}
+                      to verify and sign in.
                     </p>
                     <label className="field">
                       <span className="visually-hidden">

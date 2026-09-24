@@ -154,14 +154,15 @@ export function AdminReportsView({
               </Link>
             </div>
             <p className="report-connection-note">
-              Currently connected: purchases recorded by Skyra Booking. Shopify
-              store-wide orders and refunds are not connected yet.
+              Currently connected: online purchases and Cash payments recorded
+              by Skyra Booking. Shopify store-wide orders and refunds are not
+              connected yet.
             </p>
             <div className="report-metrics">
               <article>
                 <span>Total customer spend</span>
                 <strong>{money(data.spending.totalSpendCents)}</strong>
-                <small>Recorded Booking purchases</small>
+                <small>Recorded online and Cash purchases</small>
               </article>
               <article>
                 <span>Pass revenue</span>
@@ -212,9 +213,9 @@ export function AdminReportsView({
               </p>
             )}
             <p className="report-source">
-              Source: Booking purchase records for the selected dates (
-              {data.range.timezone}). Shopify store-wide orders, discounts and
-              refunds still need connecting.
+              Source: Booking online purchases and recorded Cash payments for
+              the selected dates ({data.range.timezone}). Shopify store-wide
+              orders, discounts and refunds still need connecting.
             </p>
             <details className="report-field-help">
               <summary>What do these fields mean?</summary>

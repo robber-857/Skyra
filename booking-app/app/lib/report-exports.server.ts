@@ -21,7 +21,7 @@ export function reportCsv(report: Report, kind: "spending" | "unused") {
     ? csv([
         [
           "Customer",
-          "Total spend (AUD; Booking purchases only)",
+          "Total spend (AUD; Booking online and Cash purchases)",
           "Pass purchases",
           "Refunds (AUD)",
           "Last purchase",

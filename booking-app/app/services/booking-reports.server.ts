@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { DateTime } from "luxon";
 import { z } from "zod";
 import db from "../db.server";
@@ -64,6 +65,29 @@ export async function bookingReports(actor: Actor, raw: unknown) {
         range = reportDateRange(raw, shop.timezone, now);
       const customerId = range.customerId || null;
       const search = range.search;
+      // Cash grants predate this report: use their immutable recorded amount,
+      // never the current catalogue price or the number of remaining credits.
+      const recordedPurchases = Prisma.sql`
+        SELECT h."customerId", ch."priceCents" AS "amountCents",
+          h."purchaseKind"='NEW_PASS' AS "isPass", r."createdAt"
+        FROM "PaidBookingResult" r
+        JOIN "BookingCheckout" ch ON ch.id=r."checkoutId" AND ch."shopId"=r."shopId"
+        JOIN "BookingHold" h ON h.id=ch."holdId" AND h."shopId"=ch."shopId"
+        WHERE r."shopId"=${shop.id}::uuid
+        UNION ALL
+        SELECT e."customerId", cash."amountCents", e."passPlanId" IS NOT NULL AS "isPass", cash."createdAt"
+        FROM "Entitlement" e
+        JOIN LATERAL (
+          SELECT a."createdAt",
+            CASE WHEN a.after->>'amount' ~ '^[0-9]+([.][0-9]{1,2})?$'
+              THEN (a.after->>'amount')::numeric * 100 END AS "amountCents"
+          FROM "AuditLog" a
+          WHERE a."shopId"=e."shopId" AND a."entityId"=e.id::text
+            AND a.action='CASH_CREDITS_GRANTED'
+          ORDER BY a."createdAt", a.id LIMIT 1
+        ) cash ON cash."amountCents">0 AND cash."amountCents"<=10000000
+        WHERE e."shopId"=${shop.id}::uuid AND e."sourceSystem"='MANUAL_CASH'
+      `;
       const [
         states,
         sessionCount,
@@ -93,7 +117,7 @@ export async function bookingReports(actor: Actor, raw: unknown) {
         }),
         tx.$queryRaw<
           { count: number; valueCents: number }[]
-        >`SELECT COUNT(*)::int AS count, COALESCE(SUM(c."priceCents"),0)::float8 AS "valueCents" FROM "PaidBookingResult" r JOIN "BookingCheckout" c ON c.id=r."checkoutId" AND c."shopId"=r."shopId" WHERE r."shopId"=${shop.id}::uuid AND r."createdAt">=${range.start} AND r."createdAt"<${range.end}`,
+        >`WITH recorded AS (${recordedPurchases}) SELECT COUNT(*)::int AS count, COALESCE(SUM("amountCents"),0)::float8 AS "valueCents" FROM recorded WHERE "createdAt">=${range.start} AND "createdAt"<${range.end}`,
         tx.$queryRaw<
           {
             passes: number;
@@ -118,7 +142,7 @@ export async function bookingReports(actor: Actor, raw: unknown) {
             passRevenueCents: number;
             lastPurchase: Date;
           }[]
-        >`SELECT c.id AS "customerId", COALESCE(NULLIF(TRIM(c."preferredName"), ''), NULLIF(TRIM(c."shopifyName"), ''), NULLIF(c.email, ''), 'Unnamed client') AS "customerName", COUNT(*)::int AS "purchaseCount", COALESCE(SUM(ch."priceCents"),0)::float8 AS "totalSpendCents", COUNT(*) FILTER (WHERE h."purchaseKind"='NEW_PASS')::int AS "passPurchases", COALESCE(SUM(ch."priceCents") FILTER (WHERE h."purchaseKind"='NEW_PASS'),0)::float8 AS "passRevenueCents", MAX(r."createdAt") AS "lastPurchase" FROM "PaidBookingResult" r JOIN "BookingCheckout" ch ON ch.id=r."checkoutId" AND ch."shopId"=r."shopId" JOIN "BookingHold" h ON h.id=ch."holdId" AND h."shopId"=ch."shopId" JOIN "CustomerProfile" c ON c.id=h."customerId" AND c."shopId"=h."shopId" WHERE r."shopId"=${shop.id}::uuid AND r."createdAt">=${range.start} AND r."createdAt"<${range.end} AND (${customerId}::uuid IS NULL OR c.id=${customerId}::uuid) AND (${search}='' OR strpos(lower(COALESCE(c."preferredName",'')), lower(${search}))>0 OR strpos(lower(COALESCE(c."shopifyName",'')), lower(${search}))>0 OR strpos(lower(COALESCE(c.email,'')), lower(${search}))>0) GROUP BY c.id,c."preferredName" ORDER BY "totalSpendCents" DESC,c.id ASC`,
+        >`WITH recorded AS (${recordedPurchases}) SELECT c.id AS "customerId", COALESCE(NULLIF(TRIM(c."preferredName"), ''), NULLIF(TRIM(c."shopifyName"), ''), NULLIF(c.email, ''), 'Unnamed client') AS "customerName", COUNT(*)::int AS "purchaseCount", COALESCE(SUM(r."amountCents"),0)::float8 AS "totalSpendCents", COUNT(*) FILTER (WHERE r."isPass")::int AS "passPurchases", COALESCE(SUM(r."amountCents") FILTER (WHERE r."isPass"),0)::float8 AS "passRevenueCents", MAX(r."createdAt") AS "lastPurchase" FROM recorded r JOIN "CustomerProfile" c ON c.id=r."customerId" AND c."shopId"=${shop.id}::uuid WHERE r."createdAt">=${range.start} AND r."createdAt"<${range.end} AND (${customerId}::uuid IS NULL OR c.id=${customerId}::uuid) AND (${search}='' OR strpos(lower(COALESCE(c."preferredName",'')), lower(${search}))>0 OR strpos(lower(COALESCE(c."shopifyName",'')), lower(${search}))>0 OR strpos(lower(COALESCE(c.email,'')), lower(${search}))>0) GROUP BY c.id,c."preferredName" ORDER BY "totalSpendCents" DESC,c.id ASC`,
         tx.$queryRaw<
           {
             entitlementId: string;
