@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Form,
   Link,
@@ -110,6 +110,18 @@ export default function Catalog() {
   const [tab, setTab] = useState<"service" | "pass">("service");
   const [edit, setEdit] = useState<string | null>(data.editId);
   const [open, setOpen] = useState(Boolean(data.editId));
+  const editorHeading = useRef<HTMLHeadingElement>(null);
+  const [editorRequest, setEditorRequest] = useState(0);
+  useEffect(() => {
+    if (!open) return;
+    editorHeading.current?.focus({ preventScroll: true });
+    editorHeading.current?.scrollIntoView({ block: "start" });
+  }, [open, edit, editorRequest]);
+  function openEditor(id: string | null) {
+    setEdit(id);
+    setOpen(true);
+    setEditorRequest((value) => value + 1);
+  }
   const [page, setPage] = useState(1);
   const service = data.services.find((x) => x.id === edit);
   const pass = data.passes.find((x) => x.id === edit);
@@ -144,10 +156,7 @@ export default function Catalog() {
         </div>
         <button
           className="primary"
-          onClick={() => {
-            setEdit(null);
-            setOpen(true);
-          }}
+          onClick={() => openEditor(null)}
         >
           Add {tab === "service" ? "class" : "pass"}
         </button>
@@ -166,7 +175,7 @@ export default function Catalog() {
       <Feedback result={result} />
       {open && (
         <section className="panel">
-          <h2>
+          <h2 ref={editorHeading} tabIndex={-1}>
             {edit ? "Edit" : "New"} {tab === "service" ? "class" : "pass"}
           </h2>
           <Form method="post" key={tab + edit + (item?.version || 0)}>
@@ -458,10 +467,7 @@ export default function Catalog() {
               </div>
               <div className="record-actions">
                 <button
-                  onClick={() => {
-                    setEdit(record.id);
-                    setOpen(true);
-                  }}
+                  onClick={() => openEditor(record.id)}
                 >
                   Edit
                 </button>
