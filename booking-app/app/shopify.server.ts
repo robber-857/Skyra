@@ -22,7 +22,6 @@ const shopify = shopifyApp({
     ...new Set([
       ...(process.env.SCOPES?.split(",") || []),
       "read_customers",
-      "write_customers",
       "read_publications",
       "write_publications",
     ]),
