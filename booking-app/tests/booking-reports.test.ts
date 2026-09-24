@@ -35,7 +35,7 @@ test.each(["NEW_PASS", "DROP_IN"] as const)(
         kind === "NEW_PASS"
           ? `PASS_PLAN:${f.plan.id}`
           : `SERVICE:${f.service.id}`,
-      units: 10,
+      units: kind === "NEW_PASS" ? 10 : 1,
       validityDays: 30,
       amount: "371.00",
       reason: "Synthetic cash receipt",
@@ -84,10 +84,10 @@ test.each(["NEW_PASS", "DROP_IN"] as const)(
       (await bookingReports(actor, { ...range, customer: other.customer.id }))
         .spending.rows,
     ).toEqual([]);
-    // Cash remains revenue after credits expire; an online payment adds to it.
+    // Revoking credits is not a refund; an online payment adds to cash revenue.
     await db.entitlement.update({
       where: { id: grant.id },
-      data: { expiresAt: new Date("2026-09-24T00:00:00Z") },
+      data: { status: "REVOKED" },
     });
     await processPaidBookingEvent((await queuePaid(f)).id);
     const combined = await bookingReports(actor, range);
@@ -114,6 +114,7 @@ test("historical cash uses the Sydney receipt day, even before Pass activation",
       sourceSystem: "MANUAL_CASH",
       externalKey: randomUUID(),
       grantedUnits: 10,
+      validityDays: 30,
     },
   });
   await db.auditLog.create({
