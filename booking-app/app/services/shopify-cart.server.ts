@@ -2,6 +2,7 @@ import { z } from "zod";
 import { DomainError } from "../lib/errors.server";
 import { priceInCents } from "./purchase-mapping.server";
 import type { GraphQL } from "./shopify-catalog.server";
+import { PRODUCTION_BOOKING_SHOP } from "./commerce-capabilities.server";
 
 export const CART_CREATE = `mutation BookingCartCreate($input: CartInput!) {
  cartCreate(input: $input) {
@@ -295,13 +296,18 @@ export function assertBookingCart(
     !cartId.searchParams.get("key")
   )
     throw changed();
+  // Owner-confirmed primary domain, scoped to this single merchant. Never derive
+  // trusted hosts from the cart URL or browser input. Shared by create and resume.
+  const checkoutHosts = [domain, "checkout.shopify.com"];
+  if (domain === PRODUCTION_BOOKING_SHOP)
+    checkoutHosts.push("skyrastudio.com.au");
   if (
     !/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/i.test(domain) ||
     url.protocol !== "https:" ||
     url.username ||
     url.password ||
     url.port ||
-    ![domain, "checkout.shopify.com"].includes(url.hostname) ||
+    !checkoutHosts.includes(url.hostname) ||
     !/^\/(checkouts|cart)\//.test(url.pathname)
   )
     throw changed();

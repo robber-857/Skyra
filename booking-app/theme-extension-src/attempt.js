@@ -130,7 +130,7 @@ document.dispatchEvent(new Event("skyra:attempt-ready"));
 window.SkyraBookingRecovery = function ({host, error, retry, restart, signIn}) {
   const code = error.code;
   const login = code === "LOGIN_REQUIRED" && signIn;
-  const terminal = ["ATTEMPT_EXPIRED", "NOT_FOUND", "FORBIDDEN", "VALIDATION", "SOLD_OUT", "BOOKING_CLOSED", "NOT_YET_OPEN", "RULES_NOT_READY"].includes(code) || (code === "UNAVAILABLE" && error.status === 409);
+  const terminal = ["ATTEMPT_EXPIRED", "NOT_FOUND", "FORBIDDEN", "VALIDATION", "SOLD_OUT", "BOOKING_CLOSED", "NOT_YET_OPEN", "RULES_NOT_READY", "CART_CHANGED"].includes(code) || (code === "UNAVAILABLE" && error.status === 409);
   const title = document.createElement("h3");
   title.textContent = login ? "Sign in to continue" : terminal ? "Let's check your booking again" : "We couldn't continue your booking";
   title.tabIndex = -1;
