@@ -1,5 +1,10 @@
 import { CashCreditForm } from "../components/cash-credit-form";
 import { StaffBookingForm } from "../components/staff-booking-form";
+import { AttendanceBackfillForm } from "../components/attendance-backfill-form";
+import {
+  attendanceBackfillOptions,
+  backfillAttendance,
+} from "../services/attendance-backfill.server";
 import {
   bookClientIntoSession,
   staffBookingOptions,
@@ -40,6 +45,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     warning,
     creditOptions: await manualCreditOptions(actor),
     bookingOptions: await staffBookingOptions(actor, params.clientId!),
+    attendanceOptions: await attendanceBackfillOptions(
+      actor,
+      params.clientId!,
+      url.searchParams.get("attendanceDate"),
+    ),
     idempotencyKey: randomUUID(),
   };
 }
@@ -50,6 +60,22 @@ export async function action({ request, params }: ActionFunctionArgs) {
     throw new Response("Method not allowed", { status: 405 });
   const form = await request.formData();
   try {
+    if (form.get("intent") === "backfill-attendance") {
+      if (form.get("confirmed") !== "on")
+        return {
+          error: "Confirm attendance and the selected Pass before recording.",
+        };
+      const bookingId = await backfillAttendance(actor, {
+        customerId: params.clientId,
+        sessionId: form.get("sessionId"),
+        entitlementId: form.get("entitlementId"),
+        reason: form.get("reason"),
+        idempotencyKey: form.get("idempotencyKey"),
+      });
+      return {
+        message: `Attendance recorded. One Pass credit used. Reference: ${bookingId}`,
+      };
+    }
     if (form.get("intent") === "book-class") {
       if (form.get("confirmed") !== "on")
         return { error: "Confirm the client, class and Pass before booking." };
@@ -118,6 +144,12 @@ export default function Client() {
           <StaffBookingForm
             key={`booking:${data.idempotencyKey}`}
             options={data.bookingOptions}
+            clientName={data.data.client.name}
+            idempotencyKey={data.idempotencyKey}
+          />
+          <AttendanceBackfillForm
+            key={`attendance:${data.idempotencyKey}`}
+            data={data.attendanceOptions}
             clientName={data.data.client.name}
             idempotencyKey={data.idempotencyKey}
           />
