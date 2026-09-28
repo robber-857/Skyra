@@ -23,8 +23,7 @@ async function listNotifications(
       id: true,
       sessionId: true,
       status: true,
-      customerId: true,
-      customer: { select: { preferredName: true } },
+      customer: { select: { preferredName: true, shopifyName: true } },
       session: {
         select: {
           startsAt: true,
@@ -50,8 +49,9 @@ async function listNotifications(
         startsAt: booking.session.startsAt.toISOString(),
         timezone: booking.session.timezone,
         customerName:
-          booking.customer.preferredName ||
-          `Customer ${booking.customerId.slice(-8)}`,
+          booking.customer.preferredName.trim() ||
+          booking.customer.shopifyName.trim() ||
+          "Name unavailable",
       },
     ];
   });
