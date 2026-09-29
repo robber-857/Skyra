@@ -1,3 +1,4 @@
+import { requireBookingTerms, recordBookingTerms } from "./booking-terms.server";
 import { z } from "zod";
 import { DomainError } from "../lib/errors.server";
 import { withAttempt, type BookingActor } from "./booking.server";
@@ -15,8 +16,8 @@ export async function resumeBookingCheckout(
   raw: unknown,
   storefront: GraphQL,
 ) {
-  const data = input.parse(raw);
-  async function target() {
+  const data = input.parse(requireBookingTerms(raw));
+  async function target(recordConsent = false) {
     const result = await bookingResult(actor, data);
     if (!("resumeAvailable" in result) || !result.resumeAvailable)
       throw new DomainError(
@@ -51,6 +52,7 @@ export async function resumeBookingCheckout(
           "Your payment hold has ended. Check your booking status.",
           409,
         );
+      if (recordConsent) await recordBookingTerms(tx, shop.id, actor.customerGid!, hold.checkout.id, now);
       return {
         checkout: hold.checkout,
         expiresAt: hold.expiresAt,
@@ -67,7 +69,7 @@ export async function resumeBookingCheckout(
       409,
     );
   const checkoutUrl = assertBookingCart(cart, before.checkout, before.domain);
-  const after = await target();
+  const after = await target(true);
   if (
     after.checkout.id !== before.checkout.id ||
     after.checkout.cartId !== before.checkout.cartId

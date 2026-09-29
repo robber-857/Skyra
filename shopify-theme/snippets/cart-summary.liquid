@@ -257,15 +257,17 @@
   </div>
 </div>
 
+<skyra-terms-gate>
+{% render 'skyra-terms-consent', form_id: 'cart-form' %}
 <div class="cart__ctas">
   <button
     type="submit"
     id="checkout"
     class="cart__checkout-button button"
     name="checkout"
-    {% if cart == empty %}
-      disabled
-    {% endif %}
+    data-terms-checkout
+    data-cart-empty="{% if cart == empty %}true{% else %}false{% endif %}"
+    disabled
     form="cart-form"
   >
     <span class="button-text">
@@ -280,10 +282,11 @@
         {% if accelerated_checkout_buttons_layout == 'vertical' %}additional-checkout-buttons--vertical{% endif %}
       "
     >
-      {{ content_for_additional_checkout_buttons }}
+      <div data-terms-payment hidden inert>{{ content_for_additional_checkout_buttons }}</div>
     </div>
   {% endif %}
 </div>
+</skyra-terms-gate>
 
 {% stylesheet %}
   .cart-actions {

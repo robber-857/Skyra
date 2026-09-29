@@ -1,3 +1,4 @@
+import { requireBookingTerms, recordBookingTerms } from "./booking-terms.server";
 import { createHash, randomBytes } from "node:crypto";
 import type { BookingAttempt, Prisma, Shop } from "@prisma/client";
 import { z } from "zod";
@@ -252,7 +253,7 @@ export async function prepareBookingCheckout(
   raw: unknown,
   clientsForShop: (domain: string) => Promise<CommerceClients>,
 ) {
-  const input = holdInput.parse(raw);
+  const input = holdInput.parse(requireBookingTerms(raw));
   if (
     !actor.customerGid ||
     !/^gid:\/\/shopify\/Customer\/[1-9]\d*$/.test(actor.customerGid)
@@ -303,7 +304,10 @@ export async function prepareBookingCheckout(
   const claim = await withContext(actor, input, async (tx, context) => {
     sameCatalog(before, context);
     assertReplayable(context);
-    if (context.checkout) return { intent: context.checkout, creating: false };
+    if (context.checkout) {
+      await recordBookingTerms(tx, actor.shopId, actor.customerGid!, context.checkout.id, new Date());
+      return { intent: context.checkout, creating: false };
+    }
     const intent = await tx.bookingCheckout.create({
       data: {
         shopId: actor.shopId,
@@ -327,6 +331,7 @@ export async function prepareBookingCheckout(
         after: { holdId: intent.holdId },
       },
     });
+    await recordBookingTerms(tx, actor.shopId, actor.customerGid!, intent.id, new Date());
     return { intent, creating: true };
   });
   const { intent, creating } = claim;

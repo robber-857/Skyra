@@ -1,3 +1,4 @@
+import bookingTerms from "../app/lib/booking-terms.json";
 import {
   prepareNativeBookingCart,
   submitNativeCheckout,
@@ -217,6 +218,23 @@ window.SkyraBookingTransaction = function ({
     if (!response.ok) { const error = new Error(data.error || "We could not check your booking."); error.code=data.code; error.status=response.status; error.bookingError=true; throw error; }
     return data;
   }
+  function paymentConsent(main, proceed, available = true) {
+    const label = el("label", "skyra-booking__terms"), checkbox = el("input"), copy = el("span");
+    checkbox.type = "checkbox";
+    checkbox.required = true;
+    copy.append(document.createTextNode("I have read and agree to the "));
+    const link = el("a", "", "Terms & Conditions");
+    link.href = bookingTerms.url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    copy.append(link, document.createTextNode("."));
+    label.append(checkbox, copy);
+    proceed.disabled = true;
+    checkbox.addEventListener("change", () => { proceed.disabled = !available || !checkbox.checked; });
+    main.append(label);
+    return () => checkbox.checked;
+  }
+  const termsAcceptance = {accepted: true, version: bookingTerms.version};
   function resultView(data, retry) {
     const copy = {
       CONFIRMED:["Booking confirmed", "Your place is reserved. You can find the class details here."],
@@ -236,7 +254,9 @@ window.SkyraBookingTransaction = function ({
     main.append(el("p", "skyra-booking__notice", text[1]));
     if(data.resumeAvailable) {
       main.append(el("p", "skyra-booking__notice", "Your place is temporarily held until " + format(data.holdExpiresAt, {hour:"numeric",minute:"2-digit"}) + ". If you have not paid, continue the existing checkout below."));
-      main.append(button("Continue payment", "skyra-booking__primary", resumePayment));
+      const proceed = button("Continue payment", "skyra-booking__primary", () => { if (accepted()) resumePayment(); });
+      const accepted = paymentConsent(main, proceed);
+      main.append(proceed);
     }
     if(data.bookingReference) main.append(el("p", "", "Booking reference: " + data.bookingReference));
     if (!["CONFIRMED","ATTENDED","CANCELLED","LATE_CANCEL","NO_SHOW"].includes(data.status))
@@ -252,7 +272,7 @@ window.SkyraBookingTransaction = function ({
     const version=++revision;
     frame("Opening your existing checkout").append(el("p", "skyra-booking__notice", "Checking your current payment and seat hold…"));
     try {
-      const data=await resultRequest("/resume");
+      const data=await resultRequest("/resume", {termsAcceptance});
       if(version!==revision || !root.contains(host)) return;
       const url=new URL(data.checkoutUrl);
       if(data.status!=="CHECKOUT_READY" || url.protocol!=="https:" || url.username || url.password) throw new Error("Invalid checkout response");
@@ -284,6 +304,7 @@ window.SkyraBookingTransaction = function ({
       const purchaseKind=kind(pass);
       const data=await resultRequest("/checkout", {
         purchaseKind,
+        termsAcceptance,
         idempotencyKey,
         ...(purchaseKind === "NEW_PASS" ? {passPlanId:pass.id} : {}),
       });
@@ -301,7 +322,7 @@ window.SkyraBookingTransaction = function ({
         throw new Error("Shopify returned an invalid Checkout URL.");
       window.location.assign(checkoutUrl.href);
     } catch(error) {
-      if(version===revision && root.contains(host)) errorView(error, ()=>openCheckout(pass, idempotencyKey));
+      if(version===revision && root.contains(host)) errorView(error, error.code === "TERMS_REQUIRED" ? review : ()=>openCheckout(pass, idempotencyKey));
     }
   }
   async function confirm(pass) {
@@ -402,10 +423,11 @@ window.SkyraBookingTransaction = function ({
         "skyra-booking__primary",
         () => {
           if(ownedPass && data.ownedPassesAvailable) confirm(pass);
-          if(!ownedPass && data.checkoutAvailable) openCheckout(pass);
+          if(!ownedPass && data.checkoutAvailable && accepted()) openCheckout(pass);
         },
       );
       checkout.disabled = ownedPass ? !data.ownedPassesAvailable : !data.checkoutAvailable;
+      const accepted = ownedPass ? () => true : paymentConsent(main, checkout, data.checkoutAvailable);
       main.append(checkout);
     } catch (error) {
       if (version === revision && root.contains(host)) errorView(error, load);

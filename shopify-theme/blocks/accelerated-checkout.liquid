@@ -36,7 +36,10 @@
       hidden
     {% endunless %}
   >
-    {{ accelerated_checkout_button }}
+    <skyra-terms-gate>
+      {% render 'skyra-terms-consent' %}
+      <div data-terms-payment hidden inert>{{ accelerated_checkout_button }}</div>
+    </skyra-terms-gate>
   </div>
 {% endif %}
 

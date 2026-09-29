@@ -704,3 +704,5 @@ body [data-skyra-booking-root] .skyra-booking__detail h3 {
 }
 .skyra-booking__note { display:block; margin:20px 0 8px; font-weight:600; }
 .skyra-booking__note textarea { display:block; width:100%; box-sizing:border-box; padding:12px; margin-top:8px; border:1px solid #b6bbb5; border-radius:8px; font:inherit; font-weight:400; resize:vertical; }
+
+.skyra-booking__terms{display:flex;align-items:flex-start;gap:12px;margin:20px 0;line-height:1.5;font-size:14px;cursor:pointer}.skyra-booking__terms input{appearance:auto;width:20px;height:20px;flex:0 0 20px;margin:1px 0;accent-color:#202020}.skyra-booking__terms a{color:inherit;text-decoration:underline;text-underline-offset:3px}.skyra-booking__terms input:focus-visible{outline:2px solid currentColor;outline-offset:3px}
