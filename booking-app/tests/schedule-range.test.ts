@@ -587,3 +587,101 @@ test("copy rolls back replacement when a conflicting booking has no refundable l
     }),
   ).toBe(0);
 });
+
+test("skip mode fills gaps without changing conflicting sessions, bookings or checkout holds", async () => {
+  const f = await fixture();
+  await f.add("2035-07-02T10:00");
+  await f.add("2035-07-02T12:00");
+  await f.add("2035-07-02T14:00");
+  const [conflict] = await f.add("2035-07-09T10:15");
+  const [identical] = await f.add("2035-07-09T12:00");
+  const customer = await db.customerProfile.create({
+    data: {
+      shopId: f.shop.id,
+      shopifyCustomerGid: "gid://shopify/Customer/12345",
+    },
+  });
+  const booking = await db.booking.create({
+    data: {
+      shopId: f.shop.id,
+      sessionId: conflict.id,
+      customerId: customer.id,
+    },
+  });
+  const holdingCustomer = await db.customerProfile.create({
+    data: { shopId: f.shop.id, shopifyCustomerGid: "gid://shopify/Customer/67890" },
+  });
+  const attempt = await db.bookingAttempt.create({
+    data: {
+      shopId: f.shop.id,
+      sessionId: conflict.id,
+      customerId: holdingCustomer.id,
+      tokenHash: randomUUID(),
+      surface: "HOME",
+      status: "HOLD_ACTIVE",
+      expiresAt: new Date(Date.now() + 600000),
+    },
+  });
+  const hold = await db.bookingHold.create({
+    data: {
+      shopId: f.shop.id,
+      sessionId: conflict.id,
+      customerId: holdingCustomer.id,
+      attemptId: attempt.id,
+      purchaseKind: "DROP_IN",
+      idempotencyKey: randomUUID(),
+      expiresAt: new Date(Date.now() + 600000),
+    },
+  });
+  expect(await copyPreviousWeek(f.actor, "2035-07-09", "skip")).toMatchObject({
+    copied: 1,
+    skippedConflicts: 1,
+    preserved: 1,
+    replaced: 0,
+    cancelledBookings: 0,
+  });
+  expect(
+    await db.classSession.findUnique({ where: { id: conflict.id } }),
+  ).toEqual(conflict);
+  expect(
+    await db.classSession.findUnique({ where: { id: identical.id } }),
+  ).toEqual(identical);
+  expect(await db.booking.findUnique({ where: { id: booking.id } })).toEqual(
+    booking,
+  );
+  expect(await db.bookingHold.findUnique({ where: { id: hold.id } })).toEqual(
+    hold,
+  );
+  expect(
+    await db.bookingAttempt.findUnique({ where: { id: attempt.id } }),
+  ).toEqual(attempt);
+  expect(
+    await db.bookingNotification.count({ where: { shopId: f.shop.id } }),
+  ).toBe(0);
+  expect(
+    await db.entitlementLedgerEntry.count({ where: { shopId: f.shop.id } }),
+  ).toBe(0);
+  expect(await copyPreviousWeek(f.actor, "2035-07-09", "skip")).toMatchObject({
+    copied: 0,
+    skippedConflicts: 1,
+    preserved: 2,
+    replaced: 0,
+  });
+});
+
+test("skip mode copies remaining current-week classes even when earlier occurrences have passed", async () => {
+  const f = await fixture();
+  await f.add("2035-07-02T10:00");
+  await f.add("2035-07-06T10:00");
+  setDate("2035-07-11T00:00:00Z");
+  expect(await copyPreviousWeek(f.actor, "2035-07-09", "skip")).toMatchObject({
+    copied: 1,
+    skippedUnavailable: 1,
+    replaced: 0,
+  });
+  expect(await copyPreviousWeek(f.actor, "2035-07-09", "skip")).toMatchObject({
+    copied: 0,
+    skippedUnavailable: 1,
+    preserved: 1,
+  });
+});

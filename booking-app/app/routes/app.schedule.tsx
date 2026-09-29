@@ -62,9 +62,17 @@ export async function action({ request }: ActionFunctionArgs) {
       };
     }
     if (form.get("intent") === "copy") {
-      const result = await copyPreviousWeek(actor, String(form.get("week")));
+      const mode = form.get("copyMode") ?? "skip";
+      const result = await copyPreviousWeek(
+        actor,
+        String(form.get("week")),
+        mode,
+      );
       return {
-        message: `${result.copied} draft session(s) copied. ${result.replaced} conflicting session(s) replaced. ${result.preserved} identical session(s) kept. ${result.cancelledBookings} booking(s) cancelled with credits returned.`,
+        message:
+          mode === "skip"
+            ? `${result.copied} draft session(s) copied. ${result.skippedConflicts} conflicting occurrence(s) skipped. ${result.preserved} identical session(s) kept. ${result.skippedUnavailable} past or unavailable occurrence(s) skipped. Existing sessions and bookings were kept.`
+            : `${result.copied} draft session(s) copied. ${result.replaced} conflicting session(s) replaced. ${result.preserved} identical session(s) kept. ${result.cancelledBookings} booking(s) cancelled with credits returned.`,
       };
     }
     if (form.get("intent") === "publish") {
@@ -103,6 +111,7 @@ export default function Schedule() {
       "",
   );
   const [coachFilter, setCoachFilter] = useState("");
+  const [copyMode, setCopyMode] = useState("skip");
   const activeCoachIds = new Set(
     data.coaches
       .filter((coach) => coach.status === "ACTIVE")
@@ -304,10 +313,13 @@ export default function Schedule() {
         <div className="schedule-actions">
           <Form
             method="post"
+            className="schedule-copy-form"
             onSubmit={(event) => {
               if (
                 !window.confirm(
-                  "Copy the previous week? Conflicting sessions will be replaced. Their bookings will be cancelled and credits returned. Identical sessions and their bookings will be kept.",
+                  copyMode === "skip"
+                    ? "Copy only non-conflicting classes from the previous week as drafts? Existing sessions and bookings will be kept. Past or unavailable occurrences will be skipped."
+                    : "Copy the previous week? Conflicting sessions will be replaced. Their bookings will be cancelled and credits returned. Identical sessions and their bookings will be kept.",
                 )
               )
                 event.preventDefault();
@@ -315,9 +327,21 @@ export default function Schedule() {
           >
             <input type="hidden" name="intent" value="copy" />
             <input type="hidden" name="week" value={data.week} />
-            <button disabled={busy}>
-              Copy previous week &amp; replace conflicts
-            </button>
+            <label>
+              When copying last week
+              <select
+                name="copyMode"
+                value={copyMode}
+                onChange={(event) => setCopyMode(event.target.value)}
+                disabled={busy}
+              >
+                <option value="skip">
+                  Keep existing sessions · skip conflicts
+                </option>
+                <option value="replace">Replace conflicting sessions</option>
+              </select>
+            </label>
+            <button disabled={busy}>Copy previous week</button>
           </Form>
           <Form method="post">
             <input type="hidden" name="intent" value="publish" />

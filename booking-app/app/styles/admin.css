@@ -685,8 +685,17 @@ body:has(.reports-workspace) { background: #eef1ef; }
 }
 .schedule-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
+}
+.schedule-copy-form {
+  display: grid;
+  gap: 8px;
+  max-width: 100%;
+}
+.schedule-copy-form select {
+  width: 100%;
 }
 .schedule-actions form,
 .schedule-remove-form {

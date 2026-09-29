@@ -525,8 +525,13 @@ export async function scheduleData(shopId: string, day: string) {
   return { sessions, week: range.label, timezone: shop.timezone };
 }
 
-export async function copyPreviousWeek(actor: Actor, day: string) {
+export async function copyPreviousWeek(
+  actor: Actor,
+  day: string,
+  rawMode: unknown = "replace",
+) {
   requireOperations(actor);
+  const mode = z.enum(["skip", "replace"]).parse(rawMode);
   return db.$transaction(
     async (tx) => {
       await lockShop(tx, actor.shopId);
@@ -546,11 +551,14 @@ export async function copyPreviousWeek(actor: Actor, day: string) {
           startsAt: { gte: previous, lt: target.start },
         },
         include: { service: true, coach: true },
+        orderBy: [{ startsAt: "asc" }, { id: "asc" }],
       });
       let count = 0;
       let replaced = 0;
       let preserved = 0;
       let cancelledBookings = 0;
+      let skippedConflicts = 0;
+      let skippedUnavailable = 0;
       const createdIds = new Set<string>();
       for (const source of sources) {
         let dedupeKey = "copy-" + source.id + "-" + target.label;
@@ -588,11 +596,16 @@ export async function copyPreviousWeek(actor: Actor, day: string) {
           source.service.status !== "ACTIVE" ||
           source.coach.status !== "ACTIVE" ||
           !assignment
-        )
+        ) {
+          if (mode === "skip") {
+            skippedUnavailable++;
+            continue;
+          }
           throw new DomainError(
             "INVALID_ASSIGNMENT",
             "A previous-week class or coach is no longer available.",
           );
+        }
         const conflicts = await tx.classSession.findMany({
           where: {
             shopId: actor.shopId,
@@ -617,7 +630,10 @@ export async function copyPreviousWeek(actor: Actor, day: string) {
         )) {
           await tx.$queryRaw`SELECT id FROM "ClassSession" WHERE id=${conflict.id}::uuid AND "shopId"=${actor.shopId}::uuid FOR UPDATE`;
         }
-        if (conflicts.some((conflict) => createdIds.has(conflict.id)))
+        if (
+          mode === "replace" &&
+          conflicts.some((conflict) => createdIds.has(conflict.id))
+        )
           throw new DomainError(
             "SCHEDULE_CONFLICT",
             "The previous week's classes overlap after copying. Check their times and coach buffers.",
@@ -634,6 +650,11 @@ export async function copyPreviousWeek(actor: Actor, day: string) {
         ) {
           createdIds.add(conflicts[0].id);
           preserved++;
+          continue;
+        }
+        // Preserve existing sessions, rosters, credits and checkout holds untouched.
+        if (mode === "skip" && conflicts.length > 0) {
+          skippedConflicts++;
           continue;
         }
         const conflictIds = conflicts.map((conflict) => conflict.id);
@@ -795,7 +816,14 @@ export async function copyPreviousWeek(actor: Actor, day: string) {
         createdIds.add(session.id);
         count++;
       }
-      return { copied: count, replaced, preserved, cancelledBookings };
+      return {
+        copied: count,
+        replaced,
+        preserved,
+        cancelledBookings,
+        skippedConflicts,
+        skippedUnavailable,
+      };
     },
     { timeout: 15000 },
   );
