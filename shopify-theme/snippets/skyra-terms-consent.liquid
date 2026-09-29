@@ -5,7 +5,7 @@
 {{ 'skyra-terms-consent.css' | asset_url | stylesheet_tag }}
 <script src="{{ 'skyra-terms-consent.js' | asset_url }}" defer></script>
 <label class="skyra-terms-consent">
-  <input type="checkbox" data-terms-consent required
-    {% if form_id %}form="{{ form_id }}" name="attributes[Terms and Conditions]" value="Agreed: skyra-terms-2026-09-29; https://skyrastudio.com.au/pages/term-conditions"{% endif %}>
+  <input type="checkbox" data-terms-consent
+    {% if form_id %}required form="{{ form_id }}" name="attributes[Terms and Conditions]" value="Agreed: skyra-terms-2026-09-29; https://skyrastudio.com.au/pages/term-conditions"{% endif %}>
   <span>I have read and agree to the <a href="/pages/term-conditions" target="_blank" rel="noopener noreferrer">Terms &amp; Conditions</a>.</span>
 </label>

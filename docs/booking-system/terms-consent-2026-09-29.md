@@ -10,3 +10,5 @@
 Validation: 580 tests, app typechecks/lint/build, theme validation; synthetic browser checks for unchecked/checked/uncheck and resume, and 390px layout. No actual payment or legal acceptance made during testing.
 
 Release must preserve active Shopify scopes (no new write_customers permission). Remote theme sections contained newer merchant edits; the selective theme release is based on their downloaded originals, changing only the Terms link. Backup: `tmp/terms-live-backup/`; staged release: `tmp/terms-theme-release/` (both ignored).
+
+Released: backend commit `701c2c6`, CI run `36566225826` success, Render `dep-datqknrrjlhs73c0d7p0` Live and `/health` 200. Shopify version `skyra-terms-consent-20260929` (`1148188590081`) released. Selective theme upload to live theme `155942944935` succeeded. Live product/cart confirmed unchecked consent and disabled checkout; adding an item requires no consent and the temporary item was removed, restoring the empty cart. Contact and Privacy public pages show hello@skyrastudio.com.au.
