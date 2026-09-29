@@ -15,6 +15,7 @@ export async function adminSessionDetail(actor: Actor, id: unknown) {
     where: { id: parsed.data, shopId: actor.shopId },
     select: {
       id: true,
+      version: true,
       startsAt: true,
       endsAt: true,
       timezone: true,

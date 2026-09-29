@@ -1,6 +1,7 @@
 import {
   useLoaderData,
   useActionData,
+  redirect,
   type LoaderFunctionArgs,
   type ActionFunctionArgs,
 } from "react-router";
@@ -10,12 +11,25 @@ import { adminSessionDetail } from "../services/admin-session.server";
 import { DomainError, publicError } from "../lib/errors.server";
 import { backfillSessionTimeChange } from "../services/session-change-notifications.server";
 import { refreshMailDeliveryStatus } from "../services/mail-delivery-status.server";
+import { removeSession } from "../services/schedule.server";
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const { actor } = await adminContext(request);
+  const { actor, shop } = await adminContext(request);
   const form = await request.formData();
   try {
     const session = await adminSessionDetail(actor, params.id);
+    if (form.get("intent") === "remove") {
+      await removeSession(actor, {
+        id: session.id,
+        version: form.get("version"),
+      });
+      const week = DateTime.fromJSDate(session.startsAt, {
+        zone: shop.timezone,
+      })
+        .startOf("week")
+        .toISODate()!;
+      return redirect(`/app/schedule?week=${week}`);
+    }
     if (form.get("intent") === "backfill-time-change") {
       const count = await backfillSessionTimeChange(
         actor,

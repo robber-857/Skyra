@@ -163,6 +163,29 @@ export function AdminSessionDetailView({
           </Link>
         )}
       </header>
+      {(s.status === "DRAFT" || s.canEdit) && (
+        <Form
+          method="post"
+          onSubmit={(event) => {
+            if (
+              !window.confirm(
+                `Delete ${s.service.name} from Weekly Schedule? This removes this session only.`,
+              )
+            )
+              event.preventDefault();
+          }}
+        >
+          <input type="hidden" name="intent" value="remove" />
+          <input type="hidden" name="version" value={s.version} />
+          <button className="danger-text" disabled={busy}>
+            Delete session
+          </button>
+          <p className="muted">
+            Bookings must be resolved and active checkout holds cleared before
+            deletion.
+          </p>
+        </Form>
+      )}
       <section className="panel" aria-label="Session summary">
         <div className="schedule-calendar-head">
           <p>

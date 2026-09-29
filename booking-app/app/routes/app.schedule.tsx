@@ -15,7 +15,7 @@ import {
   addSessions,
   publishWeek,
   copyPreviousWeek,
-  cancelDraft,
+  removeSession,
   scheduleData,
   updateSession,
 } from "../services/schedule.server";
@@ -82,8 +82,8 @@ export async function action({ request }: ActionFunctionArgs) {
       };
     }
     if (form.get("intent") === "remove") {
-      await cancelDraft(actor, String(form.get("id")));
-      return { message: "Draft removed." };
+      await removeSession(actor, Object.fromEntries(form));
+      return { message: "Session deleted from Weekly Schedule." };
     }
     return { error: "Unknown action." };
   } catch (error) {
@@ -568,12 +568,25 @@ export default function Schedule() {
               </button>
             </div>
           </Form>
-          {editing.status === "DRAFT" && (
-            <Form method="post" className="schedule-remove-form">
+          {(editing.status === "DRAFT" ||
+            new Date(editing.startsAt) > new Date()) && (
+            <Form
+              method="post"
+              className="schedule-remove-form"
+              onSubmit={(event) => {
+                if (
+                  !window.confirm(
+                    `Delete ${editing.service.name} from Weekly Schedule? This removes this session only.`,
+                  )
+                )
+                  event.preventDefault();
+              }}
+            >
               <input name="intent" type="hidden" value="remove" />
               <input name="id" type="hidden" value={editing.id} />
+              <input name="version" type="hidden" value={editing.version} />
               <button className="danger-text" disabled={busy}>
-                Remove draft
+                Delete session
               </button>
             </Form>
           )}

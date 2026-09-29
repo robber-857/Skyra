@@ -423,17 +423,60 @@ export async function publishWeek(actor: Actor, day: string) {
     return { published, skipped };
   });
 }
-export async function cancelDraft(actor: Actor, id: string) {
+export async function removeSession(actor: Actor, raw: unknown) {
   requireOperations(actor);
+  const { id, version } = z
+    .object({
+      id: z.string().uuid(),
+      version: z.coerce.number().int().positive(),
+    })
+    .parse(raw);
   return db.$transaction(async (tx) => {
     await lockShop(tx, actor.shopId);
+    await tx.$queryRaw`SELECT id FROM "ClassSession" WHERE "shopId" = ${actor.shopId}::uuid AND id = ${id}::uuid FOR UPDATE`;
     const session = await tx.classSession.findFirst({
       where: { id, shopId: actor.shopId },
     });
-    if (!session || session.status !== "DRAFT")
+    if (!session) throw new DomainError("NOT_FOUND", "Session not found.", 404);
+    if (session.version !== version)
       throw new DomainError(
-        "NOT_DRAFT",
-        "Only draft sessions can be removed here.",
+        "CONFLICT",
+        "This session changed in another window. Refresh and try again.",
+        409,
+      );
+    if (!["DRAFT", "PUBLISHED"].includes(session.status))
+      throw new DomainError("NOT_REMOVABLE", "This session cannot be deleted.");
+    if (session.status === "PUBLISHED" && session.startsAt <= new Date())
+      throw new DomainError(
+        "PAST_SESSION",
+        "Past published sessions cannot be deleted.",
+      );
+    const bookings = await tx.booking.count({
+      where: {
+        shopId: actor.shopId,
+        sessionId: id,
+        status: { in: ["CONFIRMED", "ATTENDED", "NO_SHOW", "LATE_CANCEL"] },
+      },
+    });
+    if (bookings)
+      throw new DomainError(
+        "HAS_BOOKINGS",
+        "This session has bookings or attendance records. Resolve its bookings before deleting it.",
+        409,
+      );
+    const holds = await tx.bookingHold.count({
+      where: {
+        shopId: actor.shopId,
+        sessionId: id,
+        status: "ACTIVE",
+        expiresAt: { gt: new Date() },
+      },
+    });
+    if (holds)
+      throw new DomainError(
+        "ACTIVE_HOLDS",
+        "This session has an active checkout hold. Try again after the hold expires.",
+        409,
       );
     await tx.classSession.update({
       where: { id },
@@ -442,9 +485,9 @@ export async function cancelDraft(actor: Actor, id: string) {
     await audit(
       tx,
       actor,
-      "DRAFT_CANCELLED",
+      session.status === "DRAFT" ? "DRAFT_CANCELLED" : "SESSION_CANCELLED",
       id,
-      { status: "DRAFT" },
+      { status: session.status },
       { status: "CANCELLED" },
     );
   });
