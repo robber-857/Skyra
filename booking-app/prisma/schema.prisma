@@ -429,6 +429,8 @@ model BookingNotification {
   recipientKind     String
   recipientId       String    @db.Uuid
   template          String    @default("BOOKING_CONFIRMED_V1")
+  eventKey          String    @default("")
+  snapshot          Json?
   status            String    @default("PENDING")
   attempts          Int       @default(0)
   availableAt       DateTime  @default(now()) @db.Timestamptz
@@ -436,10 +438,13 @@ model BookingNotification {
   acceptedAt        DateTime? @db.Timestamptz
   readAt            DateTime? @db.Timestamptz
   providerMessageId String?
+  deliveryStatus    String?
+  deliveryCheckedAt DateTime? @db.Timestamptz
+  deliveryError     String?
   lastError         String?
   createdAt         DateTime  @default(now()) @db.Timestamptz
 
-  @@unique([shopId, bookingId, recipientKind, recipientId, template])
+  @@unique([shopId, bookingId, recipientKind, recipientId, template, eventKey], name: "notificationEvent", map: "BookingNotification_event_key")
   @@index([status, availableAt])
 }
 

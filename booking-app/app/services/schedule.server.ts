@@ -16,6 +16,11 @@ import {
   restoreConsumedCredit,
 } from "./entitlements.server";
 import { enqueueBookingNotifications } from "./booking-notifications.server";
+import {
+  enqueueSessionTimeChange,
+  lockSessionMail,
+  timeChanged,
+} from "./session-change-notifications.server";
 function assertScheduleStart(startsAt: Date, timezone: string) {
   const day = DateTime.fromJSDate(startsAt, { zone: timezone }).toISODate();
   if (!day || !isScheduleDateInRange(day))
@@ -191,6 +196,7 @@ export async function updateSession(actor: Actor, raw: unknown) {
   const input = updateInput.parse(raw);
   return db.$transaction(async (tx) => {
     await lockShop(tx, actor.shopId);
+    await lockSessionMail(tx, input.id);
     const current = await tx.classSession.findFirst({
       where: { id: input.id, shopId: actor.shopId },
       include: {
@@ -329,7 +335,17 @@ export async function updateSession(actor: Actor, raw: unknown) {
       where: { id: current.id },
     });
     await audit(tx, actor, "SESSION_UPDATED", current.id, current, saved);
-    return saved;
+    const notifiedCustomers =
+      current.status === "PUBLISHED" && timeChanged(current, saved)
+        ? await enqueueSessionTimeChange(
+            tx,
+            actor.shopId,
+            saved.id,
+            current,
+            `session:${saved.id}:version:${saved.version}`,
+          )
+        : 0;
+    return { ...saved, notifiedCustomers };
   });
 }
 export async function publishWeek(actor: Actor, day: string) {

@@ -10,6 +10,7 @@ import { bookingOperationsData } from "../services/booking-operations.server";
 import { refreshClientContacts } from "../services/client-contacts.server";
 import { publicError } from "../lib/errors.server";
 import { Status } from "../components/admin-ui";
+import { EmailStatus } from "../components/email-status";
 export async function loader({ request }: LoaderFunctionArgs) {
   const { actor, admin } = await adminContext(request);
   const params = new URL(request.url).searchParams;
@@ -202,10 +203,10 @@ export default function Bookings() {
           · 8 per page
         </p>
         <p className="muted">
-          Booking confirmation, reminder and cancellation emails. Each row is
-          one notification; retries update its attempt count. Preview email
-          generates current content and does not send it or confirm inbox
-          delivery.
+          Booking confirmation, time-change, reminder and cancellation emails.
+          Each row is one notification; retries update its attempt count.
+          Preview email generates current content and does not send it or
+          confirm inbox delivery.
         </p>
         <details className="booking-email-help">
           <summary>What do email statuses mean?</summary>
@@ -235,14 +236,20 @@ export default function Bookings() {
                       ? "Admin notification"
                       : item.template === "BOOKING_REMINDER_V1"
                         ? "Customer reminder"
-                        : "Customer confirmation"}
+                        : item.template === "SESSION_TIME_CHANGED_V1"
+                          ? "Customer time change"
+                          : item.template === "BOOKING_CANCELLED_V1"
+                            ? "Customer cancellation"
+                            : "Customer confirmation"}
                 </h3>
                 <p className="muted">
                   {item.template === "BOOKING_CANCELLED_V1"
                     ? "Cancellation"
-                    : item.template === "BOOKING_REMINDER_V1"
-                      ? "12-hour reminder · Scheduled for"
-                      : "Confirmation · Created"}{" "}
+                    : item.template === "SESSION_TIME_CHANGED_V1"
+                      ? "Class time changed · Created"
+                      : item.template === "BOOKING_REMINDER_V1"
+                        ? "12-hour reminder · Scheduled for"
+                        : "Confirmation · Created"}{" "}
                   {new Date(
                     item.template === "BOOKING_REMINDER_V1"
                       ? item.availableAt
@@ -256,7 +263,11 @@ export default function Bookings() {
                   </Link>
                 </p>
                 <p className="muted">
-                  {item.status} · {item.attempts} attempt(s)
+                  <EmailStatus
+                    status={item.status}
+                    deliveryStatus={item.deliveryStatus}
+                  />{" "}
+                  · {item.attempts} attempt(s)
                   {item.lastError ? ` · ${item.lastError}` : ""}
                 </p>
               </div>

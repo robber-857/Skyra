@@ -3,6 +3,12 @@ import db from "../db.server";
 import { databaseNow } from "./booking.server";
 import { DateTime } from "luxon";
 import { DomainError } from "../lib/errors.server";
+import {
+  lockSessionMail,
+  SESSION_TIME_CHANGED,
+  sessionChangeSnapshot,
+  timeChanged,
+} from "./session-change-notifications.server";
 
 export async function enqueueBookingNotifications(
   tx: Prisma.TransactionClient,
@@ -30,7 +36,8 @@ export async function enqueueBookingNotifications(
   ]) {
     await tx.bookingNotification.upsert({
       where: {
-        shopId_bookingId_recipientKind_recipientId_template: {
+        notificationEvent: {
+          eventKey: "",
           shopId,
           bookingId,
           ...recipient,
@@ -53,7 +60,8 @@ export async function enqueueBookingNotifications(
     );
     await tx.bookingNotification.upsert({
       where: {
-        shopId_bookingId_recipientKind_recipientId_template: {
+        notificationEvent: {
+          eventKey: "",
           shopId,
           bookingId,
           recipientKind: "CUSTOMER",
@@ -83,6 +91,7 @@ const escape = (value: string) =>
       ]!,
   );
 export type BookingEmailDetails = {
+  previousTime?: { startsAt: Date; endsAt: Date; timezone: string };
   cancellation?: "CANCELLED" | "LATE_CANCEL";
   reminder?: boolean;
   recipientKind: "CUSTOMER" | "COACH" | "ADMIN";
@@ -105,22 +114,36 @@ export function renderBookingEmail(details: BookingEmailDetails) {
     throw new DomainError("INVALID_TIMEZONE", "Cannot render booking time.");
   const isOperations = ["COACH", "ADMIN"].includes(details.recipientKind);
   const isCoach = details.recipientKind === "COACH";
-  const heading = details.cancellation
-    ? "Booking cancelled"
-    : details.reminder
-      ? "Your class starts soon"
-      : isCoach
-        ? "A new booking for your class"
-        : details.recipientKind === "ADMIN"
-          ? "A new studio booking"
-          : "Your booking is confirmed";
+  const heading = details.previousTime
+    ? "Your class time has changed"
+    : details.cancellation
+      ? "Booking cancelled"
+      : details.reminder
+        ? "Your class starts soon"
+        : isCoach
+          ? "A new booking for your class"
+          : details.recipientKind === "ADMIN"
+            ? "A new studio booking"
+            : "Your booking is confirmed";
   const subject =
-    `${details.cancellation ? "Booking cancelled" : details.reminder ? "Class reminder" : isOperations ? "New booking" : "Booking confirmed"}: ${details.className}`.replace(
+    `${details.previousTime ? "Class time changed" : details.cancellation ? "Booking cancelled" : details.reminder ? "Class reminder" : isOperations ? "New booking" : "Booking confirmed"}: ${details.className}`.replace(
       /[\r\n]/g,
       " ",
     );
   const rows = [
     ["Class", details.className],
+    ...(details.previousTime
+      ? [
+          [
+            "Previous time",
+            `${DateTime.fromJSDate(details.previousTime.startsAt, { zone: details.previousTime.timezone }).setLocale("en-AU").toFormat("cccc, d LLLL yyyy · h:mm a")} – ${DateTime.fromJSDate(details.previousTime.endsAt, { zone: details.previousTime.timezone }).toFormat("h:mm a")} (${details.previousTime.timezone})`,
+          ],
+          [
+            "New time",
+            `${start.setLocale("en-AU").toFormat("cccc, d LLLL yyyy · h:mm a")} – ${end.toFormat("h:mm a")} (${details.timezone}, ${start.offsetNameShort})`,
+          ],
+        ]
+      : []),
     ["Date", start.setLocale("en-AU").toFormat("cccc, d LLLL yyyy")],
     [
       "Time",
@@ -138,15 +161,17 @@ export function renderBookingEmail(details: BookingEmailDetails) {
         ]
       : []),
   ];
-  const note = details.cancellation
-    ? details.cancellation === "CANCELLED"
-      ? "This booking has been cancelled and its reserved class credit released. Your Pass retains its original expiry and eligibility. No payment refund has been issued by this system."
-      : "This booking was cancelled after the free cancellation deadline. One class credit has been used. No payment refund has been issued by this system."
-    : details.reminder
-      ? "Your class starts in about 12 hours and your place is reserved. Free cancellation is available until 12 hours before class; after that, one class credit is used. A no-show uses one class credit; Pass credits are not returned and Drop-in payments are not refunded."
-      : isOperations
-        ? `This count reflects confirmed bookings when this email was prepared. Check ${isCoach ? "your schedule" : "Admin bookings"} for the latest roster.`
-        : "Your place is reserved. Free cancellation is available until 12 hours before class; late cancellation uses one class credit. Your booking is treated as attended by default. A no-show uses one class credit; Pass credits are not returned and Drop-in payments are not refunded. Original Pass expiry and eligibility still apply.";
+  const note = details.previousTime
+    ? "Your existing booking remains confirmed. Please use the new class time above. If you cannot attend at the new time, please contact the studio."
+    : details.cancellation
+      ? details.cancellation === "CANCELLED"
+        ? "This booking has been cancelled and its reserved class credit released. Your Pass retains its original expiry and eligibility. No payment refund has been issued by this system."
+        : "This booking was cancelled after the free cancellation deadline. One class credit has been used. No payment refund has been issued by this system."
+      : details.reminder
+        ? "Your class starts in about 12 hours and your place is reserved. Free cancellation is available until 12 hours before class; after that, one class credit is used. A no-show uses one class credit; Pass credits are not returned and Drop-in payments are not refunded."
+        : isOperations
+          ? `This count reflects confirmed bookings when this email was prepared. Check ${isCoach ? "your schedule" : "Admin bookings"} for the latest roster.`
+          : "Your place is reserved. Free cancellation is available until 12 hours before class; late cancellation uses one class credit. Your booking is treated as attended by default. A no-show uses one class credit; Pass credits are not returned and Drop-in payments are not refunded. Original Pass expiry and eligibility still apply.";
   return {
     subject,
     text: `${heading}\n\n${rows.map(([label, value]) => `${label}: ${value}`).join("\n")}\n\n${note}\n\nSkyra`,
@@ -190,6 +215,21 @@ async function prepareBookingNotification(
       404,
     );
   const reminder = notification.template === "BOOKING_REMINDER_V1";
+  const change =
+    notification.template === SESSION_TIME_CHANGED
+      ? sessionChangeSnapshot.parse(notification.snapshot)
+      : null;
+  if (
+    forDelivery &&
+    change &&
+    (timeChanged(change.next, booking.session) ||
+      booking.session.status !== "PUBLISHED" ||
+      booking.session.startsAt <= new Date())
+  )
+    throw new DomainError(
+      "NOTIFICATION_OBSOLETE",
+      "The class time changed again or the class is no longer upcoming.",
+    );
   const now = forDelivery && reminder ? await databaseNow(db) : null;
   if (
     forDelivery &&
@@ -228,6 +268,18 @@ async function prepareBookingNotification(
     bookingReference: booking.id,
     confirmedCount,
     capacity: booking.session.capacity,
+    ...(change
+      ? {
+          className: change.className,
+          coachName: change.coachName,
+          locationName: change.locationName,
+          ...change.next,
+          previousTime: change.previous,
+          bookingReference: change.bookingReference,
+          confirmedCount: change.confirmedCount,
+          capacity: change.capacity,
+        }
+      : {}),
   });
 }
 
@@ -248,6 +300,28 @@ export type BookingMailAdapter = (input: {
 >;
 
 export async function deliverBookingNotification(
+  id: string,
+  adapter: BookingMailAdapter,
+) {
+  const notification = await db.bookingNotification.findUniqueOrThrow({
+    where: { id },
+  });
+  const booking = await db.booking.findFirst({
+    where: { id: notification.bookingId, shopId: notification.shopId },
+    select: { sessionId: true },
+  });
+  return db.$transaction(
+    async (tx) => {
+      if (booking) await lockSessionMail(tx, booking.sessionId);
+      // Claim is committed independently so a process crash leaves SENDING for
+      // reconciliation, not a rolled-back PENDING job that could send twice.
+      return deliverClaimedBookingNotification(id, adapter);
+    },
+    { timeout: 25000, maxWait: 15000 },
+  );
+}
+
+async function deliverClaimedBookingNotification(
   id: string,
   adapter: BookingMailAdapter,
 ) {

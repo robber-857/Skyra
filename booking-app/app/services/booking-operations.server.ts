@@ -87,6 +87,8 @@ export async function bookingOperationsData(
         status: true,
         attempts: true,
         lastError: true,
+        deliveryStatus: true,
+        deliveryError: true,
       },
     }),
   ]);

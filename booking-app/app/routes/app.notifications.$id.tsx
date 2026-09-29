@@ -49,9 +49,10 @@ export default function NotificationPreview() {
     <main className="workspace">
       <h1>Email preview</h1>
       <p>
-        This preview uses current booking details, not a saved copy of the sent
-        email. Opening it does not send or resend an email. Past classes and
-        changed bookings can still be previewed.
+        Time-change previews preserve the original and new times recorded for
+        that change. Other previews use current booking details. Opening a
+        preview does not send or resend an email. Past classes and changed
+        bookings can still be previewed.
       </p>
       <Link to="/app/bookings">Back to bookings</Link>
       <p>{email.subject}</p>

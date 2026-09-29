@@ -75,7 +75,16 @@ export async function deliverInternalBookingMail(
     notification.recipientId,
     resolveCustomer,
   );
-  if (!to || !transactionalMailRecipientAllowed(to)) return;
+  if (!to || !transactionalMailRecipientAllowed(to)) {
+    await db.bookingNotification.updateMany({
+      where: { id, status: "PENDING" },
+      data: {
+        lastError: !to ? "RECIPIENT_UNAVAILABLE" : "TEST_RECIPIENT_RESTRICTION",
+        availableAt: new Date(Date.now() + 15 * 60000),
+      },
+    });
+    return;
+  }
   await deliverBookingNotification(id, async (input) => {
     const result = await send({
       to,
@@ -112,6 +121,13 @@ export async function sweepInternalBookingMail() {
       await deliverInternalBookingMail(job.id);
       if (++processed >= 10) break;
     } catch (error) {
+      await db.bookingNotification.updateMany({
+        where: { id: job.id, status: "PENDING" },
+        data: {
+          lastError: "RECIPIENT_LOOKUP_FAILED",
+          availableAt: new Date(Date.now() + 15 * 60000),
+        },
+      });
       log.warn(
         { err: error, notificationId: job.id },
         "Booking email recipient resolution failed",

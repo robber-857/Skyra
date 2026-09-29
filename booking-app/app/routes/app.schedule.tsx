@@ -56,8 +56,10 @@ export async function action({ request }: ActionFunctionArgs) {
       return { message: sessions.length + " draft session(s) saved." };
     }
     if (form.get("intent") === "update") {
-      await updateSession(actor, Object.fromEntries(form));
-      return { message: "Session updated." };
+      const session = await updateSession(actor, Object.fromEntries(form));
+      return {
+        message: `Session updated. ${session.notifiedCustomers} student time-change email(s) queued. View session details for email status.`,
+      };
     }
     if (form.get("intent") === "copy") {
       const result = await copyPreviousWeek(actor, String(form.get("week")));

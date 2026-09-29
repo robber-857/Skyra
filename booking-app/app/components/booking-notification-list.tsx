@@ -52,7 +52,9 @@ export function BookingNotificationList({
                   <span>
                     {item.template === "BOOKING_CANCELLED_V1"
                       ? "Booking cancelled"
-                      : "New booking"}
+                      : item.template === "SESSION_TIME_CHANGED_V1"
+                        ? "Class time changed"
+                        : "New booking"}
                   </span>
                   <time dateTime={item.createdAt}>
                     {DateTime.fromISO(item.createdAt, {
@@ -68,7 +70,8 @@ export function BookingNotificationList({
                   }).toFormat("d LLL · h:mm a")}
                 </p>
                 <p className="muted">
-                  Email job: {item.emailStatus.toLowerCase().replaceAll("_", " ")}
+                  Email job:{" "}
+                  {item.emailStatus.toLowerCase().replaceAll("_", " ")}
                 </p>
               </div>
               <div className="record-actions">

@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { sweepMailDeliveryStatus } from "../app/services/mail-delivery-status.server";
 import { sweepCoachLoginMail } from "../app/services/coach-self-service.server";
 import { sweepInternalBookingMail } from "../app/services/internal-booking-mail.server";
 import { markStaleNotificationsUnknown } from "../app/services/booking-notifications.server";
@@ -98,6 +99,7 @@ async function sweepBookings() {
     await markStaleNotificationsUnknown();
     await sweepCoachLoginMail();
     await sweepInternalBookingMail();
+    await sweepMailDeliveryStatus();
   } catch {
     log.error("Booking expiry sweep failed");
   } finally {
