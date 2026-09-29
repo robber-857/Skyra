@@ -92,7 +92,7 @@
       </section>
 
       <section class="commerce-cta reveal" aria-labelledby="program-cta-title">
-        <span class="commerce-cta__icon" aria-hidden="true">□</span>
+        <img class="commerce-cta__icon" src="{{ 'skyra-logo.png' | asset_url }}" alt="Skyra Studio" width="54" height="54" loading="lazy" />
         <div><h2 id="program-cta-title">Ready to move with us?</h2><p>Explore the schedule and choose the class that fits you.</p></div>
         <a class="commerce-button" href="#skyra-booking-programs">Book your class now <span aria-hidden="true">→</span></a>
       </section>
@@ -103,8 +103,8 @@
           <img src="{{ 'skyra-logo.png' | asset_url }}" alt="Skyra Studio" width="208" height="208" loading="lazy" />
           <p>Where movement becomes expression.</p>
           <nav class="footer-socials" aria-label="Social media">
-            <a href="{{ section.settings.instagram_url | default: 'https://www.instagram.com/' }}" aria-label="Instagram"><img src="{{ 'skyra-instagram.svg' | asset_url }}" width="24" height="24" alt="" /></a>
-            <a href="{{ section.settings.xiaohongshu_url | default: 'https://www.xiaohongshu.com/' }}" aria-label="Rednote"><img src="{{ 'skyra-xiaohongshu.svg' | asset_url }}" width="24" height="24" alt="" /></a>
+            <a href="{{ section.settings.instagram_url | default: 'https://www.instagram.com/skyradancesydney/' }}" aria-label="Instagram"><img src="{{ 'skyra-instagram.svg' | asset_url }}" width="24" height="24" alt="" /></a>
+            <a href="{{ section.settings.xiaohongshu_url | default: 'https://www.rednote.com/user/profile/69c9db750000000034013859?xsec_token=ABhFafMg0WYOGN7v8dZ0ud_INxS7fmTyRaBwPmAUrUtDU=&xsec_source=pc_search' }}" aria-label="Rednote"><img src="{{ 'skyra-xiaohongshu.svg' | asset_url }}" width="24" height="24" alt="" /></a>
             <a href="{{ section.settings.facebook_url | default: 'https://www.facebook.com/' }}" aria-label="Facebook"><img src="{{ 'skyra-facebook.svg' | asset_url }}" width="24" height="24" alt="" /></a>
             <a href="{{ section.settings.tiktok_url | default: 'https://www.tiktok.com/' }}" aria-label="TikTok"><img src="{{ 'skyra-tiktok.svg' | asset_url }}" width="24" height="24" alt="" /></a>
           </nav>
