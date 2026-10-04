@@ -18,9 +18,17 @@ import {
 } from "../app/services/membership-notifications.server";
 import { DEVELOPMENT_BOOKING_SHOP } from "../app/services/commerce-capabilities.server";
 
-beforeAll(() => {
+let notificationShopId: string | undefined;
+beforeAll(async () => {
   if (new URL(process.env.DATABASE_URL!).pathname !== "/skyra_booking_test")
     throw new Error("Tests require skyra_booking_test.");
+  if (await db.shop.findUnique({ where: { domain: DEVELOPMENT_BOOKING_SHOP } }))
+    throw new Error(
+      "The notification test shop already exists; preserve it and use a fresh test schema.",
+    );
+  notificationShopId = (
+    await db.shop.create({ data: { domain: DEVELOPMENT_BOOKING_SHOP } })
+  ).id;
 });
 beforeEach(() => {
   vi.stubEnv("SKYRA_MEMBERSHIP_MAIL_ENABLED", "true");
@@ -32,15 +40,22 @@ beforeEach(() => {
   vi.stubEnv("RESEND_API_KEY", "fake-not-used-key");
 });
 afterEach(() => vi.unstubAllEnvs());
-afterAll(() => db.$disconnect());
+afterAll(async () => {
+  if (notificationShopId)
+    await db.shop.update({
+      where: { id: notificationShopId },
+      data: {
+        domain: `retired-notification-${notificationShopId}.myshopify.com`,
+      },
+    });
+  await db.$disconnect();
+});
 
 let counter = 0;
 async function fixture(cycle = 1, status = "PAID", months: number | null = 1) {
   const serial = String(BigInt(Date.now()) * 1000n + BigInt(counter++));
-  const shop = await db.shop.upsert({
+  const shop = await db.shop.findUniqueOrThrow({
     where: { domain: DEVELOPMENT_BOOKING_SHOP },
-    create: { domain: DEVELOPMENT_BOOKING_SHOP },
-    update: { status: "ACTIVE" },
   });
   const customer = await db.customerProfile.create({
     data: {
