@@ -31,7 +31,7 @@ export async function staffBookingOptions(actor: Actor, customerId: string) {
     where: {
       shopId: actor.shopId,
       status: "PUBLISHED",
-      startsAt: { gt: now, lte: new Date(now.getTime() + 15 * 86400000) },
+      startsAt: { gt: now },
       service: {
         status: "ACTIVE",
         kind: { in: ["CLASS", "APPOINTMENT", "COURSE"] },

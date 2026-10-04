@@ -251,7 +251,7 @@
             render();
             root.querySelector("[data-booking-back]")?.focus();
           });
-          const bookButton = element("button", "skyra-booking__primary", closed ? ({NOT_YET_OPEN:"Opens 14 days before",BOOKING_CLOSED:"Booking closed"}[session.bookingStatus] || "Unavailable") : spots <= 0 ? copy.full : copy.book);
+          const bookButton = element("button", "skyra-booking__primary", closed ? ({BOOKING_CLOSED:"Booking closed"}[session.bookingStatus] || "Unavailable") : spots <= 0 ? copy.full : copy.book);
           bookButton.type = "button";
           bookButton.dataset.bookingBook = session.id;
           bookButton.disabled = spots <= 0 || Boolean(closed);

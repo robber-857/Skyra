@@ -354,28 +354,68 @@ test("disabled booking, unavailable Pass and anonymous requests cannot create ho
   expect(await db.bookingHold.count({ where: { shopId: f.shopId } })).toBe(0);
 });
 
-test("server rules enforce 14 days and the two-hour closing boundary including DST", async () => {
+test("published sessions open immediately with legacy or absent opening rules and retain the two-hour cutoff across DST", async () => {
   const f = await fixture();
   const startsAt = DateTime.fromISO("2026-10-10T18:30", {
     zone: "Australia/Sydney",
   }).toJSDate();
   const s = { ...f.session, startsAt };
-  const opens = DateTime.fromJSDate(startsAt, { zone: s.timezone })
-    .minus({ days: 14 })
+  const early = DateTime.fromJSDate(startsAt, { zone: s.timezone })
+    .minus({ days: 90 })
     .toJSDate();
-  expect(bookingWindow(f.shop, s, new Date(opens.getTime() - 1))).toBe(
-    "NOT_YET_OPEN",
-  );
-  expect(bookingWindow(f.shop, s, opens)).toBe("OPEN");
+  for (const openingRule of [{ bookingWindowDays: 14 }, {}, { bookingWindowDays: null }, { bookingWindowDays: 0 }]) {
+    const shop = { ...f.shop, rules: {
+      ...openingRule,
+      bookingClosesBeforeMinutes: 120,
+      seatHoldMinutes: 15,
+    } };
+    expect(bookingWindow(shop, s, early)).toBe("OPEN");
+  }
+  expect(
+    bookingWindow(f.shop, s, new Date(startsAt.getTime() - 120 * 60000 - 1)),
+  ).toBe("OPEN");
   expect(
     bookingWindow(f.shop, s, new Date(startsAt.getTime() - 120 * 60000)),
   ).toBe("BOOKING_CLOSED");
+  expect(bookingWindow(f.shop, { ...s, status: "DRAFT" }, early)).toBe("UNAVAILABLE");
+  expect(bookingWindow(f.shop, { ...s, status: "CANCELLED" }, early)).toBe("UNAVAILABLE");
+  expect(bookingWindow({ ...f.shop, rulesApprovedAt: null }, s, early)).toBe("RULES_NOT_READY");
+  expect(bookingWindow({ ...f.shop, rules: { ...rules, bookingClosesBeforeMinutes: 0 } }, s, early)).toBe("RULES_NOT_READY");
+  expect(bookingWindow({ ...f.shop, rules: { ...rules, seatHoldMinutes: 0 } }, s, early)).toBe("RULES_NOT_READY");
   await db.classSession.update({
     where: { id: f.session.id },
     data: { status: "CANCELLED" },
   });
   await expect(f.start()).rejects.toMatchObject({ code: "UNAVAILABLE" });
 });
+
+test.each(["CLASS", "APPOINTMENT", "COURSE"])(
+  "%s more than 14 days away accepts attempts and seat holds as soon as it is published",
+  async (kind) => {
+    const capacity = kind === "APPOINTMENT" ? 1 : 4;
+    const f = await fixture(capacity, kind);
+    const startsAt = new Date(Date.now() + 20 * 86400000);
+    const endsAt = new Date(startsAt.getTime() + 55 * 60000);
+    await db.classSession.update({
+      where: { id: f.session.id },
+      data: { startsAt, endsAt, busyStartsAt: startsAt, busyEndsAt: endsAt, status: "DRAFT" },
+    });
+    await expect(f.start()).rejects.toMatchObject({ code: "UNAVAILABLE" });
+    expect(await db.bookingAttempt.count({ where: { shopId: f.shopId } })).toBe(0);
+    await db.classSession.update({
+      where: { id: f.session.id },
+      data: { status: "PUBLISHED" },
+    });
+    const attempt = await f.start();
+    expect(attempt.session).toMatchObject({
+      startsAt: startsAt.toISOString(),
+      bookingStatus: "OPEN",
+    });
+    expect((await bookingPassOptions(f.actor(), { token: attempt.token })).passes.map((p) => p.id)).toContain(f.pass.id);
+    expect(await f.hold(attempt.token)).toMatchObject({ status: "ACTIVE" });
+    expect((await classAvailability(f.shopId, [f.session.id])).get(f.session.id)).toBe(capacity - 1);
+  },
+);
 
 test("confirmed bookings consume capacity and the database itself rejects oversell and capacity reduction", async () => {
   const f = await fixture(2),

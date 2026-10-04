@@ -28,10 +28,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
     rulesApproved: Boolean(shop.rulesApprovedAt),
     seatHoldMinutes:
       typeof rules.seatHoldMinutes === "number" ? rules.seatHoldMinutes : null,
-    bookingWindowDays:
-      typeof rules.bookingWindowDays === "number"
-        ? rules.bookingWindowDays
-        : null,
     bookingClosesBeforeMinutes:
       typeof rules.bookingClosesBeforeMinutes === "number"
         ? rules.bookingClosesBeforeMinutes
@@ -111,7 +107,6 @@ export async function action({ request }: ActionFunctionArgs) {
         if (
           enabled &&
           (!current.rulesApprovedAt ||
-            before.bookingWindowDays !== 14 ||
             before.bookingClosesBeforeMinutes !== 120 ||
             before.seatHoldMinutes !== 15)
         )
@@ -215,7 +210,7 @@ export default function Settings() {
         <section className="panel">
           <h2>Class booking rules</h2>
           <ul>
-            <li>Booking opens {data.bookingWindowDays} days before class.</li>
+            <li>Booking opens as soon as a class is published.</li>
             <li>
               Booking closes {data.bookingClosesBeforeMinutes} minutes before
               class.

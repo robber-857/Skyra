@@ -93,6 +93,38 @@ test("staff booking reserves one credit, activates Pass and queues notifications
     }),
   ).rejects.toMatchObject({ code: "ALREADY_BOOKED" });
 });
+
+test("staff can select and reserve a published class more than 14 days away", async () => {
+  const f = await fixture();
+  const startsAt = new Date(Date.now() + 20 * 86400000);
+  const endsAt = new Date(
+    startsAt.getTime() + f.session.endsAt.getTime() - f.session.startsAt.getTime(),
+  );
+  await db.classSession.update({
+    where: { id: f.session.id },
+    data: { startsAt, endsAt, busyStartsAt: startsAt, busyEndsAt: endsAt },
+  });
+
+  const options = await staffBookingOptions(f.actor, f.customer.id);
+  expect(options.find((session) => session.id === f.session.id)).toMatchObject({
+    startsAt: startsAt.toISOString(),
+    passes: expect.arrayContaining([expect.objectContaining({ id: f.pass.id })]),
+  });
+  const bookingId = await bookClientIntoSession(f.actor, f.input);
+  expect(
+    await db.booking.findUniqueOrThrow({ where: { id: bookingId } }),
+  ).toMatchObject({
+    status: "CONFIRMED",
+    sessionId: f.session.id,
+    customerId: f.customer.id,
+  });
+  expect(await entitlementBalance(db, f.shop.id, f.pass.id)).toEqual({
+    availableUnits: 4,
+    reservedUnits: 1,
+    consumedUnits: 0,
+  });
+});
+
 test("full classes including live checkout holds cannot be overbooked", async () => {
   const f = await fixture();
   await db.classSession.update({

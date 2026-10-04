@@ -1,5 +1,7 @@
 # Booking V3 — 开发状态
 
+2026-10-04 预订规则更新（本地代码）：取消提前 14 天才开放预订的限制。课次 `PUBLISHED` 后立即开放，仍保留开课前 2 小时关闭、满员/占位、Pass 资格和店铺发布开关。已有 `rules.bookingWindowDays=14` 不再参与校验，无需数据迁移；Staff 选课也取消对应的 15 天查询上限。Storefront、Settings 和 Staff 文案同步更新。本轮尚未部署；下方带日期的 14 天规则和验证记录保留为历史快照。
+
 2026-09-20 最新上线判断、12 小时 Customer 课前提醒、Render 现场配置和 P0 清单见 [上线状态与 12 小时课前提醒](launch-status-2026-09-20.md)。当前不建议在未完成真实邮件、三条支付、Customer/Coach、正式店安装、公开入口和备份/对账 UAT 前开放正式付费预约。
 
 2026-09-18 最新规则：No-show 消费原 Booking 预留的 1 次课，不退 Pass credit，也不自动退 Drop-in 付款。此规则覆盖下文 2026-09-16 的退回课次决定；历史已退课次保留原账本、不追扣。Recent bookings 每页 8 条、前后翻页与页码跳转，邮件状态说明见 [Booking 列表、邮件与 No-show](booking-list-and-no-show-2026-09-18.md)。

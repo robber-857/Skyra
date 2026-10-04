@@ -108,7 +108,7 @@ window.SkyraBookingCalendar = function ({ today, selected, end, pick }) {
     body.append(grid);
     const note = document.createElement("p");
     note.textContent =
-      "Browse the next 31 days. Bookings open 14 days before class.";
+      "Browse the next 31 days. Bookings open when classes are published.";
     body.append(note);
   }
   render();

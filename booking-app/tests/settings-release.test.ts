@@ -111,6 +111,45 @@ test("another store cannot use the development release control", async () => {
   expect(mocks.update).not.toHaveBeenCalled();
 });
 
+test("approved cutoff and hold rules allow release without the retired opening-window field", async () => {
+  vi.stubEnv("SKYRA_BOOKING_TEST_SHOP", domain);
+  vi.stubEnv("SKYRA_BOOKING_CHECKOUT_ENABLED", "true");
+  vi.stubEnv("SKYRA_BOOKING_OWNED_PASSES_ENABLED", "true");
+  const shop = {
+    ...approvedShop,
+    rules: {
+      bookingClosesBeforeMinutes: 120,
+      seatHoldMinutes: 15,
+      onlineBookingsEnabled: false,
+    },
+  };
+  mocks.findUniqueOrThrow.mockResolvedValue(shop);
+  expect(await releaseRequest(true)).toEqual({ message: "Online booking enabled." });
+  expect(mocks.update).toHaveBeenCalledWith({
+    where: { id: actor.shopId },
+    data: { rules: { ...shop.rules, onlineBookingsEnabled: true } },
+  });
+});
+
+test.each(["unapproved", "cutoff", "hold"])(
+  "removing the opening window preserves %s readiness checks",
+  async (condition) => {
+    vi.stubEnv("SKYRA_BOOKING_TEST_SHOP", domain);
+    vi.stubEnv("SKYRA_BOOKING_CHECKOUT_ENABLED", "true");
+    vi.stubEnv("SKYRA_BOOKING_OWNED_PASSES_ENABLED", "true");
+    mocks.findUniqueOrThrow.mockResolvedValue({
+      ...approvedShop,
+      rulesApprovedAt: condition === "unapproved" ? null : approvedShop.rulesApprovedAt,
+      rules: {
+        bookingClosesBeforeMinutes: condition === "cutoff" ? 0 : 120,
+        seatHoldMinutes: condition === "hold" ? 0 : 15,
+      },
+    });
+    expect(await releaseRequest(true)).toMatchObject({ code: "RULES_NOT_READY" });
+    expect(mocks.update).not.toHaveBeenCalled();
+  },
+);
+
 test("production Admin remains gated and can close online bookings during emergency stop", async () => {
   const production = "mf0n6s-zg.myshopify.com";
   mocks.adminContext.mockResolvedValue({

@@ -1,6 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
 import { Prisma, type BookingAttempt, type Shop } from "@prisma/client";
-import { DateTime } from "luxon";
 import { z } from "zod";
 import db from "../db.server";
 import { DomainError } from "../lib/errors.server";
@@ -57,7 +56,6 @@ export function bookingWindow(
   const rules = shop.rules as Record<string, unknown>;
   if (
     !shop.rulesApprovedAt ||
-    rules.bookingWindowDays !== 14 ||
     rules.bookingClosesBeforeMinutes !== 120 ||
     rules.seatHoldMinutes !== 15
   )
@@ -65,13 +63,8 @@ export function bookingWindow(
   if (session.status !== "PUBLISHED") return "UNAVAILABLE";
   if (now.getTime() >= session.startsAt.getTime() - 120 * 60000)
     return "BOOKING_CLOSED";
-  // Calendar days in the location timezone preserve the studio's DST behavior.
-  const opensAt = DateTime.fromJSDate(session.startsAt, {
-    zone: session.timezone,
-  })
-    .minus({ days: 14 })
-    .toMillis();
-  return now.getTime() < opensAt ? "NOT_YET_OPEN" : "OPEN";
+  // Published sessions open immediately; legacy bookingWindowDays is ignored.
+  return "OPEN";
 }
 export async function classForBooking(
   tx: Tx,

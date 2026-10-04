@@ -80,6 +80,41 @@ test("10 simultaneous confirmations reserve once, create one booking and confirm
     confirmOwnedBooking(f.actor, { ...f.input, entitlementId: randomUUID() }),
   ).rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT" });
 });
+
+test("an existing Pass can confirm a published class more than 14 days away", async () => {
+  const f = await fixture();
+  const startsAt = new Date(Date.now() + 20 * 86400000);
+  const endsAt = new Date(
+    startsAt.getTime() + f.session.endsAt.getTime() - f.session.startsAt.getTime(),
+  );
+  await db.classSession.update({
+    where: { id: f.session.id },
+    data: { startsAt, endsAt, busyStartsAt: startsAt, busyEndsAt: endsAt },
+  });
+  const attempt = await startAttempt(f.actor, {
+    sessionId: f.session.id,
+    surface: "PROGRAMS",
+  });
+  expect(attempt.session).toMatchObject({
+    startsAt: startsAt.toISOString(),
+    bookingStatus: "OPEN",
+  });
+  const result = await confirmOwnedBooking(f.actor, {
+    ...f.input,
+    token: attempt.token,
+  });
+  expect(result.status).toBe("CONFIRMED");
+  expect(
+    await db.booking.findUniqueOrThrow({ where: { id: result.bookingReference! } }),
+  ).toMatchObject({ sessionId: f.session.id, customerId: f.customer.id });
+  const ledger = await db.entitlementLedgerEntry.findMany({
+    where: { entitlementId: f.entitlement.id },
+  });
+  expect(ledger.map((entry) => entry.kind).sort()).toEqual(["GRANT", "RESERVE"]);
+  expect(ledger.reduce((sum, entry) => sum + entry.availableDelta, 0)).toBe(4);
+  expect(ledger.reduce((sum, entry) => sum + entry.reservedDelta, 0)).toBe(1);
+});
+
 test("owned Pass review uses no Shopify network and release remains disabled", async () => {
   const f = await fixture();
   const clients = vi.fn();

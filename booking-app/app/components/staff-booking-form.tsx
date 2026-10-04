@@ -21,7 +21,7 @@ export function StaffBookingForm({
       <h2>Book a class for {clientName}</h2>
       <p>
         Choose a published class and reserve one credit from the selected Pass.
-        The usual 14-day booking window and 2-hour cutoff apply.
+        Booking opens when a class is published and closes 2 hours before it starts.
       </p>
       {!options.length ? (
         <p>
