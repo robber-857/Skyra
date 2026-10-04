@@ -27,6 +27,7 @@ import { AUTO_RENEW_TERMS_VERSION } from "../app/services/membership-capabilitie
 import type { GraphQL } from "../app/services/shopify-catalog.server";
 
 const sdk = vi.hoisted(() => ({
+  ready: vi.fn(),
   contract: vi.fn(),
   context: vi.fn(),
   submit: vi.fn(),
@@ -41,7 +42,7 @@ vi.mock("../app/services/membership-capabilities.server", () => ({
   AUTO_RENEW_TERMS_VERSION: "2026-10-02.v1",
   membershipCapabilities: () => ({
     checkoutAvailable: true,
-    autoRenewAvailable: true,
+    autoRenewAvailable: sdk.ready(),
   }),
 }));
 vi.mock(
@@ -64,6 +65,7 @@ beforeAll(() => {
 });
 beforeEach(() => {
   vi.resetAllMocks();
+  sdk.ready.mockReturnValue(true);
   sdk.closeCheckout.mockResolvedValue(undefined);
 });
 afterAll(() => db.$disconnect());
@@ -944,8 +946,10 @@ test("late billing event recovers an unknown response and duplicate delivery gra
   expect(sdk.submit).toHaveBeenCalledTimes(1);
 });
 
-test("verified contract event completes its persisted webhook receipt", async () => {
+test.each([true, false])("verified contract event completes its receipt while billing ready=%s", async (ready) => {
   const f = await fixture(false);
+  sdk.ready.mockReturnValue(ready);
+  await db.passMembership.update({where:{id:f.member.id},data:{contractGid:null,autoRenew:false}});
   const event = await queueMembershipEvent(
     f.shop.id,
     "MEMBERSHIP_CONTRACT_RECEIVED",
@@ -964,6 +968,7 @@ test("verified contract event completes its persisted webhook receipt", async ()
     await db.webhookReceipt.findUnique({ where: { id: event.aggregateId } }),
   ).toMatchObject({ status: "PROCESSED" });
   expect(sdk.submit).not.toHaveBeenCalled();
+  expect(await db.passMembership.findUnique({where:{id:f.member.id}})).toMatchObject({contractGid:f.contract.id});
 });
 
 test("unmatched order backoff lets a later verified receipt reconcile without another charge", async () => {

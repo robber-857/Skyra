@@ -410,7 +410,9 @@ export async function sweepMembershipWork(adminForShop: AdminForShop) {
         contractGid: { not: null },
       },
     });
-    if (!ready && !cancelled) continue;
+    // Disabling new purchases/billing must not strand provider receipts or
+    // prevent an already-created contract from being bound and cancelled.
+    if (!ready && !cancelled && !pending.length) continue;
     const admin = await adminForShop(shop.domain);
     for (const event of pending) {
       try {
@@ -445,7 +447,6 @@ export async function sweepMembershipWork(adminForShop: AdminForShop) {
             },
           });
         } else if (event.kind === "MEMBERSHIP_CONTRACT_RECEIVED") {
-          if (!ready) continue;
           const contractGid = (event.payload as { contractGid: string })
             .contractGid;
           if (!(await bindMembershipContract(shop.id, contractGid, admin))) {
