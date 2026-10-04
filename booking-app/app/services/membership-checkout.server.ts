@@ -79,7 +79,9 @@ async function readPlan(
     where: { id: actor.shopId, status: "ACTIVE" },
   });
   if (!shop) fail("NOT_FOUND", "Memberships are unavailable.", 404);
-  const capabilities = membershipCapabilities(shop.domain);
+  const capabilities = membershipCapabilities(shop.domain, actor.customerGid);
+  if (process.env.SKYRA_MEMBERSHIPS_UAT_PASS_PLAN_ID && passPlanId !== process.env.SKYRA_MEMBERSHIPS_UAT_PASS_PLAN_ID)
+    fail("PASS_UNAVAILABLE", "This Pass is not part of the checkout test.");
   if (!capabilities.checkoutAvailable)
     fail(
       "CHECKOUT_NOT_AVAILABLE",

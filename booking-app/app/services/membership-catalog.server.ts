@@ -17,7 +17,7 @@ export async function membershipCatalog(actor: BookingActor, raw: unknown) {
   });
   if (!shop)
     throw new DomainError("NOT_FOUND", "Memberships are unavailable.", 404);
-  const capabilities = membershipCapabilities(shop.domain);
+  const capabilities = membershipCapabilities(shop.domain, actor.customerGid);
   const now = await databaseNow(db);
   const customer = actor.customerGid
     ? await db.customerProfile.findUnique({
@@ -38,6 +38,7 @@ export async function membershipCatalog(actor: BookingActor, raw: unknown) {
       status: "ACTIVE",
       saleable: true,
       standalonePurchaseEnabled: true,
+      ...(process.env.SKYRA_MEMBERSHIPS_UAT_PASS_PLAN_ID ? { id: process.env.SKYRA_MEMBERSHIPS_UAT_PASS_PLAN_ID } : {}),
     },
     orderBy: [{ requestedPriceCents: "asc" }, { id: "asc" }],
   });

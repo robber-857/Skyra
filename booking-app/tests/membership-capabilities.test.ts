@@ -3,6 +3,26 @@ import { membershipCapabilities } from "../app/services/membership-capabilities.
 
 afterEach(() => vi.unstubAllEnvs());
 
+test("owner-only Basic checkout UAT never releases other customers or worker billing", () => {
+  vi.stubEnv("SKYRA_BOOKING_PRODUCTION_SHOP", "mf0n6s-zg.myshopify.com");
+  vi.stubEnv("SKYRA_BOOKING_PRODUCTION_RELEASE_APPROVED", "true");
+  vi.stubEnv("SKYRA_BOOKING_PRODUCTION_CHECKOUT_ENABLED", "true");
+  vi.stubEnv("SKYRA_MEMBERSHIPS_ENABLED", "false");
+  vi.stubEnv("SKYRA_MEMBERSHIPS_CHECKOUT_PROTECTION", "INVENTORY");
+  vi.stubEnv("SKYRA_MEMBERSHIPS_BILLING_ENABLED", "false");
+  vi.stubEnv("SKYRA_MEMBERSHIPS_UAT_CUSTOMER_GID", "gid://shopify/Customer/1");
+  vi.stubEnv("SKYRA_MEMBERSHIPS_UAT_PASS_PLAN_ID", "test-pass");
+  vi.stubEnv("SKYRA_MEMBERSHIPS_SUBSCRIPTIONS_READY", "true");
+  vi.stubEnv("SKYRA_MEMBERSHIPS_CHECKOUT_GUARD_READY", "false");
+  vi.stubEnv("SKYRA_MEMBERSHIPS_CHECKOUT_EXCLUSION_VERIFIED", "false");
+  vi.stubEnv("SKYRA_BOOKING_EMERGENCY_STOP", "false");
+  expect(membershipCapabilities("mf0n6s-zg.myshopify.com", "gid://shopify/Customer/1").autoRenewAvailable).toBe(true);
+  expect(membershipCapabilities("mf0n6s-zg.myshopify.com", "gid://shopify/Customer/2").autoRenewAvailable).toBe(false);
+  expect(membershipCapabilities("mf0n6s-zg.myshopify.com").autoRenewAvailable).toBe(false);
+  vi.stubEnv("SKYRA_MEMBERSHIPS_BILLING_ENABLED", "true");
+  expect(membershipCapabilities("mf0n6s-zg.myshopify.com", "gid://shopify/Customer/1").autoRenewAvailable).toBe(false);
+});
+
 function testStore() {
   vi.stubEnv("SKYRA_BOOKING_TEST_SHOP", "skyra-booking-dev.myshopify.com");
   vi.stubEnv("SKYRA_BOOKING_CHECKOUT_ENABLED", "true");

@@ -96,7 +96,7 @@ export async function prepareMembershipCheckoutAuthorization(
   if (
     !actor.customerGid ||
     purchase.currency !== "AUD" ||
-    !membershipCapabilities(domain).checkoutGuardReady
+    !membershipCapabilities(domain, actor.customerGid).checkoutGuardReady
   )
     throw new DomainError(
       "MEMBERSHIP_CHECKOUT_GUARD_UNAVAILABLE",

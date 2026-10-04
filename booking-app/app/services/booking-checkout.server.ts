@@ -250,6 +250,8 @@ async function guardManagedPassCheckout(
 }
 
 function managedMonthlyPass(context: Context) {
+  // Owner-only standalone UAT leaves the existing Booking purchase path intact.
+  if (process.env.SKYRA_MEMBERSHIPS_UAT_CUSTOMER_GID && process.env.SKYRA_MEMBERSHIPS_ENABLED !== "true") return false;
   return (
     context.plan?.validityMonths === 1 &&
     (Boolean(context.plan.sellingPlanGid) ||
