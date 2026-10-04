@@ -229,6 +229,18 @@ test("unsynchronized product cannot create a plan", async () => {
   expect(f.admin).not.toHaveBeenCalled();
 });
 
+test("a retained draft course does not block renewal setup for an otherwise active course scope", async () => {
+  const f = await fixture();
+  const draft = await db.service.create({data: {
+    shopId: f.shop.id, locationId: f.location.id, name: "Draft private class",
+    kind: "APPOINTMENT", requestedPriceCents: 5000, durationMin: 60, capacity: 1, status: "DRAFT",
+  }});
+  await db.passPlan.update({where: {id:f.plan.id},data:{services:{create:{serviceId:draft.id}}}});
+  await f.run();
+  expect((await f.current()).renewalSetupState).toBe("READY");
+  expect(await db.passPlan.findUnique({where: {id:f.plan.id},include:{services:true}})).toMatchObject({services:expect.arrayContaining([expect.objectContaining({serviceId:draft.id})])});
+});
+
 test("configured Pass changes require re-verification and preserve existing terms", async () => {
   const f = await fixture();
   await f.run();

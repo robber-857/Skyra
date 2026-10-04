@@ -75,7 +75,7 @@ export async function configureMonthlyPlan(
       pass.introOnly ||
       pass.requestedPriceCents <= 0 ||
       !pass.services.length ||
-      pass.services.some((s) => s.service.status !== "ACTIVE") ||
+      !pass.services.some((s) => s.service.status === "ACTIVE") ||
       new Set(pass.services.map((s) => s.service.kind)).size !== 1
     )
       throw new DomainError(
