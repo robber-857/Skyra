@@ -6,6 +6,7 @@ import { audit, lockShop } from "./catalog.server";
 import { priceInCents } from "./purchase-mapping.server";
 import type { GraphQL } from "./shopify-catalog.server";
 import { assertMembershipSellingPlan } from "./membership-selling-plan.server";
+import { inventoryMembershipCheckout } from "./membership-inventory-checkout.server";
 
 export const CREATE_MONTHLY_PLAN = `#graphql
 mutation AdminMonthlyPlanCreate($input: SellingPlanGroupInput!, $resources: SellingPlanGroupResourceInput!) {
@@ -167,7 +168,11 @@ export async function configureMonthlyPlan(
               },
             ],
           },
-          resources: { productVariantIds: [mapping.variantGid] },
+          resources: {
+            productVariantIds: inventoryMembershipCheckout()
+              ? []
+              : [mapping.variantGid],
+          },
         },
       });
       const payload = await response.json();
@@ -227,6 +232,9 @@ export async function configureMonthlyPlan(
     variantGid: mapping.variantGid!,
     priceCents: pass.requestedPriceCents,
     currency: "AUD",
+    ...(inventoryMembershipCheckout()
+      ? { association: "DETACHED" as const }
+      : {}),
   });
   await db.$transaction(async (tx) => {
     await lockShop(tx, actor.shopId);

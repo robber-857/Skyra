@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { DateTime } from "luxon";
-import { afterAll, beforeAll, beforeEach, expect, test, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
 import db from "../app/db.server";
 import { DomainError } from "../app/lib/errors.server";
 import { paidFixture, queuePaid } from "./paid-fixture";
@@ -67,6 +67,22 @@ beforeEach(() => {
   sdk.closeCheckout.mockResolvedValue(undefined);
 });
 afterAll(() => db.$disconnect());
+afterEach(() => vi.unstubAllEnvs());
+
+test("Basic free-order UAT switch prevents a new recurring charge", async () => {
+  const f = await fixture(false);
+  await expire(f);
+  const renewal = (await claimDueMembershipCycle(f.member.id))!;
+  vi.stubEnv("SKYRA_MEMBERSHIPS_CHECKOUT_PROTECTION", "INVENTORY");
+  vi.stubEnv("SKYRA_MEMBERSHIPS_BILLING_ENABLED", "false");
+  await processMembershipBilling(renewal.id, vi.fn());
+  expect(sdk.submit).not.toHaveBeenCalled();
+  expect(await db.passPurchase.findUnique({where: {id: renewal.id}})).toMatchObject({submittedAt: null});
+  sdk.submit.mockRejectedValue(new Error("Response lost"));
+  vi.stubEnv("SKYRA_MEMBERSHIPS_BILLING_ENABLED", "true");
+  await processMembershipBilling(renewal.id, vi.fn());
+  expect(sdk.submit).toHaveBeenCalledWith(expect.any(Function), expect.objectContaining({inventoryProtected: true}));
+});
 
 async function fixture(
   book = true,
@@ -74,6 +90,7 @@ async function fixture(
     mode?: "ONCE" | "AUTO_RENEW";
     validityMonths?: number;
     free?: boolean;
+    privateInventory?: boolean;
   } = {},
 ) {
   const f = await paidFixture(
@@ -118,6 +135,19 @@ async function fixture(
     where: { id: purchase.id },
     data: { status: "CHECKOUT_READY" },
   });
+  if (options.privateInventory) {
+    const nativeId = String(BigInt(`0x${randomUUID().replaceAll("-", "").slice(0,12)}`));
+    const productGid = `gid://shopify/Product/${nativeId}`;
+    const variantGid = `gid://shopify/ProductVariant/${nativeId}`;
+    await db.passPurchase.update({ where: { id: purchase.id }, data: { productGid, variantGid } });
+    await db.membershipCheckoutResource.create({ data: {
+      purchaseId: purchase.id, shopId: f.shop.id, state: "READY", productGid, variantGid,
+      inventoryItemGid: "gid://shopify/InventoryItem/999113",
+      locationGid: "gid://shopify/Location/1", publicationGid: "gid://shopify/Publication/1",
+    } });
+    f.payload.line_items[0].product_id = Number(nativeId);
+    f.payload.line_items[0].variant_id = Number(nativeId);
+  }
   f.payload.line_items[0].properties.push({
     name: "_skyra_pass_purchase_ref",
     value: purchase.reference,
@@ -207,11 +237,12 @@ async function fixture(
   };
 }
 
-test("100 percent discounted first Pass grants once, books only its course and retains a zero receipt", async () => {
+test.each([false, true])("100 percent discounted first Pass (private inventory %s) grants once, books only its course and retains a zero receipt", async (privateInventory) => {
   const f = await fixture(true, {
     mode: "ONCE",
     validityMonths: 1,
     free: true,
+    privateInventory,
   });
   expect(f.booking?.status).toBe("CONFIRMED");
   expect(f.entitlement.startsAt).toBeNull();

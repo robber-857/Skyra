@@ -748,6 +748,7 @@ export async function submitMembershipBilling(
     idempotencyKey: string;
     originTime: Date | string;
     billingCycleSelector: MembershipBillingCycleSelector;
+    inventoryProtected?: boolean;
   },
 ): Promise<MembershipBilling> {
   const originTime = new Date(input.originTime);
@@ -773,7 +774,9 @@ export async function submitMembershipBilling(
         idempotencyKey: input.idempotencyKey,
         originTime: originTime.toISOString(),
         billingCycleSelector: { index: input.billingCycleSelector.index },
-        inventoryPolicy: "PRODUCT_VARIANT_INVENTORY_POLICY",
+        inventoryPolicy: input.inventoryProtected
+          ? "ALLOW_OVERSELLING"
+          : "PRODUCT_VARIANT_INVENTORY_POLICY",
         paymentProcessingPolicy: "FAIL_UNLESS_VALID_PAYMENT_METHOD",
       },
     },

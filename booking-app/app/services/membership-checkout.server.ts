@@ -26,6 +26,7 @@ import {
 import type { GraphQL } from "./shopify-catalog.server";
 import { prepareMembershipCheckoutAuthorization } from "./membership-checkout-guard.server";
 import { assertMembershipSellingPlan } from "./membership-selling-plan.server";
+import { prepareInventoryPass } from "./membership-inventory-checkout.server";
 
 function fail(code: string, message: string, status = 409): never {
   throw new DomainError(code, message, status);
@@ -290,7 +291,12 @@ export async function preparePassPurchaseCart(
   clients: CommerceClients,
   bookingReference?: string,
 ) {
-  const purchase = claim.purchase;
+  if (!claim.creating && claim.purchase.status !== "CHECKOUT_READY")
+    fail(
+      "PASS_PAYMENT_REVIEW",
+      "Your payment is being checked. Do not start another payment.",
+    );
+  const purchase = await prepareInventoryPass(claim.purchase, clients.admin);
   const target = {
     reference: purchase.reference,
     productGid: purchase.productGid,

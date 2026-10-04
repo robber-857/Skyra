@@ -5,6 +5,7 @@ import { DomainError } from "../lib/errors.server";
 import type { GraphQL } from "./shopify-catalog.server";
 import { membershipCapabilities } from "./membership-capabilities.server";
 import { closeMembershipCheckoutForRenewal } from "./membership-checkout-guard.server";
+import { inventoryMembershipCheckout } from "./membership-inventory-checkout.server";
 import { settlePassPurchasePayment } from "./membership-payments.server";
 import {
   readSubscriptionContract,
@@ -196,6 +197,8 @@ export async function processMembershipBilling(
   if (first.billingAttemptGid) {
     billing = await readMembershipBilling(admin, first.billingAttemptGid);
   } else {
+    if (inventoryMembershipCheckout() &&
+      process.env.SKYRA_MEMBERSHIPS_BILLING_ENABLED !== "true") return;
     // After a lost response, do not re-charge with a new key, or assume that a
     // provider deduplication window lasts forever. Stop for reconciliation.
     if (first.submittedAt || first.status !== "BILLING_PENDING") return;
@@ -318,6 +321,9 @@ export async function processMembershipBilling(
             idempotencyKey: current.idempotencyKey,
             originTime: previousPass.expiresAt,
             billingCycleSelector: context.billingCycleSelector,
+            ...(inventoryMembershipCheckout()
+              ? { inventoryProtected: true }
+              : {}),
           }
         : false;
     });

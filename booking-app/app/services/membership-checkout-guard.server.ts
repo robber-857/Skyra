@@ -6,6 +6,10 @@ import type { BookingActor } from "./booking.server";
 import type { GraphQL } from "./shopify-catalog.server";
 import { membershipCapabilities } from "./membership-capabilities.server";
 import {
+  inventoryMembershipCheckout,
+  assertInventoryPassClosedOrOpen,
+} from "./membership-inventory-checkout.server";
+import {
   authorizeMembershipCheckout,
   assertMembershipCheckoutProtection,
   assertNoPublicMembershipStorefrontTokens,
@@ -61,6 +65,10 @@ export async function closeMembershipCheckoutForRenewal(
       "The original monthly Pass checkout must be verified before renewal.",
       409,
     );
+  if (inventoryMembershipCheckout()) {
+    await assertInventoryPassClosedOrOpen(original.id, admin, "CLOSED");
+    return;
+  }
   await assertMembershipCheckoutProtection(
     admin,
     original.productGid,
@@ -96,6 +104,10 @@ export async function prepareMembershipCheckoutAuthorization(
       503,
     );
   const proof = membershipCheckoutProof(actor.customerGid, purchase);
+  if (inventoryMembershipCheckout()) {
+    await assertInventoryPassClosedOrOpen(purchase.id, admin, "OPEN");
+    return undefined;
+  }
   await assertMembershipCheckoutProtection(
     admin,
     purchase.productGid,

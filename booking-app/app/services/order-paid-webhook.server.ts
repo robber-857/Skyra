@@ -316,7 +316,26 @@ export async function receiveOrderPaidWebhook(input: {
         where: { shopId: shop.id, reference: line.reference },
         include: { hold: { include: { customer: true } } },
       });
-      let codes = validationCodes(input.shopDomain, order, line, checkout);
+      const paid = checkout ? await tx.passPurchase.findFirst({
+        where: {
+          shopId: shop.id, bookingCheckoutId: checkout.id, cycle: 1,
+          status: "PAID", sourceOrderGid: order.orderGid,
+          sourceLineItemGid: line.lineItemGid, priceCents: checkout.priceCents,
+          paidPriceCents: order.finalCents,
+          productGid: line.productGid, variantGid: line.variantGid,
+        },
+      }) : null;
+      const resource = paid ? await tx.membershipCheckoutResource.findUnique({
+        where: { purchaseId: paid.id },
+      }) : null;
+      // Keep the original booking snapshot immutable. Only an already settled,
+      // exact first purchase can supply its private inventory variant identity.
+      const paymentCheckout = checkout && paid && resource?.state === "READY" &&
+        resource.shopId === shop.id && resource.productGid === paid.productGid &&
+        resource.variantGid === paid.variantGid
+        ? { ...checkout, productGid: paid.productGid, variantGid: paid.variantGid }
+        : checkout;
+      let codes = validationCodes(input.shopDomain, order, line, paymentCheckout);
       // Membership settlement runs first in the authenticated webhook route.
       // A discounted first period may book only from that exact verified paid
       // purchase; ordinary booking orders keep their existing amount checks.
@@ -327,19 +346,6 @@ export async function receiveOrderPaidWebhook(input: {
         order.subtotalCents === order.finalCents &&
         order.finalCents + order.totalDiscountsCents === checkout.priceCents
       ) {
-        const paid = await tx.passPurchase.findFirst({
-          where: {
-            shopId: shop.id,
-            bookingCheckoutId: checkout.id,
-            cycle: 1,
-            status: "PAID",
-            sourceOrderGid: order.orderGid,
-            sourceLineItemGid: line.lineItemGid,
-            priceCents: checkout.priceCents,
-            paidPriceCents: order.finalCents,
-          },
-          select: { id: true },
-        });
         if (paid) codes = codes.filter((code) => code !== "AMOUNT_MISMATCH");
       }
       const valid = codes.length === 0;

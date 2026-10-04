@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, beforeEach, expect, test, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
 import db from "../app/db.server";
 import { savePass } from "../app/services/catalog.server";
 import { configureMonthlyPlan } from "../app/services/membership-plan-setup.server";
@@ -23,6 +23,17 @@ beforeEach(() => {
   mocks.verify.mockResolvedValue({});
 });
 afterAll(() => db.$disconnect());
+afterEach(() => vi.unstubAllEnvs());
+
+test("Basic plan creation leaves the public template variant detached", async () => {
+  vi.stubEnv("SKYRA_MEMBERSHIPS_CHECKOUT_PROTECTION", "INVENTORY");
+  const f = await fixture();
+  await f.run();
+  expect(f.admin).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+    variables: expect.objectContaining({ resources: { productVariantIds: [] } }),
+  }));
+  expect(mocks.verify).toHaveBeenCalledWith(f.admin, expect.objectContaining({ association: "DETACHED" }));
+});
 
 async function fixture() {
   const f = await paidFixture("NEW_PASS", false, "APPOINTMENT", 1);

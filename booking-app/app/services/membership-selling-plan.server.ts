@@ -61,6 +61,7 @@ const targetSchema = z
     sellingPlanGid: gid("SellingPlan"),
     priceCents: z.number().int().positive().safe(),
     currency: z.literal("AUD"),
+    association: z.enum(["ASSIGNED", "DETACHED"]).optional(),
   })
   .strict();
 export type MembershipSellingPlanTarget = z.infer<typeof targetSchema>;
@@ -238,7 +239,9 @@ export async function assertMembershipSellingPlan(
     cents(variant.price) !== expected.priceCents ||
     groups.nodes.length !== 1 ||
     group?.id !== expected.trustedGroupGid ||
-    !(group.appliesToProduct || group.appliesToProductVariant) ||
+    (expected.association === "DETACHED"
+      ? group.appliesToProduct || group.appliesToProductVariant
+      : !(group.appliesToProduct || group.appliesToProductVariant)) ||
     plans.length !== 1 ||
     plan?.category !== "SUBSCRIPTION" ||
     !billingSchema.safeParse(plan.billingPolicy).success ||
