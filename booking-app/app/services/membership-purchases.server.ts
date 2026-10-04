@@ -164,13 +164,22 @@ export async function claimPassPurchaseInTransaction(
     },
     select: { id: true },
   });
-  const settled = await tx.paidBookingResult.count({
+  const closed = await tx.legacyCheckoutClosure.findMany({
     where: {
       shopId: input.shopId,
       checkoutId: { in: legacyCheckouts.map((c) => c.id) },
     },
+    select: { checkoutId: true },
   });
-  if (legacyCheckouts.length > settled)
+  const closedIds = new Set(closed.map((c) => c.checkoutId));
+  const openCheckouts = legacyCheckouts.filter((c) => !closedIds.has(c.id));
+  const settled = await tx.paidBookingResult.count({
+    where: {
+      shopId: input.shopId,
+      checkoutId: { in: openCheckouts.map((c) => c.id) },
+    },
+  });
+  if (openCheckouts.length > settled)
     fail(
       "PASS_PAYMENT_IN_PROGRESS",
       "An earlier payment for this Pass needs to be checked before another purchase.",
