@@ -45,6 +45,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     warning,
     creditOptions: await manualCreditOptions(actor),
     bookingOptions: await staffBookingOptions(actor, params.clientId!),
+    canBookUntilStart: actor.role === "ADMIN",
     attendanceOptions: await attendanceBackfillOptions(
       actor,
       params.clientId!,
@@ -146,6 +147,7 @@ export default function Client() {
             options={data.bookingOptions}
             clientName={data.data.client.name}
             idempotencyKey={data.idempotencyKey}
+            canBookUntilStart={data.canBookUntilStart}
           />
           <AttendanceBackfillForm
             key={`attendance:${data.idempotencyKey}`}

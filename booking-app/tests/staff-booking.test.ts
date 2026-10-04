@@ -46,6 +46,187 @@ async function fixture() {
     },
   };
 }
+async function moveSessionStart(
+  f: Awaited<ReturnType<typeof fixture>>,
+  minutesFromNow: number,
+) {
+  const startsAt = new Date(Date.now() + minutesFromNow * 60000);
+  const endsAt = new Date(
+    startsAt.getTime() + f.session.endsAt.getTime() - f.session.startsAt.getTime(),
+  );
+  return db.classSession.update({
+    where: { id: f.session.id },
+    data: { startsAt, endsAt, busyStartsAt: startsAt, busyEndsAt: endsAt },
+  });
+}
+
+test("ADMIN can book during the final two hours and concurrent retries reserve exactly one Pass credit", async () => {
+  const f = await fixture();
+  const session = await moveSessionStart(f, 60);
+  const options = await staffBookingOptions(f.actor, f.customer.id);
+  expect(options.find((s) => s.id === f.session.id)).toMatchObject({
+    startsAt: session.startsAt.toISOString(),
+    passes: expect.arrayContaining([expect.objectContaining({ id: f.pass.id })]),
+  });
+
+  const ids = await Promise.all(
+    Array.from({ length: 5 }, () => bookClientIntoSession(f.actor, f.input)),
+  );
+  expect(new Set(ids).size).toBe(1);
+  expect(await db.booking.count({ where: { shopId: f.shop.id } })).toBe(1);
+  expect(await entitlementBalance(db, f.shop.id, f.pass.id)).toEqual({
+    availableUnits: 4,
+    reservedUnits: 1,
+    consumedUnits: 0,
+  });
+  expect(
+    await db.bookingNotification.count({ where: { bookingId: ids[0] } }),
+  ).toBe(4);
+  expect(
+    await db.auditLog.count({
+      where: { entityId: ids[0], action: "STAFF_BOOKING_CONFIRMED" },
+    }),
+  ).toBe(1);
+  expect(
+    (await staffBookingOptions(f.actor, f.customer.id)).some(
+      (s) => s.id === f.session.id,
+    ),
+  ).toBe(false);
+
+  // A retry of an already-confirmed booking must still succeed after class starts.
+  await moveSessionStart(f, -1);
+  expect(await bookClientIntoSession(f.actor, f.input)).toBe(ids[0]);
+  await expect(
+    bookClientIntoSession(f.actor, { ...f.input, idempotencyKey: randomUUID() }),
+  ).rejects.toMatchObject({ code: "BOOKING_CLOSED" });
+  expect(await db.booking.count({ where: { shopId: f.shop.id } })).toBe(1);
+  expect(await entitlementBalance(db, f.shop.id, f.pass.id)).toEqual({
+    availableUnits: 4,
+    reservedUnits: 1,
+    consumedUnits: 0,
+  });
+});
+
+test("OPERATIONS cannot select or book during the final two hours, and COACH has no staff booking access", async () => {
+  const f = await fixture();
+  await moveSessionStart(f, 60);
+  const operations = { ...f.actor, role: "OPERATIONS" as const };
+  expect(
+    (await staffBookingOptions(operations, f.customer.id)).some(
+      (s) => s.id === f.session.id,
+    ),
+  ).toBe(false);
+  await expect(bookClientIntoSession(operations, f.input)).rejects.toMatchObject({
+    code: "BOOKING_CLOSED",
+  });
+  await expect(
+    bookClientIntoSession(operations, { ...f.input, mode: "ADMIN" }),
+  ).rejects.toThrow();
+  const coach = { ...f.actor, role: "COACH" as const };
+  await expect(staffBookingOptions(coach, f.customer.id)).rejects.toMatchObject({
+    code: "FORBIDDEN",
+  });
+  await expect(bookClientIntoSession(coach, f.input)).rejects.toMatchObject({
+    code: "FORBIDDEN",
+  });
+  expect(await db.booking.count({ where: { shopId: f.shop.id } })).toBe(0);
+  expect(await entitlementBalance(db, f.shop.id, f.pass.id)).toEqual({
+    availableUnits: 5,
+    reservedUnits: 0,
+    consumedUnits: 0,
+  });
+});
+
+test.each(["live-hold", "confirmed-booking"])(
+  "ADMIN late booking cannot bypass capacity occupied by a %s",
+  async (occupiedBy) => {
+    const f = await fixture();
+    await moveSessionStart(f, 60);
+    await db.classSession.update({
+      where: { id: f.session.id },
+      data: { capacity: 1 },
+    });
+    if (occupiedBy === "live-hold") {
+      await db.bookingHold.update({
+        where: { id: f.hold.id },
+        data: { status: "ACTIVE" },
+      });
+    } else {
+      const other = await db.customerProfile.create({
+        data: {
+          shopId: f.shop.id,
+          shopifyCustomerGid: "gid://shopify/Customer/988",
+        },
+      });
+      await db.booking.create({
+        data: {
+          shopId: f.shop.id,
+          sessionId: f.session.id,
+          customerId: other.id,
+        },
+      });
+    }
+    expect(
+      (await staffBookingOptions(f.actor, f.customer.id)).some(
+        (s) => s.id === f.session.id,
+      ),
+    ).toBe(false);
+    await expect(bookClientIntoSession(f.actor, f.input)).rejects.toMatchObject({
+      code: "SOLD_OUT",
+    });
+    expect(
+      await db.booking.count({
+        where: { shopId: f.shop.id, customerId: f.customer.id },
+      }),
+    ).toBe(0);
+    expect(await entitlementBalance(db, f.shop.id, f.pass.id)).toEqual({
+      availableUnits: 5,
+      reservedUnits: 0,
+      consumedUnits: 0,
+    });
+  },
+);
+
+test.each(["expired-pass", "ineligible-pass", "wrong-owner"])(
+  "ADMIN late booking cannot use an %s",
+  async (scenario) => {
+    const f = await fixture();
+    await moveSessionStart(f, 60);
+    let customerId = f.customer.id;
+    if (scenario === "expired-pass") {
+      await db.entitlement.update({
+        where: { id: f.pass.id },
+        data: { status: "EXPIRED" },
+      });
+    } else if (scenario === "ineligible-pass") {
+      await db.passEligibility.deleteMany({
+        where: { shopId: f.shop.id, passPlanId: f.plan.id },
+      });
+    } else {
+      customerId = (
+        await db.customerProfile.create({
+          data: {
+            shopId: f.shop.id,
+            shopifyCustomerGid: "gid://shopify/Customer/989",
+          },
+        })
+      ).id;
+    }
+    await expect(
+      bookClientIntoSession(f.actor, { ...f.input, customerId }),
+    ).rejects.toMatchObject({ code: "PASS_UNAVAILABLE" });
+    expect(await db.booking.count({ where: { shopId: f.shop.id } })).toBe(0);
+    expect(
+      await db.bookingNotification.count({ where: { shopId: f.shop.id } }),
+    ).toBe(0);
+    expect(await entitlementBalance(db, f.shop.id, f.pass.id)).toEqual({
+      availableUnits: 5,
+      reservedUnits: 0,
+      consumedUnits: 0,
+    });
+  },
+);
+
 test("staff booking reserves one credit, activates Pass and queues notifications exactly once with public booking closed", async () => {
   const f = await fixture();
   expect((f.shop.rules as Record<string, unknown>).onlineBookingsEnabled).toBe(

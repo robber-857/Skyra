@@ -7,10 +7,12 @@ export function StaffBookingForm({
   options,
   clientName,
   idempotencyKey,
+  canBookUntilStart = false,
 }: {
   options: Awaited<ReturnType<typeof staffBookingOptions>>;
   clientName: string;
   idempotencyKey: string;
+  canBookUntilStart?: boolean;
 }) {
   const [sessionId, setSessionId] = useState(options[0]?.id ?? "");
   const [confirmed, setConfirmed] = useState(false);
@@ -21,7 +23,9 @@ export function StaffBookingForm({
       <h2>Book a class for {clientName}</h2>
       <p>
         Choose a published class and reserve one credit from the selected Pass.
-        Booking opens when a class is published and closes 2 hours before it starts.
+        {canBookUntilStart
+          ? " Admin bookings are available from publication until the class starts, including the last 2 hours."
+          : " Booking opens when a class is published and closes 2 hours before it starts."}
       </p>
       {!options.length ? (
         <p>

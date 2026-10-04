@@ -52,6 +52,7 @@ export function bookingWindow(
   shop: Shop,
   session: { startsAt: Date; timezone: string; status: string },
   now: Date,
+  mode: "CUSTOMER" | "ADMIN" = "CUSTOMER",
 ) {
   const rules = shop.rules as Record<string, unknown>;
   if (
@@ -61,7 +62,8 @@ export function bookingWindow(
   )
     return "RULES_NOT_READY";
   if (session.status !== "PUBLISHED") return "UNAVAILABLE";
-  if (now.getTime() >= session.startsAt.getTime() - 120 * 60000)
+  const closesBeforeMinutes = mode === "ADMIN" ? 0 : 120;
+  if (now.getTime() >= session.startsAt.getTime() - closesBeforeMinutes * 60000)
     return "BOOKING_CLOSED";
   // Published sessions open immediately; legacy bookingWindowDays is ignored.
   return "OPEN";
@@ -71,6 +73,7 @@ export async function classForBooking(
   shop: Shop,
   sessionId: string,
   now: Date,
+  mode: "CUSTOMER" | "ADMIN" = "CUSTOMER",
 ) {
   const session = await tx.classSession.findFirst({
     where: { shopId: shop.id, id: sessionId },
@@ -83,7 +86,7 @@ export async function classForBooking(
     session.coach.status !== "ACTIVE"
   )
     return fail("UNAVAILABLE", "This class is no longer available.");
-  const window = bookingWindow(shop, session, now);
+  const window = bookingWindow(shop, session, now, mode);
   if (window !== "OPEN")
     fail(window, "This class is outside its booking window.");
   return session;

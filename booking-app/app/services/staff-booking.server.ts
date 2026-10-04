@@ -57,7 +57,7 @@ export async function staffBookingOptions(actor: Actor, customerId: string) {
   const options = [];
   for (const s of sessions) {
     if (
-      bookingWindow(shop, s, now) !== "OPEN" ||
+      bookingWindow(shop, s, now, actor.role === "ADMIN" ? "ADMIN" : "CUSTOMER") !== "OPEN" ||
       !capacity.get(s.id) ||
       booked.some((b) => b.sessionId === s.id)
     )
@@ -136,7 +136,13 @@ export async function bookClientIntoSession(actor: Actor, raw: unknown) {
         return previous.bookingId!;
       }
       const now = await databaseNow(tx);
-      const session = await classForBooking(tx, shop, input.sessionId, now);
+      const session = await classForBooking(
+        tx,
+        shop,
+        input.sessionId,
+        now,
+        actor.role === "ADMIN" ? "ADMIN" : "CUSTOMER",
+      );
       if (
         await tx.booking.findFirst({
           where: {

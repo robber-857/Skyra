@@ -389,6 +389,60 @@ test("published sessions open immediately with legacy or absent opening rules an
   await expect(f.start()).rejects.toMatchObject({ code: "UNAVAILABLE" });
 });
 
+test("only the internal ADMIN booking mode extends the cutoff until the exact class start", async () => {
+  const f = await fixture();
+  const startsAt = DateTime.fromISO("2026-10-04T14:20", {
+    zone: "Australia/Sydney",
+  }).toJSDate();
+  const session = { ...f.session, startsAt };
+  for (const [offset, customerResult, adminResult] of [
+    [-120 * 60000 - 1, "OPEN", "OPEN"],
+    [-120 * 60000, "BOOKING_CLOSED", "OPEN"],
+    [-1, "BOOKING_CLOSED", "OPEN"],
+    [0, "BOOKING_CLOSED", "BOOKING_CLOSED"],
+    [1, "BOOKING_CLOSED", "BOOKING_CLOSED"],
+  ] as const) {
+    const now = new Date(startsAt.getTime() + offset);
+    expect(bookingWindow(f.shop, session, now)).toBe(customerResult);
+    expect(bookingWindow(f.shop, session, now, "CUSTOMER")).toBe(customerResult);
+    expect(bookingWindow(f.shop, session, now, "ADMIN")).toBe(adminResult);
+  }
+
+  const late = new Date(startsAt.getTime() - 60000);
+  for (const status of ["DRAFT", "CANCELLED", "COMPLETED"]) {
+    expect(bookingWindow(f.shop, { ...session, status }, late, "ADMIN")).toBe(
+      "UNAVAILABLE",
+    );
+  }
+  for (const shop of [
+    { ...f.shop, rulesApprovedAt: null },
+    { ...f.shop, rules: { ...rules, bookingClosesBeforeMinutes: 0 } },
+    { ...f.shop, rules: { ...rules, seatHoldMinutes: 0 } },
+  ]) {
+    expect(bookingWindow(shop, session, late, "ADMIN")).toBe("RULES_NOT_READY");
+  }
+});
+
+test("customers remain closed within two hours and cannot inject the admin booking mode", async () => {
+  const f = await fixture();
+  const startsAt = new Date(Date.now() + 60 * 60000);
+  const endsAt = new Date(startsAt.getTime() + 55 * 60000);
+  await db.classSession.update({
+    where: { id: f.session.id },
+    data: { startsAt, endsAt, busyStartsAt: startsAt, busyEndsAt: endsAt },
+  });
+  await expect(f.start()).rejects.toMatchObject({ code: "BOOKING_CLOSED" });
+  await expect(
+    startAttempt(f.actor(), {
+      sessionId: f.session.id,
+      surface: "HOME",
+      mode: "ADMIN",
+    }),
+  ).rejects.toThrow();
+  expect(await db.bookingAttempt.count({ where: { shopId: f.shopId } })).toBe(0);
+  expect(await db.bookingHold.count({ where: { shopId: f.shopId } })).toBe(0);
+});
+
 test.each(["CLASS", "APPOINTMENT", "COURSE"])(
   "%s more than 14 days away accepts attempts and seat holds as soon as it is published",
   async (kind) => {

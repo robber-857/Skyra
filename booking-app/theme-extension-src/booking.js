@@ -10,7 +10,6 @@
     loading: "Loading live classes",
     empty: "No published classes are available for this date.",
     error: "We could not load the schedule right now.",
-    retry: "Try again",
     spots: "spots left",
     spot: "spot left",
     full: "Full",
@@ -18,20 +17,15 @@
     back: "Back to schedule",
     continue: "Continue to booking",
     book: "Book",
-    studioTimezone: "Times are shown in the studio timezone."
+    studioTimezone: "Times are shown in the studio timezone.",
+    bookingPolicy: "Online booking closes 2 hours before class. For last-minute bookings, please contact the studio."
   };
 
-  function readCopy() {
+  let copy = fallbackCopy;
+  try {
     const source = document.querySelector("[data-skyra-booking-config]");
-    if (!source) return fallbackCopy;
-    try {
-      return Object.assign({}, fallbackCopy, JSON.parse(source.textContent || "{}").copy);
-    } catch {
-      return fallbackCopy;
-    }
-  }
-
-  const copy = readCopy();
+    if (source) copy = { ...fallbackCopy, ...JSON.parse(source.textContent || "{}").copy };
+  } catch { /* Keep the fallback copy when the configuration cannot be read. */ }
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -48,12 +42,8 @@
     return next.toISOString().slice(0, 10);
   }
 
-  function dateFromKey(key) {
-    return new Date(key + "T12:00:00Z");
-  }
-
   function formatDate(key, timeZone, options) {
-    return new Intl.DateTimeFormat("en-AU", Object.assign({ timeZone: timeZone }, options)).format(dateFromKey(key));
+    return new Intl.DateTimeFormat("en-AU", { timeZone, ...options }).format(new Date(key + "T12:00:00Z"));
   }
 
   function formatTime(value, timeZone) {
@@ -125,7 +115,7 @@
       root.replaceChildren();
       const header = element("div", "skyra-booking__header");
       const heading = element("div");
-      heading.append(element("h2", "", copy.title), element("p", "", copy.subtitle));
+      heading.append(element("h2", "", copy.title), element("p", "", copy.subtitle), element("p", "", copy.bookingPolicy));
       const account = element("a", "skyra-booking__account", copy.account);
       account.href = attempt.accountUrl();
       header.append(heading, account);
