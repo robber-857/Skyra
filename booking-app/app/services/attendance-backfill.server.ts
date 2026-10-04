@@ -4,6 +4,7 @@ import { z } from "zod";
 import db from "../db.server";
 import { DomainError } from "../lib/errors.server";
 import { requireOperations, type Actor } from "./authorization";
+import { activateMembershipForAttendance } from "./membership-lifecycle.server";
 import { databaseNow } from "./booking.server";
 import { audit } from "./catalog.server";
 import {
@@ -203,6 +204,7 @@ export async function backfillAttendance(actor: Actor, raw: unknown) {
         bookingId: booking.id,
         idempotencyKey: `${key}:reserve`,
       });
+      await activateMembershipForAttendance(tx, { shopId: actor.shopId, bookingId: booking.id, sessionStartsAt: session.startsAt, actorId: actor.actorId });
       await consumeEntitlementReservation(tx, {
         shopId: actor.shopId,
         entitlementId: input.entitlementId,

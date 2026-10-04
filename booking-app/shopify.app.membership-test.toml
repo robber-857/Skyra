@@ -1,0 +1,52 @@
+client_id = "c9d266a38e2f11a1240139974253b3a1"
+name = "Skyra Booking"
+application_url = "https://skyra-booking-web.onrender.com"
+embedded = true
+[build]
+automatically_update_urls_on_dev = true
+[access_scopes]
+scopes = "write_products,read_publications,write_publications,write_metaobjects,read_metaobjects,write_metaobject_definitions,read_metaobject_definitions,write_app_proxy,unauthenticated_read_product_listings,unauthenticated_write_checkouts,unauthenticated_read_selling_plans,read_orders,read_customers,write_customers,read_own_subscription_contracts,write_own_subscription_contracts,read_customer_payment_methods,read_validations,write_validations"
+[auth]
+redirect_urls = ["https://skyra-booking-web.onrender.com/auth/callback"]
+[app_proxy]
+url = "/apps/skyra-booking"
+prefix = "apps"
+subpath = "skyra-booking"
+
+[webhooks]
+api_version = "2026-07"
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+uri = "/webhooks/app/uninstalled"
+[[webhooks.subscriptions]]
+topics = ["app/scopes_update"]
+uri = "/webhooks/app/scopes_update"
+[[webhooks.subscriptions]]
+topics = ["orders/paid"]
+uri = "/webhooks/orders/paid"
+[[webhooks.subscriptions]]
+topics = ["subscription_contracts/create", "subscription_contracts/update"]
+uri = "/webhooks/memberships/contracts"
+[[webhooks.subscriptions]]
+topics = ["subscription_billing_attempts/success", "subscription_billing_attempts/failure", "subscription_billing_attempts/challenged"]
+uri = "/webhooks/memberships/billing"
+[product.metafields.app.booking_owner_id]
+name = "Booking owner ID"
+description = "Stable Booking Service or PassPlan UUID; managed by Skyra Booking."
+type = "single_line_text_field"
+access.admin = "merchant_read"
+[product.metafields.app.entitlement_kind]
+name = "Booking entitlement kind"
+description = "Booking purchase type: DROP_IN for a Class or PACK for a Pass."
+type = "single_line_text_field"
+access.admin = "merchant_read"
+[product.metafields.app.managed_monthly_pass]
+name = "Protected monthly Pass"
+description = "Requires a Skyra-issued customer and cart authorization at payment."
+type = "boolean"
+access.admin = "merchant_read"
+[customer.metafields.app.membership_checkout]
+name = "Monthly Pass checkout authorization"
+description = "Current payment authorization; only Skyra Booking can modify it."
+type = "json"
+access.admin = "merchant_read"

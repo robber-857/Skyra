@@ -1,5 +1,7 @@
 import db from "../db.server";
 import { DomainError } from "../lib/errors.server";
+import { z } from "zod";
+import { membershipCapabilities } from "./membership-capabilities.server";
 import {
   bookingPassOptions,
   passOptionsInput,
@@ -15,8 +17,18 @@ export async function bookingPurchaseReview(
   raw: unknown,
   clientsForShop: (domain: string) => Promise<CommerceClients>,
 ) {
-  const input = passOptionsInput.parse(raw);
+  const { autoRenew, ...rest } = z
+    .object({ autoRenew: z.boolean().optional().default(false) })
+    .passthrough()
+    .parse(raw);
+  const input = passOptionsInput.parse(rest);
   const options = await bookingPassOptions(actor, input);
+  if (autoRenew && options.selected?.kind !== "NEW_PASS")
+    throw new DomainError(
+      "AUTO_RENEW_UNAVAILABLE",
+      "Automatic renewal is available only when purchasing an eligible Pass.",
+      409,
+    );
   if (!options.selected || options.selected.kind === "OWNED_PASS")
     return options;
   const selected = options.selected;
@@ -41,6 +53,22 @@ export async function bookingPurchaseReview(
       409,
     );
   if (!mapping) throw unavailable();
+  if (autoRenew) {
+    const plan = await db.passPlan.findFirst({
+      where: { id: selected.id, shopId: shop.id },
+    });
+    if (
+      !membershipCapabilities(shop.domain).autoRenewAvailable ||
+      !plan?.autoRenewEnabled ||
+      !plan.sellingPlanGid ||
+      plan.validityMonths !== 1
+    )
+      throw new DomainError(
+        "AUTO_RENEW_UNAVAILABLE",
+        "Automatic renewal is not available for this Pass.",
+        409,
+      );
+  }
   let clients: CommerceClients;
   try {
     clients = await clientsForShop(shop.domain);
@@ -77,5 +105,9 @@ export async function bookingPurchaseReview(
     current.selected?.priceCents !== selected.priceCents
   )
     throw unavailable();
-  return { ...current, availabilityCheckedAt: checked.checkedAt };
+  return {
+    ...current,
+    autoRenewSelected: autoRenew,
+    availabilityCheckedAt: checked.checkedAt,
+  };
 }

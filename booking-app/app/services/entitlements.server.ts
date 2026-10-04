@@ -295,6 +295,7 @@ export async function eligibleEntitlements(
               "Class credit",
             grantedUnits: entitlement.grantedUnits,
             expiresAt: entitlement.expiresAt,
+            activationMode: entitlement.activationMode,
             ...balance,
           },
         ]
@@ -391,7 +392,7 @@ export async function reserveEntitlementCredit(
   );
   if (balance.availableUnits < 1)
     fail("ENTITLEMENT_EMPTY", "This Pass has no available class credits.");
-  if (!entitlement.startsAt) {
+  if (!entitlement.startsAt && entitlement.activationMode !== "FIRST_ATTENDANCE") {
     entitlement = await tx.entitlement.update({
       where: { id: entitlement.id },
       data: {

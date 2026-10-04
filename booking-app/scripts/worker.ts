@@ -1,4 +1,6 @@
 import "dotenv/config";
+import { sweepMembershipWork } from "../app/services/membership-worker.server";
+import { sweepMembershipNotifications } from "../app/services/membership-notifications.server";
 import { sweepMailDeliveryStatus } from "../app/services/mail-delivery-status.server";
 import { sweepCoachLoginMail } from "../app/services/coach-self-service.server";
 import { sweepInternalBookingMail } from "../app/services/internal-booking-mail.server";
@@ -100,6 +102,10 @@ async function sweepBookings() {
     await sweepCoachLoginMail();
     await sweepInternalBookingMail();
     await sweepMailDeliveryStatus();
+    await sweepMembershipWork(
+      async (domain) => (await unauthenticated.admin(domain)).admin.graphql,
+    );
+    await sweepMembershipNotifications();
   } catch {
     log.error("Booking expiry sweep failed");
   } finally {

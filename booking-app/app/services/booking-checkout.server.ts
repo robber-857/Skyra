@@ -1,4 +1,8 @@
-import { requireBookingTerms, recordBookingTerms } from "./booking-terms.server";
+import {
+  bookingTerms,
+  requireBookingTerms,
+  recordBookingTerms,
+} from "./booking-terms.server";
 import { createHash, randomBytes } from "node:crypto";
 import type { BookingAttempt, Prisma, Shop } from "@prisma/client";
 import { z } from "zod";
@@ -25,6 +29,15 @@ import {
   createBookingCart,
   readBookingCart,
 } from "./shopify-cart.server";
+import {
+  AUTO_RENEW_TERMS_VERSION,
+  membershipCapabilities,
+} from "./membership-capabilities.server";
+import { claimPassPurchaseInTransaction } from "./membership-purchases.server";
+import {
+  extractAutoRenewChoice,
+  preparePassPurchaseCart,
+} from "./membership-checkout.server";
 
 type Input = z.infer<typeof holdInput>;
 function fail(code: string, message: string, status = 409): never {
@@ -128,6 +141,8 @@ async function readContext(
         plan?.validityDays,
         plan?.validityMonths,
         plan?.introOnly,
+        plan?.autoRenewEnabled,
+        plan?.sellingPlanGid,
         session.service.id,
         session.service.version,
         session.id,
@@ -147,6 +162,8 @@ async function readContext(
     fail("CATALOG_CHANGED", "The booking changed. Start a new booking.");
   return {
     domain: shop.domain,
+    customerId: attempt.customerId,
+    plan,
     surface: attempt.surface,
     hold,
     checkout,
@@ -171,6 +188,99 @@ async function readContext(
   };
 }
 type Context = Awaited<ReturnType<typeof readContext>>;
+
+async function guardManagedPassCheckout(
+  tx: Prisma.TransactionClient,
+  shopId: string,
+  context: Context,
+  autoRenew: boolean,
+) {
+  if (!context.plan) return;
+  // Membership and Booking serialize on the same customer before claiming a
+  // payable cart. A seat-hold deadline never proves that its checkout is unpaid.
+  await tx.$queryRaw`SELECT id FROM "CustomerProfile" WHERE id = ${context.customerId}::uuid AND "shopId" = ${shopId}::uuid FOR UPDATE`;
+  const membership = await tx.passMembership.findUnique({
+    where: {
+      shopId_customerId_passPlanId: {
+        shopId,
+        customerId: context.customerId!,
+        passPlanId: context.plan.id,
+      },
+    },
+  });
+  if (!membership) return;
+  const purchase = await tx.passPurchase.findUnique({
+    where: {
+      membershipId_cycle: {
+        membershipId: membership.id,
+        cycle: membership.currentCycle,
+      },
+    },
+  });
+  if (!purchase) return;
+  if (purchase.bookingCheckoutId === context.checkout?.id) {
+    if ((purchase.mode === "AUTO_RENEW") !== autoRenew)
+      fail(
+        "IDEMPOTENCY_CONFLICT",
+        "This checkout already uses a different renewal option.",
+      );
+    return;
+  }
+  if (purchase.status !== "PAID")
+    fail(
+      "PASS_PAYMENT_IN_PROGRESS",
+      "A payment for this Pass already exists. Return to that purchase before starting another.",
+    );
+  const entitlement = purchase.entitlementId
+    ? await tx.entitlement.findUnique({ where: { id: purchase.entitlementId } })
+    : null;
+  const [{ now }] = await tx.$queryRaw<
+    { now: Date }[]
+  >`SELECT clock_timestamp() AS now`;
+  if (
+    membership.autoRenew ||
+    membership.contractGid ||
+    !entitlement?.expiresAt ||
+    entitlement.expiresAt > now
+  )
+    fail(
+      "PASS_ALREADY_OWNED",
+      "Use your existing Pass or manage its renewal before buying another.",
+    );
+}
+
+function managedMonthlyPass(context: Context) {
+  return (
+    context.plan?.validityMonths === 1 &&
+    (Boolean(context.plan.sellingPlanGid) ||
+      context.plan.autoRenewEnabled ||
+      membershipCapabilities(context.domain).checkoutAvailable)
+  );
+}
+
+function requireRenewalAvailable(context: Context, autoRenew: boolean) {
+  if (
+    managedMonthlyPass(context) &&
+    !membershipCapabilities(context.domain).checkoutGuardReady
+  )
+    fail(
+      "MEMBERSHIP_CHECKOUT_GUARD_UNAVAILABLE",
+      "Monthly Pass payments are awaiting checkout verification.",
+      503,
+    );
+  if (
+    autoRenew &&
+    (!context.plan ||
+      !context.plan.autoRenewEnabled ||
+      !context.plan.sellingPlanGid ||
+      context.plan.validityMonths !== 1 ||
+      !membershipCapabilities(context.domain).autoRenewAvailable)
+  )
+    fail(
+      "AUTO_RENEW_UNAVAILABLE",
+      "Automatic renewal is not available for this Pass.",
+    );
+}
 
 function withContext<T>(
   actor: BookingActor,
@@ -253,7 +363,8 @@ export async function prepareBookingCheckout(
   raw: unknown,
   clientsForShop: (domain: string) => Promise<CommerceClients>,
 ) {
-  const input = holdInput.parse(requireBookingTerms(raw));
+  const choice = extractAutoRenewChoice(requireBookingTerms(raw));
+  const input = holdInput.parse(choice.input);
   if (
     !actor.customerGid ||
     !/^gid:\/\/shopify\/Customer\/[1-9]\d*$/.test(actor.customerGid)
@@ -264,10 +375,13 @@ export async function prepareBookingCheckout(
     input,
     async (_tx, context) => context,
   );
+  requireRenewalAvailable(before, choice.autoRenew);
   assertReplayable(before);
-  const handoffMode = isDevelopmentBookingShop(before.domain)
-    ? "ONLINE_STORE_NATIVE"
-    : "STOREFRONT_API";
+  const managedPassPurchase = choice.autoRenew || managedMonthlyPass(before);
+  const handoffMode =
+    !managedPassPurchase && isDevelopmentBookingShop(before.domain)
+      ? "ONLINE_STORE_NATIVE"
+      : "STOREFRONT_API";
   let clients: CommerceClients;
   try {
     clients = await clientsForShop(before.domain);
@@ -303,39 +417,115 @@ export async function prepareBookingCheckout(
   await createSeatHold(actor, input);
   const claim = await withContext(actor, input, async (tx, context) => {
     sameCatalog(before, context);
+    requireRenewalAvailable(context, choice.autoRenew);
     assertReplayable(context);
-    if (context.checkout) {
-      await recordBookingTerms(tx, actor.shopId, actor.customerGid!, context.checkout.id, new Date());
-      return { intent: context.checkout, creating: false };
-    }
-    const intent = await tx.bookingCheckout.create({
-      data: {
-        shopId: actor.shopId,
-        holdId: context.hold!.id,
-        productMappingId: context.mappingId,
-        reference: randomBytes(32).toString("base64url"),
-        productGid: context.productGid,
-        variantGid: context.variantGid,
-        priceCents: context.priceCents,
-        catalogFingerprint: context.fingerprint,
-        purchaseTerms: context.purchaseTerms,
-        handoffMode,
-      },
-    });
-    await tx.auditLog.create({
-      data: {
-        shopId: actor.shopId,
-        actorId: actor.customerGid!,
-        action: "CHECKOUT_CREATING",
-        entityId: intent.id,
-        after: { holdId: intent.holdId },
-      },
-    });
-    await recordBookingTerms(tx, actor.shopId, actor.customerGid!, intent.id, new Date());
-    return { intent, creating: true };
+    await guardManagedPassCheckout(tx, actor.shopId, context, choice.autoRenew);
+    if (
+      managedPassPurchase &&
+      context.checkout &&
+      !(await tx.passPurchase.findUnique({
+        where: { bookingCheckoutId: context.checkout.id },
+      }))
+    )
+      fail(
+        "IDEMPOTENCY_CONFLICT",
+        "This checkout already uses a different renewal option.",
+      );
+    const intent =
+      context.checkout ||
+      (await tx.bookingCheckout.create({
+        data: {
+          shopId: actor.shopId,
+          holdId: context.hold!.id,
+          productMappingId: context.mappingId,
+          reference: randomBytes(32).toString("base64url"),
+          productGid: context.productGid,
+          variantGid: context.variantGid,
+          priceCents: context.priceCents,
+          catalogFingerprint: context.fingerprint,
+          purchaseTerms: context.purchaseTerms,
+          handoffMode,
+        },
+      }));
+    if (!context.checkout)
+      await tx.auditLog.create({
+        data: {
+          shopId: actor.shopId,
+          actorId: actor.customerGid!,
+          action: "CHECKOUT_CREATING",
+          entityId: intent.id,
+          after: { holdId: intent.holdId },
+        },
+      });
+    await recordBookingTerms(
+      tx,
+      actor.shopId,
+      actor.customerGid!,
+      intent.id,
+      new Date(),
+    );
+    // Every new one-calendar-month Pass shares the durable claim, receipt and
+    // attendance activation, including a one-time purchase during Booking.
+    const membershipClaim = managedPassPurchase
+      ? await claimPassPurchaseInTransaction(tx, {
+          shopId: actor.shopId,
+          customerId: context.customerId!,
+          passPlanId: context.plan!.id,
+          mode: choice.autoRenew ? "AUTO_RENEW" : "ONCE",
+          bookingCheckoutId: intent.id,
+          idempotencyKey: `booking-membership:${intent.id}`,
+          productMappingId: context.mappingId,
+          productGid: context.productGid,
+          variantGid: context.variantGid,
+          sellingPlanGid: choice.autoRenew
+            ? context.plan!.sellingPlanGid
+            : null,
+          priceCents: context.priceCents,
+          currency: "AUD",
+          credits: context.purchaseTerms.credits,
+          validityDays: context.purchaseTerms.validityDays,
+          validityMonths: context.purchaseTerms.validityMonths,
+          timezone: context.purchaseTerms.timezone,
+          termsVersion: bookingTerms.version,
+          autoRenewTermsVersion: choice.autoRenew
+            ? AUTO_RENEW_TERMS_VERSION
+            : undefined,
+        })
+      : null;
+    return { intent, creating: !context.checkout, membershipClaim };
   });
   const { intent, creating } = claim;
   try {
+    if (claim.membershipClaim) {
+      const ready = await preparePassPurchaseCart(
+        actor,
+        claim.membershipClaim,
+        before.domain,
+        clients,
+        intent.reference,
+      );
+      return await withContext(actor, input, async (tx, context) => {
+        sameCatalog(before, context);
+        if (
+          context.checkout?.id !== intent.id ||
+          context.checkout.status !== (creating ? "CREATING" : "READY")
+        )
+          fail(
+            "CART_RECOVERY_REQUIRED",
+            "This checkout needs a payment review before you continue.",
+          );
+        await tx.bookingCheckout.update({
+          where: { id: intent.id },
+          data: { status: "READY", cartId: ready.cartId },
+        });
+        return {
+          status: "CHECKOUT_READY",
+          checkoutUrl: ready.checkoutUrl,
+          holdExpiresAt: context.hold!.expiresAt.toISOString(),
+          returnPath: attemptReturnPath(context.surface, input.token),
+        };
+      });
+    }
     if (intent.handoffMode === "ONLINE_STORE_NATIVE") {
       const variantId = Number(intent.variantGid.split("/").at(-1));
       if (!Number.isSafeInteger(variantId) || variantId <= 0)

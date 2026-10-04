@@ -1,4 +1,5 @@
 import bookingTerms from "../app/lib/booking-terms.json";
+import { passValidity, renewalChoice, renewalDescription, renewalTermsVersion } from "./pass-purchase-ui.js";
 import {
   prepareNativeBookingCart,
   submitNativeCheckout,
@@ -40,12 +41,9 @@ window.SkyraBookingTransaction = function ({
     ...data.passes,
   ];
   const terms = (option) =>
-    kind(option) === "OWNED_PASS" ? option.availableUnits + " credits available · " + (option.expiresAt ? "Expires " + format(option.expiresAt, {day:"numeric",month:"short",year:"numeric"}) : "Activates on first booked class") : kind(option) === "DROP_IN"
+    kind(option) === "OWNED_PASS" ? option.availableUnits + " credits available · " + (option.expiresAt ? "Expires " + format(option.expiresAt, {day:"numeric",month:"short",year:"numeric"}) : option.activationMode === "FIRST_ATTENDANCE" ? "Starts after your first attended class" : "Starts on first class") : kind(option) === "DROP_IN"
       ? "One booking · This class only"
-      : option.credits +
-        " classes · Valid for " +
-        (option.validityMonths ?? option.validityDays) +
-        (option.validityMonths ? " calendar months from first class" : " days from first class");
+      : passValidity(option);
   const format = (value, options) =>
     new Intl.DateTimeFormat("en-AU", { timeZone: timezone, ...options }).format(
       new Date(value),
@@ -54,6 +52,7 @@ window.SkyraBookingTransaction = function ({
   let comment = attempt.customerComment || "", commentLoaded = false;
   let payload,
     selectedId,
+    autoRenew = false,
     revision = 0;
   shell(host);
   const exit = () => {
@@ -141,7 +140,7 @@ window.SkyraBookingTransaction = function ({
           ...(option
             ? kind(option) === "OWNED_PASS" ? {purchaseKind:"OWNED_PASS", entitlementId:option.id} : kind(option) === "DROP_IN"
               ? { purchaseKind: "DROP_IN" }
-              : { purchaseKind: "NEW_PASS", passPlanId: option.id }
+              : { purchaseKind: "NEW_PASS", passPlanId: option.id, autoRenew }
             : {}),
         }),
         signal: AbortSignal.timeout(10000),
@@ -181,6 +180,14 @@ window.SkyraBookingTransaction = function ({
       return;
     }
     const group = el("fieldset", "skyra-booking__passes");
+    const renewal = el("div");
+    const renderRenewal = (pass) => {
+      renewal.replaceChildren();
+      if (!pass || kind(pass) !== "NEW_PASS") { autoRenew = false; return; }
+      if (!pass.autoRenew?.available) autoRenew = false;
+      const choice = renewalChoice({ pass, value: autoRenew, name: root.id + "-renewal", className: "skyra-booking__renewal", onChange: (value) => { autoRenew = value; } });
+      if (choice) renewal.append(choice);
+    };
     group.append(
       el("legend", "skyra-booking__live", "Available booking options"),
     );
@@ -200,13 +207,16 @@ window.SkyraBookingTransaction = function ({
       group.append(label);
       input.addEventListener("change", () => {
         selectedId = key(pass);
+        autoRenew = false;
+        renderRenewal(pass);
         next.disabled = false;
       });
     });
     const next = button("Continue", "skyra-booking__primary", review);
     next.disabled = !selectedId;
     next.dataset.passContinue = "";
-    main.append(group, next);
+    renderRenewal(options(payload).find((pass) => key(pass) === selectedId));
+    main.append(group, renewal, next);
   }
   async function resultRequest(path, body = {}) {
     const response = await fetch((root.dataset.proxyBase || "/apps/skyra-booking") + path, {
@@ -218,7 +228,7 @@ window.SkyraBookingTransaction = function ({
     if (!response.ok) { const error = new Error(data.error || "We could not check your booking."); error.code=data.code; error.status=response.status; error.bookingError=true; throw error; }
     return data;
   }
-  function paymentConsent(main, proceed, available = true) {
+  function paymentConsent(main, proceed, available = true, renewalPass) {
     const label = el("label", "skyra-booking__terms"), checkbox = el("input"), copy = el("span");
     checkbox.type = "checkbox";
     checkbox.required = true;
@@ -230,9 +240,20 @@ window.SkyraBookingTransaction = function ({
     copy.append(link, document.createTextNode("."));
     label.append(checkbox, copy);
     proceed.disabled = true;
-    checkbox.addEventListener("change", () => { proceed.disabled = !available || !checkbox.checked; });
+    let renewalCheckbox;
+    const update = () => { proceed.disabled = !available || !checkbox.checked || (renewalCheckbox && !renewalCheckbox.checked); };
+    checkbox.addEventListener("change", update);
     main.append(label);
-    return () => checkbox.checked;
+    if (renewalPass) {
+      const renewalLabel = el("label", "skyra-booking__terms");
+      renewalCheckbox = el("input");
+      renewalCheckbox.type = "checkbox";
+      renewalCheckbox.required = true;
+      renewalCheckbox.addEventListener("change", update);
+      renewalLabel.append(renewalCheckbox, el("span", "", "I authorise the renewal payment at each pass expiry and understand that no further payment is taken while the next pass awaits activation."));
+      main.append(renewalLabel);
+    }
+    return () => checkbox.checked && (!renewalCheckbox || renewalCheckbox.checked);
   }
   const termsAcceptance = {accepted: true, version: bookingTerms.version};
   function resultView(data, retry) {
@@ -307,9 +328,11 @@ window.SkyraBookingTransaction = function ({
         termsAcceptance,
         idempotencyKey,
         ...(purchaseKind === "NEW_PASS" ? {passPlanId:pass.id} : {}),
+        ...(purchaseKind === "NEW_PASS" ? {autoRenew, ...(autoRenew ? {autoRenewAcceptance:{accepted:true,version:pass.autoRenew?.termsVersion || renewalTermsVersion}} : {})} : {}),
       });
       if(version!==revision || !root.contains(host)) return;
       if(data.status === "NATIVE_CART_READY") {
+        if (autoRenew) throw new Error("Automatic renewal checkout is not available. Return to your Pass selection to check again.");
         const checkoutAction = await prepareNativeBookingCart(data);
         if(version!==revision || !root.contains(host)) return;
         submitNativeCheckout(checkoutAction);
@@ -397,6 +420,10 @@ window.SkyraBookingTransaction = function ({
         el("strong", "", money(pass)),
       );
       summary.append(total);
+      if (autoRenew) {
+        if (!pass.autoRenew?.available) throw new Error("Automatic renewal is no longer available. Choose your Pass again.");
+        summary.append(el("p", "skyra-booking__notice", renewalDescription(pass, money(pass))));
+      }
       const noteLabel=el("label","skyra-booking__note","Note for your coach (optional)");
       const note=el("textarea");note.maxLength=1000;note.rows=3;note.value=comment;note.placeholder="For this session, I would like to work on…";note.addEventListener("input",()=>{comment=note.value;});noteLabel.append(note);
       const noteStatus=el("p","skyra-booking__notice");noteStatus.setAttribute("role","status");
@@ -427,7 +454,7 @@ window.SkyraBookingTransaction = function ({
         },
       );
       checkout.disabled = ownedPass ? !data.ownedPassesAvailable : !data.checkoutAvailable;
-      const accepted = ownedPass ? () => true : paymentConsent(main, checkout, data.checkoutAvailable);
+      const accepted = ownedPass ? () => true : paymentConsent(main, checkout, data.checkoutAvailable, autoRenew ? pass : null);
       main.append(checkout);
     } catch (error) {
       if (version === revision && root.contains(host)) errorView(error, load);

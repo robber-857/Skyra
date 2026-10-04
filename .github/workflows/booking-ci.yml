@@ -16,7 +16,7 @@ jobs:
           POSTGRES_USER: skyra
           POSTGRES_PASSWORD: ci-test-only
           POSTGRES_DB: skyra_booking_test
-        ports: ["5432:5432"]
+        ports: ["55432:5432"]
         options: >-
           --health-cmd "pg_isready -U skyra -d skyra_booking_test"
           --health-interval 5s --health-timeout 5s --health-retries 10
@@ -24,7 +24,7 @@ jobs:
       run:
         working-directory: booking-app
     env:
-      DATABASE_URL: postgresql://skyra:ci-test-only@localhost:5432/skyra_booking_test?schema=public&connection_limit=25
+      DATABASE_URL: postgresql://skyra:ci-test-only@localhost:55432/skyra_booking_test?schema=public&connection_limit=25
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444

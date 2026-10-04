@@ -1,0 +1,14 @@
+[package]
+name = "skyra-membership-checkout-guard"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+# Pin the official scaffold SDK; Shopify CLI applies the required Wasm
+# trampoline after the raw Cargo build and before execution or deployment.
+shopify_function = "=2.1.0"
+
+[profile.release]
+lto = true
+opt-level = 'z'
+strip = true

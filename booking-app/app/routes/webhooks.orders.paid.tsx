@@ -2,6 +2,7 @@ import type { ActionFunctionArgs } from "react-router";
 import { log } from "../lib/log.server";
 import { receiveOrderPaidWebhook } from "../services/order-paid-webhook.server";
 import { authenticate } from "../shopify.server";
+import { receiveMembershipOrderPaid } from "../services/membership-payments.server";
 
 function isOrdersPaid(topic: string) {
   return topic.toLowerCase().replaceAll("_", "/") === "orders/paid";
@@ -14,6 +15,8 @@ export async function action({ request }: ActionFunctionArgs) {
   const normalizedTopic = String(topic);
   if (!isOrdersPaid(normalizedTopic))
     return new Response(null, { status: 400 });
+  const membership = await receiveMembershipOrderPaid({ shopDomain: shop, webhookId, rawBody, payload });
+  if (membership?.skipBooking) return new Response(null, { status: 200 });
   const result = await receiveOrderPaidWebhook({
     shopDomain: shop,
     webhookId,

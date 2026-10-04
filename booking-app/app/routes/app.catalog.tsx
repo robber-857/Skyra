@@ -35,11 +35,19 @@ const PAGE_SIZE = 8;
 export async function loader({ request }: LoaderFunctionArgs) {
   const { actor, shop } = await adminContext(request);
   const data = await catalogData(actor.shopId);
-  const edit = new URL(request.url).searchParams.get("edit");
+  const params = new URL(request.url).searchParams;
+  const edit = params.get("edit");
+  const initialTab: "pass" | "service" =
+    params.get("tab") === "pass" ? "pass" : "service";
+  const records = initialTab === "pass" ? data.passes : data.services;
+  const editId = records.find((record) => record.id === edit)?.id ?? null;
   return {
     ...data,
     domain: shop.domain,
-    editId: data.services.find((service) => service.id === edit)?.id ?? null,
+    initialTab,
+    editId,
+    openEditor: Boolean(editId) || params.get("new") === "1",
+    fromMemberships: params.get("from") === "memberships",
   };
 }
 export async function action({ request }: ActionFunctionArgs) {
@@ -107,9 +115,9 @@ export default function Catalog() {
     return () => clearInterval(timer);
   }, [data.mappings, revalidator]);
   const busy = useNavigation().state !== "idle";
-  const [tab, setTab] = useState<"service" | "pass">("service");
+  const [tab, setTab] = useState<"service" | "pass">(data.initialTab);
   const [edit, setEdit] = useState<string | null>(data.editId);
-  const [open, setOpen] = useState(Boolean(data.editId));
+  const [open, setOpen] = useState(data.openEditor);
   const editorHeading = useRef<HTMLHeadingElement>(null);
   const [editorRequest, setEditorRequest] = useState(0);
   useEffect(() => {
@@ -154,10 +162,7 @@ export default function Catalog() {
             setup.
           </p>
         </div>
-        <button
-          className="primary"
-          onClick={() => openEditor(null)}
-        >
+        <button className="primary" onClick={() => openEditor(null)}>
           Add {tab === "service" ? "class" : "pass"}
         </button>
       </header>
@@ -173,6 +178,17 @@ export default function Catalog() {
         </button>
       </div>
       <Feedback result={result} />
+      {tab === "pass" && (
+        <p className="muted">
+          Pass names, prices, credits and validity shown in the Membership
+          purchase section come from this catalogue. After saving and product
+          synchronization, use <Link to="/app/memberships">Memberships</Link> to
+          offer a Pass for purchase or turn it off.
+        </p>
+      )}
+      {data.fromMemberships && (
+        <Link to="/app/memberships">Back to Memberships</Link>
+      )}
       {open && (
         <section className="panel">
           <h2 ref={editorHeading} tabIndex={-1}>
@@ -334,7 +350,9 @@ export default function Catalog() {
                       defaultValue={pass?.validityMonths ?? ""}
                     />
                     <small>
-                      Validity begins on the date of the first booked class.
+                      New one-calendar-month Passes start at the first
+                      staff-confirmed attendance, including each renewed Pass.
+                      Other Passes start on the date of the first booked class.
                     </small>
                   </Field>
                   <label>
@@ -369,8 +387,10 @@ export default function Catalog() {
                       )}
                     </select>
                     <small>
-                      Select services from one type only. Group-class Passes
-                      cannot book private appointments or Workshops.
+                      Required: this Pass can only book the selected classes.
+                      For a private monthly Pass, select its Private appointment
+                      classes only and set Calendar months to 1. After saving,
+                      configure monthly renewal in Memberships.
                     </small>
                   </Field>
                   <label>
@@ -466,11 +486,7 @@ export default function Catalog() {
                 )}
               </div>
               <div className="record-actions">
-                <button
-                  onClick={() => openEditor(record.id)}
-                >
-                  Edit
-                </button>
+                <button onClick={() => openEditor(record.id)}>Edit</button>
                 {mapping?.syncStatus === "ERROR" && (
                   <Form method="post">
                     <input name="intent" type="hidden" value="retry" />

@@ -27,6 +27,8 @@ async function setup() {
   vi.stubEnv("SKYRA_MAIL_PROVIDER", "resend");
   vi.stubEnv("RESEND_API_KEY", "fake-test-key");
   vi.stubEnv("SKYRA_MAIL_FROM", "hello@example.com");
+  // Mock delivery tests must not inherit an operator's real UAT recipient.
+  vi.stubEnv("SKYRA_MAIL_TEST_RECIPIENT", "");
   vi.stubEnv("SKYRA_COACH_MAIL_KEY", "12".repeat(32));
   vi.stubEnv("SHOPIFY_APP_URL", "https://app.example.com");
   vi.stubEnv("SKYRA_COACH_LOGIN_SHOP", f.shop.domain);
@@ -194,7 +196,9 @@ test("Booking mail resolves current Admin, assigned Coach and Shopify Customer d
     f.customer.shopifyCustomerGid,
   );
   const customer = jobs.find(
-    (job) => job.template === "BOOKING_CONFIRMED_V1" && job.recipientKind === "CUSTOMER",
+    (job) =>
+      job.template === "BOOKING_CONFIRMED_V1" &&
+      job.recipientKind === "CUSTOMER",
   )!;
   expect(
     (
@@ -225,6 +229,7 @@ test("ambiguous login sends are UNKNOWN, wiped and never retried", async () => {
 
 test("mail remains off by default; transport uses configured sender and provider idempotency", async () => {
   await setup();
+  vi.stubEnv("SKYRA_MAIL_TEST_RECIPIENT", "karen@example.com");
   const mail = {
     to: "karen@example.com",
     subject: "Sign in",
@@ -250,4 +255,8 @@ test("mail remains off by default; transport uses configured sender and provider
     to: ["karen@example.com"],
   });
   expect(options.headers).toMatchObject({ "Idempotency-Key": "test-123" });
+  expect(
+    await sendTransactionalMail({ ...mail, to: "other@example.com" }, send),
+  ).toEqual({ status: "FAILED" });
+  expect(send).toHaveBeenCalledTimes(1);
 });

@@ -207,6 +207,21 @@ export async function syncCatalogEvent(eventId: string, graphql: GraphQL) {
             type: "single_line_text_field",
             value: ownerType === "SERVICE" ? "DROP_IN" : "PACK",
           },
+          ...(ownerType === "PASS_PLAN" &&
+          "validityMonths" in owner &&
+          owner.validityMonths === 1
+            ? [
+                {
+                  ownerId: product.id,
+                  namespace: "$app",
+                  key: "managed_monthly_pass",
+                  type: "boolean",
+                  // A product once sold as a monthly Pass stays protected, including
+                  // its old checkout URLs, even after the plan is changed or retired.
+                  value: "true",
+                },
+              ]
+            : []),
         ],
       });
       if (ownerType === "SERVICE") {

@@ -1,0 +1,48 @@
+{
+  "payload": {
+    "export": "cart_validations_generate_run",
+    "input": {
+      "buyerJourney": {
+        "step": "CHECKOUT_COMPLETION"
+      },
+      "cart": {
+        "authorization": null,
+        "buyerIdentity": null,
+        "cost": {
+          "totalAmount": {
+            "amount": "299.00",
+            "currencyCode": "AUD"
+          }
+        },
+        "lines": [
+          {
+            "sellingPlanAllocation": null,
+            "merchandise": {
+              "__typename": "ProductVariant",
+              "product": {
+                "managedMonthlyPass": null,
+                "id": "gid://shopify/Product/903"
+              },
+              "id": "gid://shopify/ProductVariant/901"
+            },
+            "cost": {
+              "totalAmount": {
+                "amount": "299.00",
+                "currencyCode": "AUD"
+              },
+              "subtotalAmount": {
+                "amount": "299.00",
+                "currencyCode": "AUD"
+              }
+            },
+            "quantity": 3
+          }
+        ]
+      }
+    },
+    "target": "cart.validations.generate.run",
+    "output": {
+      "operations": []
+    }
+  }
+}

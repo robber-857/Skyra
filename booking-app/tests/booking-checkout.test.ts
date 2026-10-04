@@ -1,5 +1,5 @@
 import { bookingTerms } from "../app/services/booking-terms.server";
-const termsAcceptance = {accepted: true, version: bookingTerms.version};
+const termsAcceptance = { accepted: true, version: bookingTerms.version };
 import { randomUUID } from "node:crypto";
 import { beforeAll, afterAll, expect, test, vi } from "vitest";
 import db from "../app/db.server";
@@ -17,6 +17,8 @@ import {
 } from "../app/services/shopify-cart.server";
 import type { GraphQL } from "../app/services/shopify-catalog.server";
 import { DEVELOPMENT_BOOKING_SHOP } from "../app/services/commerce-capabilities.server";
+import { PASS_PURCHASE_REFERENCE_KEY } from "../app/services/shopify-membership.server";
+import * as membershipGuard from "../app/services/membership-checkout-guard.server";
 
 beforeAll(() => {
   if (new URL(process.env.DATABASE_URL!).pathname !== "/skyra_booking_test")
@@ -196,7 +198,8 @@ async function fixture(
         : Response.json({ data: storeData }),
   );
   const clients = vi.fn(async () => ({ admin, storefront }));
-  const run = () => prepareBookingCheckout(actor, {...input, termsAcceptance}, clients);
+  const run = () =>
+    prepareBookingCheckout(actor, { ...input, termsAcceptance }, clients);
   const intent = () =>
     db.bookingCheckout.findFirstOrThrow({ where: { shopId } });
   return {
@@ -218,6 +221,87 @@ async function fixture(
     intent,
   };
 }
+
+test("existing one-time monthly Pass retains legacy checkout while membership rollout is off", async () => {
+  const f = await fixture();
+  await db.passPlan.update({
+    where: { id: f.pass.id },
+    data: { validityMonths: 1 },
+  });
+  expect(await f.run()).toMatchObject({ status: "CHECKOUT_READY" });
+  expect(
+    await db.passPurchase.count({
+      where: { bookingCheckoutId: (await f.intent()).id },
+    }),
+  ).toBe(0);
+});
+
+test("configured monthly Pass cannot bypass the unavailable native guard", async () => {
+  const f = await fixture();
+  await db.passPlan.update({
+    where: { id: f.pass.id },
+    data: {
+      validityMonths: 1,
+      sellingPlanGid: "gid://shopify/SellingPlan/789",
+    },
+  });
+  await expect(f.run()).rejects.toMatchObject({
+    code: "MEMBERSHIP_CHECKOUT_GUARD_UNAVAILABLE",
+  });
+  expect(f.cartCreate).not.toHaveBeenCalled();
+});
+
+test("one-time monthly Booking uses one managed cart and a shared payment claim", async () => {
+  vi.stubEnv("SKYRA_MEMBERSHIPS_CHECKOUT_GUARD_READY", "true");
+  vi.stubEnv("SKYRA_MEMBERSHIPS_CHECKOUT_EXCLUSION_VERIFIED", "true");
+  const authorization = vi
+    .spyOn(membershipGuard, "prepareMembershipCheckoutAuthorization")
+    .mockResolvedValue(undefined);
+  try {
+    const f = await fixture();
+    await db.passPlan.update({
+      where: { id: f.pass.id },
+      data: {
+        validityMonths: 1,
+        sellingPlanGid: "gid://shopify/SellingPlan/789",
+      },
+    });
+    const first = await f.run();
+    const replay = await f.run();
+    expect(first).toMatchObject({
+      status: "CHECKOUT_READY",
+      checkoutUrl: f.cart.checkoutUrl,
+    });
+    expect(replay).toMatchObject({
+      status: "CHECKOUT_READY",
+      checkoutUrl: f.cart.checkoutUrl,
+    });
+    const checkout = await f.intent();
+    const purchase = await db.passPurchase.findUniqueOrThrow({
+      where: { bookingCheckoutId: checkout.id },
+    });
+    expect(purchase).toMatchObject({
+      mode: "ONCE",
+      status: "CHECKOUT_READY",
+      validityMonths: 1,
+      priceCents: f.pass.requestedPriceCents,
+      sellingPlanGid: null,
+      autoRenewTermsVersion: null,
+      cartId: checkout.cartId,
+    });
+    expect(f.cartCreate).toHaveBeenCalledTimes(1);
+    expect(f.cart.lines.nodes[0].attributes).toEqual([
+      { key: PASS_PURCHASE_REFERENCE_KEY, value: purchase.reference },
+      { key: BOOKING_REFERENCE_KEY, value: checkout.reference },
+    ]);
+    expect(await db.passPurchase.count({ where: { shopId: f.shop.id } })).toBe(
+      1,
+    );
+  } finally {
+    authorization.mockRestore();
+    vi.unstubAllEnvs();
+  }
+});
 
 test.each(["NEW_PASS", "DROP_IN"] as const)(
   "creates and reuses one %s Cart without exposing its secret",
@@ -350,6 +434,35 @@ test("10 concurrent retries create only one Cart and do not extend the Hold", as
       expect(result.reason.code).toBe("CART_PENDING");
 });
 
+test("another browser attempt for the same class cannot create a second payment cart", async () => {
+  const f = await fixture();
+  await db.classSession.update({
+    where: { id: f.session.id },
+    data: { capacity: 8 },
+  });
+  await f.run();
+  const another = await startAttempt(f.actor, {
+    sessionId: f.session.id,
+    surface: "PROGRAMS",
+  });
+  await expect(
+    prepareBookingCheckout(
+      f.actor,
+      {
+        ...f.input,
+        token: another.token,
+        idempotencyKey: randomUUID(),
+        termsAcceptance,
+      },
+      f.clients,
+    ),
+  ).rejects.toMatchObject({ code: "ALREADY_RESERVED" });
+  expect(f.cartCreate).toHaveBeenCalledTimes(1);
+  expect(await db.bookingCheckout.count({ where: { shopId: f.shop.id } })).toBe(
+    1,
+  );
+});
+
 test.each([
   "anonymous",
   "other-customer",
@@ -369,7 +482,7 @@ test.each([
   if (mode === "disabled")
     await db.shop.update({ where: { id: f.shop.id }, data: { rules: {} } });
   await expect(
-    prepareBookingCheckout(actor, {...input, termsAcceptance}, f.clients),
+    prepareBookingCheckout(actor, { ...input, termsAcceptance }, f.clients),
   ).rejects.toThrow();
   expect(f.clients).not.toHaveBeenCalled();
   expect(await db.bookingHold.count({ where: { shopId: f.shop.id } })).toBe(0);
@@ -859,7 +972,11 @@ test.each(["EXPIRED", "RELEASED"])("cannot resume %s hold", async (status) => {
     data: { status },
   });
   await expect(
-    resumeBookingCheckout(f.actor, { token: f.input.token, termsAcceptance }, f.cartRead),
+    resumeBookingCheckout(
+      f.actor,
+      { token: f.input.token, termsAcceptance },
+      f.cartRead,
+    ),
   ).rejects.toMatchObject({ code: "CHECKOUT_NOT_RESUMABLE" });
   expect(f.cartRead).not.toHaveBeenCalled();
 });
@@ -880,7 +997,11 @@ test("payment notification during cart read prevents returning checkout", async 
     return Response.json({ data: { cart: f.cart } });
   };
   await expect(
-    resumeBookingCheckout(f.actor, { token: f.input.token, termsAcceptance }, read),
+    resumeBookingCheckout(
+      f.actor,
+      { token: f.input.token, termsAcceptance },
+      read,
+    ),
   ).rejects.toMatchObject({ code: "CHECKOUT_NOT_RESUMABLE" });
   expect(await bookingResult(f.actor, { token: f.input.token })).toMatchObject({
     status: "PROCESSING",
@@ -891,24 +1012,58 @@ test("modified original cart cannot resume", async () => {
   await f.run();
   f.cart.lines.nodes[0].quantity = 2;
   await expect(
-    resumeBookingCheckout(f.actor, { token: f.input.token, termsAcceptance }, f.cartRead),
+    resumeBookingCheckout(
+      f.actor,
+      { token: f.input.token, termsAcceptance },
+      f.cartRead,
+    ),
   ).rejects.toMatchObject({ code: "CART_CHANGED" });
   expect(f.cartCreate).toHaveBeenCalledTimes(1);
 });
 
- test.each([undefined, {accepted:false,version:bookingTerms.version}, {accepted:"true",version:bookingTerms.version}, {accepted:true,version:"stale"}])("checkout rejects invalid consent before reserving or calling Shopify: %j", async (termsAcceptance) => {
-  const f = await fixture();
-  await expect(prepareBookingCheckout(f.actor, {...f.input, termsAcceptance}, f.clients)).rejects.toMatchObject({code:"TERMS_REQUIRED"});
-  expect(f.clients).not.toHaveBeenCalled();
-  expect(await db.bookingHold.count({where:{shopId:f.shop.id}})).toBe(0);
-});
+test.each([
+  undefined,
+  { accepted: false, version: bookingTerms.version },
+  { accepted: "true", version: bookingTerms.version },
+  { accepted: true, version: "stale" },
+])(
+  "checkout rejects invalid consent before reserving or calling Shopify: %j",
+  async (termsAcceptance) => {
+    const f = await fixture();
+    await expect(
+      prepareBookingCheckout(
+        f.actor,
+        { ...f.input, termsAcceptance },
+        f.clients,
+      ),
+    ).rejects.toMatchObject({ code: "TERMS_REQUIRED" });
+    expect(f.clients).not.toHaveBeenCalled();
+    expect(await db.bookingHold.count({ where: { shopId: f.shop.id } })).toBe(
+      0,
+    );
+  },
+);
 test("acceptance is bound to checkout and authenticated customer; retries preserve receipt", async () => {
-  const f=await fixture(); await f.run(); await f.run();
-  const checkout=await f.intent();
-  const receipts=await db.auditLog.findMany({where:{shopId:f.shop.id,entityId:checkout.id,action:"CHECKOUT_TERMS_ACCEPTED"}});
+  const f = await fixture();
+  await f.run();
+  await f.run();
+  const checkout = await f.intent();
+  const receipts = await db.auditLog.findMany({
+    where: {
+      shopId: f.shop.id,
+      entityId: checkout.id,
+      action: "CHECKOUT_TERMS_ACCEPTED",
+    },
+  });
   expect(receipts).toHaveLength(1);
   expect(receipts[0].actorId).toBe(f.actor.customerGid);
-  expect(receipts[0].after).toMatchObject({...bookingTerms,accepted:true});
-  expect(Number.isNaN(Date.parse((receipts[0].after as {acceptedAt:string}).acceptedAt))).toBe(false);
-  await expect(resumeBookingCheckout(f.actor,{token:f.input.token},f.cartRead)).rejects.toMatchObject({code:"TERMS_REQUIRED"});
+  expect(receipts[0].after).toMatchObject({ ...bookingTerms, accepted: true });
+  expect(
+    Number.isNaN(
+      Date.parse((receipts[0].after as { acceptedAt: string }).acceptedAt),
+    ),
+  ).toBe(false);
+  await expect(
+    resumeBookingCheckout(f.actor, { token: f.input.token }, f.cartRead),
+  ).rejects.toMatchObject({ code: "TERMS_REQUIRED" });
 });

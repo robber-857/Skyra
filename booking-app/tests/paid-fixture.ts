@@ -6,6 +6,7 @@ export async function paidFixture(
   kind: "NEW_PASS" | "DROP_IN" = "NEW_PASS",
   expiredHold = false,
   serviceKind: "CLASS" | "APPOINTMENT" = "CLASS",
+  validityMonths?: number,
 ) {
   const shop = await db.shop.create({
     data: {
@@ -43,6 +44,7 @@ export async function paidFixture(
       name: "Five Class Pass",
       credits: 5,
       validityDays: 30,
+      ...(validityMonths != null ? { validityMonths } : {}),
       requestedPriceCents: 22000,
       status: "ACTIVE",
     },
@@ -124,6 +126,7 @@ export async function paidFixture(
         version: 1,
         credits: kind === "NEW_PASS" ? 5 : 1,
         validityDays: 30,
+        ...(validityMonths != null ? { validityMonths } : {}),
         timezone: session.timezone,
         sessionStartsAt: start.toISOString(),
         sessionEndsAt: end.toISOString(),

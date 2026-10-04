@@ -1,0 +1,18 @@
+api_version = "2026-07"
+
+[[extensions]]
+name = "t:name"
+handle = "skyra-membership-checkout-guard"
+type = "function"
+uid = "775e8340-9d6d-ea3a-7c2f-ed60043a7deebf8b8e56"
+description = "t:description"
+
+  [[extensions.targeting]]
+  target = "cart.validations.generate.run"
+  input_query = "src/cart_validations_generate_run.graphql"
+  export = "cart_validations_generate_run"
+
+  [extensions.build]
+  command = "node build.mjs"
+  path = "target/wasm32-unknown-unknown/release/skyra-membership-checkout-guard.wasm"
+  watch = ["src/**/*.rs", "src/**/*.graphql", "Cargo.toml", "Cargo.lock", "build.mjs"]

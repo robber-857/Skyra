@@ -9,6 +9,7 @@ import {
 } from "./entitlements.server";
 import { purchaseMappingReady } from "./purchase-mapping.server";
 import { commerceCapabilities } from "./commerce-capabilities.server";
+import { AUTO_RENEW_TERMS_VERSION, membershipCapabilities } from "./membership-capabilities.server";
 
 type Tx = Prisma.TransactionClient;
 export type BookingActor = {
@@ -659,6 +660,11 @@ export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
           priceCents: plan.requestedPriceCents,
           currency: "AUD",
           kind: "NEW_PASS" as const,
+          ...(plan.autoRenewEnabled ? { autoRenew: {
+            available: membershipCapabilities(shop.domain).autoRenewAvailable && Boolean(plan.sellingPlanGid),
+            termsVersion: AUTO_RENEW_TERMS_VERSION,
+            reason: "Automatic renewal is being prepared. One-time purchase is still available.",
+          } } : {}),
         },
       ];
     });

@@ -12,6 +12,7 @@ import {
   restoreConsumedCredit,
 } from "./entitlements.server";
 import { enqueueBookingNotifications } from "./booking-notifications.server";
+import { activateMembershipForAttendance } from "./membership-lifecycle.server";
 export const bookingChangeInput = z
   .object({
     bookingId: z.string().uuid(),
@@ -190,6 +191,13 @@ async function changeBooking(identity: Identity, raw: unknown) {
         status = input.action === "COMPLETE" ? "ATTENDED" : "NO_SHOW";
       }
     }
+    if (input.action === "CHECK_IN" || input.action === "COMPLETE") {
+      await activateMembershipForAttendance(tx, { shopId: booking.shopId, bookingId: booking.id, sessionStartsAt: booking.session.startsAt, actorId });
+    }
+    if (input.action === "NO_SHOW" || input.action === "CANCEL_WAIVE") {
+      const activated = await tx.entitlement.findFirst({ where: { shopId: booking.shopId, activationMode: "FIRST_ATTENDANCE", activationBookingId: booking.id, startsAt: { not: null } } });
+      if (activated) fail("PASS_ACTIVATION_REVIEW", "This class activated a membership. Review its renewal before reversing attendance.");
+    }
     if (status !== "CONFIRMED" && !attendanceCorrection) {
       const reservations = await tx.entitlementLedgerEntry.findMany({
         where: {
@@ -327,6 +335,8 @@ export async function settleDefaultAttendanceWork(
             "BOOKING_LEDGER_REVIEW",
             "This booking needs a credit ledger review before auto-settlement.",
           );
+        const pass = await tx.entitlement.findUniqueOrThrow({ where: { id: reservations[0].entitlementId } });
+        if (pass.activationMode === "FIRST_ATTENDANCE" && !pass.startsAt) return false;
         await consumeEntitlementReservation(tx, {
           shopId: booking.shopId,
           entitlementId: reservations[0].entitlementId,

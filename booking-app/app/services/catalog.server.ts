@@ -155,6 +155,37 @@ export async function savePass(actor: Actor, raw: unknown) {
         409,
       );
     const ids = [...new Set(serviceIds)];
+    if (old && ["CREATING", "UNKNOWN"].includes(old.renewalSetupState))
+      throw new DomainError(
+        "RENEWAL_SETUP_PENDING",
+        "Monthly plan creation is being checked. Resolve it before editing this Pass.",
+        409,
+      );
+    if (old?.sellingPlanGid) {
+      const previous = await tx.passEligibility.findMany({
+        where: { shopId: actor.shopId, passPlanId: old.id },
+      });
+      const changed =
+        previous.length !== ids.length ||
+        previous.some((entry) => !ids.includes(entry.serviceId));
+      if (
+        changed &&
+        (await tx.passMembership.count({
+          where: { shopId: actor.shopId, passPlanId: old.id },
+        }))
+      )
+        throw new DomainError(
+          "RENEWAL_CLASSES_LOCKED",
+          "This renewal Pass already has members. Create a new Pass to change its eligible classes.",
+          409,
+        );
+      if (input.validityMonths !== 1 || input.introOnly)
+        throw new DomainError(
+          "INVALID_RENEWAL_PLAN",
+          "A configured renewal Pass must remain one calendar month without a first-time restriction. Create a new Pass for different terms.",
+          409,
+        );
+    }
     const services = await tx.service.findMany({
       where: { shopId: actor.shopId, id: { in: ids } },
       select: { id: true, kind: true },
@@ -172,7 +203,13 @@ export async function savePass(actor: Actor, raw: unknown) {
     const saved = old
       ? await tx.passPlan.update({
           where: { id: old.id },
-          data: { ...input, version: { increment: 1 } },
+          data: {
+            ...input,
+            version: { increment: 1 },
+            ...(old.sellingPlanGid
+              ? { renewalSetupState: "VERIFYING", autoRenewEnabled: false }
+              : {}),
+          },
         })
       : await tx.passPlan.create({ data: { ...input, shopId: actor.shopId } });
     await tx.passEligibility.deleteMany({

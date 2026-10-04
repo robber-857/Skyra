@@ -316,7 +316,32 @@ export async function receiveOrderPaidWebhook(input: {
         where: { shopId: shop.id, reference: line.reference },
         include: { hold: { include: { customer: true } } },
       });
-      const codes = validationCodes(input.shopDomain, order, line, checkout);
+      let codes = validationCodes(input.shopDomain, order, line, checkout);
+      // Membership settlement runs first in the authenticated webhook route.
+      // A discounted first period may book only from that exact verified paid
+      // purchase; ordinary booking orders keep their existing amount checks.
+      if (
+        codes.includes("AMOUNT_MISMATCH") &&
+        checkout &&
+        line.priceCents === checkout.priceCents &&
+        order.subtotalCents === order.finalCents &&
+        order.finalCents + order.totalDiscountsCents === checkout.priceCents
+      ) {
+        const paid = await tx.passPurchase.findFirst({
+          where: {
+            shopId: shop.id,
+            bookingCheckoutId: checkout.id,
+            cycle: 1,
+            status: "PAID",
+            sourceOrderGid: order.orderGid,
+            sourceLineItemGid: line.lineItemGid,
+            priceCents: checkout.priceCents,
+            paidPriceCents: order.finalCents,
+          },
+          select: { id: true },
+        });
+        if (paid) codes = codes.filter((code) => code !== "AMOUNT_MISMATCH");
+      }
       const valid = codes.length === 0;
       await tx.webhookReceipt.update({
         where: { id: receipt.id },

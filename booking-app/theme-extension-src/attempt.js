@@ -1,3 +1,5 @@
+import { storefrontLoginUrl } from "./storefront-login.js";
+
 // Server-owned recovery context; storage remembers only the opaque token.
 window.SkyraBookingAttempt = function (root) {
   const surface = (root.dataset.surface || "programs").toUpperCase();
@@ -73,21 +75,7 @@ window.SkyraBookingAttempt = function (root) {
     },
     loginUrl() {
       if (!current) return "";
-      const safeBase = "https://booking.invalid";
-      const requested = new URL(current.returnPath, safeBase);
-      const expectedPath = surface === "HOME" ? "/" : "/pages/programs";
-      if (requested.origin !== safeBase || requested.pathname !== expectedPath) throw new Error("Invalid booking return path");
-      const localPreview = ["127.0.0.1", "localhost"].includes(window.location.hostname);
-      if (localPreview && !storefront.shopDomain) throw new Error("Missing Shopify shop domain");
-      const loginOrigin = localPreview && storefront.shopDomain ? "https://" + storefront.shopDomain : window.location.origin;
-      const destination = new URL(requested.pathname + requested.search + requested.hash, loginOrigin);
-      const activePreview = new URL(window.location.href).searchParams.get("preview_theme_id");
-      const runtimeThemeId = /^\d+$/.test(String(window.Shopify?.theme?.id || "")) ? String(window.Shopify.theme.id) : "";
-      const themeId = storefront.themeId || runtimeThemeId;
-      if (themeId && (localPreview || activePreview === themeId)) {
-        destination.searchParams.set("preview_theme_id", themeId);
-      }
-      return loginOrigin + "/customer_authentication/login?return_to=" + encodeURIComponent(destination.pathname + destination.search + destination.hash);
+      return storefrontLoginUrl({ returnPath: current.returnPath, expectedPath: surface === "HOME" ? "/" : "/pages/programs", shopDomain: storefront.shopDomain, themeId: storefront.themeId });
     },
     remember() {
       if (!current) return;

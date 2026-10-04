@@ -1,0 +1,52 @@
+query Input {
+  buyerJourney {
+    step
+  }
+  cart {
+    authorization: metafield(namespace: "$app", key: "membership_checkout") {
+      jsonValue
+    }
+    buyerIdentity {
+      isAuthenticated
+      customer {
+        id
+        authorization: metafield(namespace: "$app", key: "membership_checkout") {
+          jsonValue
+        }
+      }
+    }
+    cost {
+      totalAmount {
+        amount
+        currencyCode
+      }
+    }
+    lines {
+      quantity
+      cost {
+        subtotalAmount { amount currencyCode }
+        totalAmount {
+          amount
+          currencyCode
+        }
+      }
+      merchandise {
+        __typename
+        ... on ProductVariant {
+          id
+          product {
+            id
+            managedMonthlyPass: metafield(namespace: "$app", key: "managed_monthly_pass") {
+              jsonValue
+            }
+          }
+        }
+      }
+      sellingPlanAllocation {
+        sellingPlan {
+          id
+        }
+      }
+    }
+  }
+}

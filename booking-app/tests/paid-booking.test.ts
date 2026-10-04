@@ -85,6 +85,18 @@ test("second paid order cannot reuse a checkout", async () => {
   expect(await db.entitlement.count({ where: { shopId: f.shop.id } })).toBe(1);
 });
 
+test("different paid orders racing for one checkout grant once and retain the other payment for review", async () => {
+  const f = await paidFixture();
+  const events = await Promise.all([queuePaid(f, "1001"), queuePaid(f, "1002")]);
+  const results = await Promise.all(events.map((event) => processPaidBookingEvent(event.id)));
+  expect(results.filter((result) => result.status === "CONFIRMED")).toHaveLength(1);
+  expect(results.filter((result) => result.reason === "PAYMENT_SOURCE_ALREADY_USED")).toHaveLength(1);
+  expect(await db.entitlement.count({ where: { shopId: f.shop.id } })).toBe(1);
+  expect(await db.booking.count({ where: { shopId: f.shop.id } })).toBe(1);
+  expect(await db.webhookReceipt.count({ where: { shopId: f.shop.id, status: "NEEDS_ATTENTION" } })).toBe(1);
+  expect(await db.outboxEvent.count({ where: { shopId: f.shop.id, kind: "ORDER_PAID_REVIEW" } })).toBe(1);
+});
+
 test("expired hold with available capacity recovers even after expiry sweep", async () => {
   const f = await paidFixture("NEW_PASS", true);
   expect(await processPaidBookingEvent((await queuePaid(f)).id)).toMatchObject({
