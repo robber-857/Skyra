@@ -467,6 +467,18 @@ export async function sweepMembershipWork(adminForShop: AdminForShop) {
             });
             continue;
           }
+          // Keep attendance-driven date changes queued until billing readiness
+          // returns. Cancellation must still reconcile while the gate is closed.
+          if (!ready && member.autoRenew && member.status !== "CANCELLED") {
+            await db.outboxEvent.updateMany({
+              where: {
+                id: event.id,
+                payload: { equals: event.payload as Prisma.InputJsonValue },
+              },
+              data: { availableAt: new Date(Date.now() + 60000) },
+            });
+            continue;
+          }
           const contract = await readSubscriptionContract(
             admin,
             member.contractGid,

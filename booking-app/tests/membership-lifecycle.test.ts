@@ -34,6 +34,7 @@ const sdk = vi.hoisted(() => ({
   billing: vi.fn(),
   order: vi.fn(),
   closeCheckout: vi.fn(),
+  nextBillingDate: vi.fn(),
 }));
 vi.mock("../app/services/membership-checkout-guard.server", () => ({
   closeMembershipCheckoutForRenewal: sdk.closeCheckout,
@@ -56,6 +57,7 @@ vi.mock(
     submitMembershipBilling: sdk.submit,
     readMembershipBilling: sdk.billing,
     readMembershipOrder: sdk.order,
+    setNextBillingDate: sdk.nextBillingDate,
   }),
 );
 
@@ -944,6 +946,54 @@ test("late billing event recovers an unknown response and duplicate delivery gra
     }),
   ).toBe(1);
   expect(sdk.submit).toHaveBeenCalledTimes(1);
+});
+
+test("first-attendance billing-date sync waits for readiness and resumes without charging", async () => {
+  const f = await fixture(true, { validityMonths: 1 });
+  sdk.ready.mockReturnValue(false);
+  vi.stubEnv("SKYRA_MEMBERSHIPS_CHECKOUT_PROTECTION", "INVENTORY");
+  vi.stubEnv("SKYRA_MEMBERSHIPS_BILLING_ENABLED", "false");
+  await classAt(f, -7200000, 3600000);
+  await change(f, "CHECK_IN");
+  const pass = await db.entitlement.findUniqueOrThrow({
+    where: { id: f.entitlement.id },
+  });
+  const event = await db.outboxEvent.findFirstOrThrow({
+    where: {
+      shopId: f.shop.id,
+      kind: "MEMBERSHIP_CONTRACT_SYNC",
+      aggregateId: f.member.id,
+    },
+  });
+  const shops = vi.spyOn(db.shop, "findMany").mockResolvedValue([f.shop]);
+  try {
+    await sweepMembershipWork(async () => vi.fn<GraphQL>());
+    const deferred = await db.outboxEvent.findUniqueOrThrow({
+      where: { id: event.id },
+    });
+    expect(deferred.status).toBe("PENDING");
+    expect(deferred.payload).toEqual(event.payload);
+    expect(deferred.availableAt.getTime()).toBeGreaterThan(Date.now());
+    expect(sdk.nextBillingDate).not.toHaveBeenCalled();
+    expect(sdk.submit).not.toHaveBeenCalled();
+
+    sdk.ready.mockReturnValue(true);
+    await db.outboxEvent.update({
+      where: { id: event.id },
+      data: { availableAt: new Date(Date.now() - 1000) },
+    });
+    await sweepMembershipWork(async () => vi.fn<GraphQL>());
+    expect(await db.outboxEvent.findUnique({ where: { id: event.id } }))
+      .toMatchObject({ status: "DONE" });
+    expect(sdk.nextBillingDate).toHaveBeenCalledWith(
+      expect.any(Function), f.contract.id, pass.expiresAt,
+    );
+    await sweepMembershipWork(async () => vi.fn<GraphQL>());
+    expect(sdk.nextBillingDate).toHaveBeenCalledTimes(1);
+    expect(sdk.submit).not.toHaveBeenCalled();
+  } finally {
+    shops.mockRestore();
+  }
 });
 
 test.each([true, false])("verified contract event completes its receipt while billing ready=%s", async (ready) => {
