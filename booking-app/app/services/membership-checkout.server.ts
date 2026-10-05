@@ -99,6 +99,8 @@ async function readPlan(
   });
   if (!plan)
     fail("PASS_UNAVAILABLE", "This Pass is not available for purchase.");
+  if (!autoRenew && !plan.oneTimePurchaseEnabled)
+    fail("ONE_TIME_PURCHASE_DISABLED", "This Pass is available only with automatic renewal. Please review and accept the renewal terms.");
   if (plan.validityMonths === 1 && !capabilities.checkoutGuardReady)
     fail(
       "MEMBERSHIP_CHECKOUT_GUARD_UNAVAILABLE",

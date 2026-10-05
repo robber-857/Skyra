@@ -132,6 +132,7 @@ model PassPlan {
   validityMonths      Int?
   saleable            Boolean @default(true)
   standalonePurchaseEnabled Boolean @default(false)
+  oneTimePurchaseEnabled Boolean @default(true)
   autoRenewEnabled    Boolean @default(false)
   sellingPlanGid      String?
   sellingPlanGroupGid String?

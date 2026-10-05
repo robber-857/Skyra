@@ -19,6 +19,7 @@ export function renewalChoice({ pass, value = false, name, className, onChange }
   legend.textContent = "How would you like to buy this pass?";
   group.append(legend);
   for (const [autoRenew, text] of [[false, "One-time purchase"], [true, "Automatically renew when this pass expires"]]) {
+    if (!autoRenew && pass.oneTimePurchaseEnabled === false) continue;
     const label = document.createElement("label");
     const input = document.createElement("input");
     input.type = "radio";

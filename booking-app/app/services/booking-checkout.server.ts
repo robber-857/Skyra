@@ -142,6 +142,7 @@ async function readContext(
         plan?.validityMonths,
         plan?.introOnly,
         plan?.autoRenewEnabled,
+        plan?.oneTimePurchaseEnabled,
         plan?.sellingPlanGid,
         session.service.id,
         session.service.version,
@@ -261,6 +262,8 @@ function managedMonthlyPass(context: Context) {
 }
 
 function requireRenewalAvailable(context: Context, autoRenew: boolean) {
+  if (context.plan && !autoRenew && !context.plan.oneTimePurchaseEnabled)
+    fail("ONE_TIME_PURCHASE_DISABLED", "This Pass is available only with automatic renewal. Please review and accept the renewal terms.");
   if (
     managedMonthlyPass(context) &&
     !membershipCapabilities(context.domain).checkoutGuardReady

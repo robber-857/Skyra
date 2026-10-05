@@ -185,6 +185,7 @@ window.SkyraBookingTransaction = function ({
       renewal.replaceChildren();
       if (!pass || kind(pass) !== "NEW_PASS") { autoRenew = false; return; }
       if (!pass.autoRenew?.available) autoRenew = false;
+      else if (pass.oneTimePurchaseEnabled === false) autoRenew = true;
       const choice = renewalChoice({ pass, value: autoRenew, name: root.id + "-renewal", className: "skyra-booking__renewal", onChange: (value) => { autoRenew = value; } });
       if (choice) renewal.append(choice);
     };

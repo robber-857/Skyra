@@ -71,6 +71,38 @@ const server = http.createServer(async (req, res) => {
   const outcomes = [];
   try {
     for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
+      for (const surface of ["membership", "booking"]) {
+        reset();
+        state.passes = [{ ...pass, oneTimePurchaseEnabled: false }];
+        const context = await browser.newContext({ viewport });
+        const page = await context.newPage();
+        await page.route("https://checkout.invalid/test", (route) => route.fulfill({ body: "fixture checkout" }));
+        await page.goto(base + (surface === "membership" ? "/pages/membership" : "/booking-ui"));
+        if (surface === "booking") await page.locator('.skyra-booking__pass input[value="NEW_PASS:monthly"]').check();
+        const renewal = page.getByRole("radio", { name: "Automatically renew when this pass expires" });
+        await renewal.waitFor();
+        assert.equal(await renewal.isChecked(), true);
+        assert.equal(await page.getByRole("radio", { name: "One-time purchase", exact: true }).count(), 0);
+        await page.screenshot({ path: path.join(output, `renewal-only-${surface}-${viewport.width}.png`), fullPage: true });
+        await page.getByRole("button", { name: surface === "membership" ? "Review pass" : "Continue", exact: true }).click();
+        const checkout = page.getByRole("button", { name: "Continue to Shopify Checkout" });
+        await checkout.waitFor();
+        assert.equal(await page.getByRole("checkbox").count(), 2);
+        assert.equal(await page.getByRole("checkbox").nth(1).isChecked(), false);
+        await page.getByRole("checkbox").nth(0).check();
+        assert.equal(await checkout.isDisabled(), true);
+        await page.getByRole("checkbox").nth(1).check();
+        await checkout.click();
+        if (surface === "membership") await page.getByRole("heading", { name: "Your pass is ready" }).waitFor();
+        else await page.waitForURL("https://checkout.invalid/test");
+        const request = surface === "membership" ? state.purchases[0] : state.checkoutRequests[0];
+        assert.equal(request.autoRenew, true);
+        assert.deepEqual(request.autoRenewAcceptance, { accepted: true, version: "2026-10-02.v1" });
+        outcomes.push(`${viewport.width}px ${surface}: renewal-only hides one-time purchase and requires explicit renewal consent`);
+        await context.close();
+      }
+    }
+    for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
       reset();
       const context = await browser.newContext({ viewport });
       const page = await context.newPage();

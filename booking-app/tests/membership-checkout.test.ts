@@ -3,7 +3,8 @@ import { afterAll, beforeAll, beforeEach, expect, test, vi } from "vitest";
 import db from "../app/db.server";
 import { DomainError } from "../app/lib/errors.server";
 import { bookingTerms } from "../app/services/booking-terms.server";
-import { startAttempt } from "../app/services/booking.server";
+import { startAttempt, bookingPassOptions } from "../app/services/booking.server";
+import { bookingPurchaseReview } from "../app/services/booking-purchase-review.server";
 import { prepareBookingCheckout } from "../app/services/booking-checkout.server";
 import { membershipCatalog } from "../app/services/membership-catalog.server";
 import {
@@ -508,4 +509,50 @@ test("payment challenge is returned only to its owner after verifying the existi
   await expect(
     membershipPurchaseResult(f.actor, { purchaseId: purchase.id }, admin),
   ).rejects.toMatchObject({ code: "BILLING_ACTION_UNAVAILABLE" });
+});
+
+test("renewal-only Membership rejects one-time requests before cart creation and still requires consent", async () => {
+  const f = await fixture();
+  await db.passPlan.update({ where: { id: f.plan.id }, data: { oneTimePurchaseEnabled: false } });
+  const catalog = await membershipCatalog(f.actor, {});
+  expect(catalog.passes[0]).toMatchObject({ oneTimePurchaseEnabled: false, autoRenew: { available: true } });
+  await expect(prepareMembershipCheckout(f.actor, { ...f.input, autoRenew: false, autoRenewAcceptance: undefined }, f.clients)).rejects.toMatchObject({ code: "ONE_TIME_PURCHASE_DISABLED" });
+  await expect(prepareMembershipCheckout(f.actor, { ...f.input, autoRenewAcceptance: undefined }, f.clients)).rejects.toMatchObject({ code: "AUTO_RENEW_TERMS_REQUIRED" });
+  expect(mocked.create).not.toHaveBeenCalled();
+  expect(await db.passPurchase.count({ where: { shopId: f.shop.id } })).toBe(0);
+  await expect(f.run()).resolves.toHaveProperty("checkoutUrl");
+});
+
+test("renewal-only Booking rejects one-time review and checkout, but permits consented renewal", async () => {
+  const f = await fixture();
+  await db.passPlan.update({ where: { id: f.plan.id }, data: { oneTimePurchaseEnabled: false } });
+  const input = await bookingInput(f);
+  const options = await bookingPassOptions(f.actor, { token: input.token, purchaseKind: "NEW_PASS", passPlanId: f.plan.id });
+  expect(options.selected).toMatchObject({ oneTimePurchaseEnabled: false, autoRenew: { available: true } });
+  await expect(bookingPurchaseReview(f.actor, { token: input.token, purchaseKind: "NEW_PASS", passPlanId: f.plan.id, autoRenew: false }, f.clients)).rejects.toMatchObject({ code: "ONE_TIME_PURCHASE_DISABLED" });
+  await expect(prepareBookingCheckout(f.actor, { ...input, autoRenew: false }, f.clients)).rejects.toMatchObject({ code: "ONE_TIME_PURCHASE_DISABLED" });
+  expect(mocked.create).not.toHaveBeenCalled();
+  expect(await db.bookingHold.count({ where: { shopId: f.shop.id } })).toBe(0);
+  await expect(prepareBookingCheckout(f.actor, { ...input, autoRenew: true, autoRenewAcceptance: f.input.autoRenewAcceptance }, f.clients)).resolves.toHaveProperty("checkoutUrl");
+});
+
+test("disabling both purchase modes removes new offers without hiding owned memberships", async () => {
+  const f = await fixture();
+  await f.run();
+  await db.passPlan.update({ where: { id: f.plan.id }, data: { oneTimePurchaseEnabled: false, autoRenewEnabled: false } });
+  const catalog = await membershipCatalog(f.actor, {});
+  expect(catalog.passes).toHaveLength(0);
+  expect(catalog.memberships).toHaveLength(1);
+  const input = await bookingInput(f);
+  const options = await bookingPassOptions(f.actor, { token: input.token });
+  expect(options.passes).toHaveLength(0);
+});
+
+test("stale one-time checkout replay is rejected after the administrator disables that mode", async () => {
+  const f = await fixture();
+  const input = { ...f.input, autoRenew: false, autoRenewAcceptance: undefined };
+  await prepareMembershipCheckout(f.actor, input, f.clients);
+  await db.passPlan.update({ where: { id: f.plan.id }, data: { oneTimePurchaseEnabled: false } });
+  await expect(prepareMembershipCheckout(f.actor, input, f.clients)).rejects.toMatchObject({ code: "ONE_TIME_PURCHASE_DISABLED" });
+  expect(mocked.create).toHaveBeenCalledTimes(1);
 });

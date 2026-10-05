@@ -650,6 +650,9 @@ export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
       if (plan.introOnly && !canUseIntro) return [];
       const mapping = mappings.find((m) => m.ownerId === plan.id);
       if (!purchaseMappingReady(mapping, plan)) return [];
+      const renewalAvailable = plan.autoRenewEnabled && plan.validityMonths === 1 &&
+        membershipCapabilities(shop.domain).autoRenewAvailable && Boolean(plan.sellingPlanGid);
+      if (!plan.oneTimePurchaseEnabled && !renewalAvailable) return [];
       return [
         {
           id: plan.id,
@@ -660,10 +663,11 @@ export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
           priceCents: plan.requestedPriceCents,
           currency: "AUD",
           kind: "NEW_PASS" as const,
+          oneTimePurchaseEnabled: plan.oneTimePurchaseEnabled,
           ...(plan.autoRenewEnabled ? { autoRenew: {
-            available: membershipCapabilities(shop.domain).autoRenewAvailable && Boolean(plan.sellingPlanGid),
+            available: renewalAvailable,
             termsVersion: AUTO_RENEW_TERMS_VERSION,
-            reason: "Automatic renewal is being prepared. One-time purchase is still available.",
+            reason: "Automatic renewal is being prepared.",
           } } : {}),
         },
       ];

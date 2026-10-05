@@ -102,6 +102,7 @@ export async function membershipCatalog(actor: BookingActor, raw: unknown) {
         plan.autoRenewEnabled &&
         Boolean(plan.sellingPlanGid) &&
         plan.validityMonths === 1;
+      if (!plan.oneTimePurchaseEnabled && !available) return [];
       return [
         {
           id: plan.id,
@@ -113,6 +114,7 @@ export async function membershipCatalog(actor: BookingActor, raw: unknown) {
           priceCents: plan.requestedPriceCents,
           currency: "AUD",
           kind: "NEW_PASS" as const,
+          oneTimePurchaseEnabled: plan.oneTimePurchaseEnabled,
           autoRenew: { available, termsVersion: AUTO_RENEW_TERMS_VERSION },
         },
       ];

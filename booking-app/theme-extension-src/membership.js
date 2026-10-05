@@ -153,8 +153,8 @@ function mount(root) {
       const title = node("div", "membership-shop__card-title");
       title.append(node("h4", "", pass.name), node("strong", "", money(pass)));
       card.append(title, node("p", "membership-shop__validity", passValidity(pass)));
-      let autoRenew = false;
-      const renewal = renewalChoice({ pass, name: root.id + "-" + pass.id + "-renewal", className: "membership-shop__renewal", onChange: (value) => { autoRenew = value; } });
+      let autoRenew = pass.oneTimePurchaseEnabled === false;
+      const renewal = renewalChoice({ pass, value: autoRenew, name: root.id + "-" + pass.id + "-renewal", className: "membership-shop__renewal", onChange: (value) => { autoRenew = value; } });
       if (renewal) card.append(renewal);
       const current = catalog.memberships.find((item) => item.passPlanId === pass.id && (typeof item.blocksPurchase === "boolean" ? item.blocksPurchase : item.hasPendingPayment || item.autoRenew || !["CANCELLED", "EXPIRED"].includes(item.status)));
       if (current) {
@@ -173,6 +173,7 @@ function mount(root) {
   function review(pass, autoRenew) {
     if (pending) { renderCatalog(); return; }
     if (autoRenew && !pass.autoRenew?.available) { load(); return; }
+    if (!autoRenew && pass.oneTimePurchaseEnabled === false) { load(); return; }
     frame("Review your pass");
     root.append(button("Back to passes", renderCatalog, true));
     const summary = node("div", "membership-shop__review");
@@ -200,7 +201,9 @@ function mount(root) {
     const renewal = autoRenew ? consent("I authorise the renewal payment at each pass expiry and understand that no further payment is taken while the next pass awaits activation.").input : null;
     const update = () => { proceed.disabled = !terms.checked || (renewal && !renewal.checked); };
     terms.addEventListener("change", update); renewal?.addEventListener("change", update); update();
-    root.append(proceed);
+    const actions = node("div", "membership-shop__review-actions");
+    actions.append(proceed);
+    root.append(actions);
     root.querySelector("h3")?.focus({ preventScroll: true });
   }
 

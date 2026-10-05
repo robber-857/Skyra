@@ -32,6 +32,8 @@ export async function bookingPurchaseReview(
   if (!options.selected || options.selected.kind === "OWNED_PASS")
     return options;
   const selected = options.selected;
+  if (selected.kind === "NEW_PASS" && !autoRenew && !selected.oneTimePurchaseEnabled)
+    throw new DomainError("ONE_TIME_PURCHASE_DISABLED", "This Pass is available only with automatic renewal. Please review and accept the renewal terms.", 409);
   const ownerType = selected.kind === "DROP_IN" ? "SERVICE" : "PASS_PLAN";
   // selected.id comes from the server's Session/eligibility resolution, never a client Variant or Service ID.
   const [shop, mapping] = await Promise.all([
@@ -99,6 +101,8 @@ export async function bookingPurchaseReview(
   }
   // Recheck attempt ownership, expiry, Session capacity and eligibility after the network call.
   const current = await bookingPassOptions(actor, input);
+  if (current.selected?.kind === "NEW_PASS" && !autoRenew && !current.selected.oneTimePurchaseEnabled)
+    throw new DomainError("ONE_TIME_PURCHASE_DISABLED", "One-time purchase is no longer available. Please review this Pass again.", 409);
   if (
     current.selected?.id !== selected.id ||
     current.selected?.kind !== selected.kind ||

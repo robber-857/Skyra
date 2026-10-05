@@ -40,6 +40,7 @@ const configInput = z.object({
   version: z.coerce.number().int().positive(),
   updatedAt: z.string().datetime(),
   standalonePurchaseEnabled: z.boolean(),
+  oneTimePurchaseEnabled: z.boolean(),
   autoRenewEnabled: z.boolean(),
 });
 
@@ -145,6 +146,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         validityMonths: true,
         validityDays: true,
         standalonePurchaseEnabled: true,
+        oneTimePurchaseEnabled: true,
         autoRenewEnabled: true,
         sellingPlanGid: true,
         renewalSetupState: true,
@@ -338,6 +340,7 @@ export async function action({ request }: ActionFunctionArgs) {
       version: form.get("version"),
       updatedAt: form.get("updatedAt"),
       standalonePurchaseEnabled: form.get("standalonePurchaseEnabled") === "on",
+      oneTimePurchaseEnabled: form.get("oneTimePurchaseEnabled") === "on",
       autoRenewEnabled: form.get("autoRenewEnabled") === "on",
     });
     await db.$transaction(async (tx) => {
@@ -391,6 +394,7 @@ export async function action({ request }: ActionFunctionArgs) {
         );
       const next = {
         standalonePurchaseEnabled: input.standalonePurchaseEnabled,
+        oneTimePurchaseEnabled: input.oneTimePurchaseEnabled,
         autoRenewEnabled: input.autoRenewEnabled,
       };
       // These settings do not alter Shopify catalogue content. Keep its version
@@ -417,6 +421,7 @@ export async function action({ request }: ActionFunctionArgs) {
         current.id,
         {
           standalonePurchaseEnabled: current.standalonePurchaseEnabled,
+          oneTimePurchaseEnabled: current.oneTimePurchaseEnabled,
           autoRenewEnabled: current.autoRenewEnabled,
           sellingPlanGid: current.sellingPlanGid,
         },
@@ -622,6 +627,14 @@ export default function Memberships() {
                   <label>
                     <input
                       type="checkbox"
+                      name="oneTimePurchaseEnabled"
+                      defaultChecked={plan.oneTimePurchaseEnabled}
+                    />{" "}
+                    Allow one-time purchase
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
                       name="autoRenewEnabled"
                       defaultChecked={plan.autoRenewEnabled}
                       disabled={
@@ -632,6 +645,9 @@ export default function Memberships() {
                     Offer automatic renewal
                   </label>
                 </div>
+                <p className="muted">
+                  Purchase options apply to both Membership and Booking. Turn off one-time purchase to require automatic renewal. Customers must still agree to renewal terms. If neither option is available, new purchases are unavailable.
+                </p>
                 <p className="muted">
                   Turn off “Offer this Pass on Membership” to remove it from the
                   purchase section. Existing paid Passes and renewal agreements

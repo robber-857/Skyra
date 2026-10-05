@@ -67,6 +67,7 @@ const pass = {
   sellingPlanGroupGid: "gid://shopify/SellingPlanGroup/2",
   renewalSetupState: "READY",
   standalonePurchaseEnabled: false,
+  oneTimePurchaseEnabled: true,
   autoRenewEnabled: false,
 };
 function save(override: Record<string, string> = {}) {
@@ -76,6 +77,7 @@ function save(override: Record<string, string> = {}) {
     version: "3",
     updatedAt: updatedAt.toISOString(),
     standalonePurchaseEnabled: "on",
+    oneTimePurchaseEnabled: "on",
     autoRenewEnabled: "on",
     sellingPlanGid: "gid://shopify/SellingPlan/3",
     ...override,
@@ -349,6 +351,7 @@ test("valid save records only per-plan settings and an audit, preserving catalog
     where: { id: pass.id, shopId: fixture.actor.shopId, version: 3, updatedAt },
     data: {
       standalonePurchaseEnabled: true,
+      oneTimePurchaseEnabled: true,
       autoRenewEnabled: true,
     },
   });
@@ -388,4 +391,11 @@ test("raced update cannot falsely report a saved configuration", async () => {
   fixture.updatePass.mockResolvedValue({ count: 0 });
   await expect(save()).resolves.toMatchObject({ code: "CONFLICT" });
   expect(fixture.audit).not.toHaveBeenCalled();
+});
+
+test("admin can save renewal-only without removing the Membership offer", async () => {
+  await expect(save({ oneTimePurchaseEnabled: "" })).resolves.toHaveProperty("message");
+  expect(fixture.updatePass).toHaveBeenCalledWith(expect.objectContaining({ data: {
+    standalonePurchaseEnabled: true, oneTimePurchaseEnabled: false, autoRenewEnabled: true,
+  } }));
 });
