@@ -1,3 +1,4 @@
+import { requiresMembershipProtection } from "./membership-protection.server";
 import { isDeepStrictEqual } from "node:util";
 import type { PassPurchase } from "@prisma/client";
 import db from "../db.server";
@@ -92,7 +93,7 @@ export async function prepareMembershipCheckoutAuthorization(
   domain: string,
   admin: GraphQL,
 ) {
-  if (purchase.validityMonths !== 1) return undefined;
+  if (!(await requiresMembershipProtection(purchase))) return undefined;
   if (
     !actor.customerGid ||
     purchase.currency !== "AUD" ||
@@ -100,7 +101,7 @@ export async function prepareMembershipCheckoutAuthorization(
   )
     throw new DomainError(
       "MEMBERSHIP_CHECKOUT_GUARD_UNAVAILABLE",
-      "Monthly Pass payments are awaiting checkout verification. Please contact the studio.",
+      "Pass payments are awaiting checkout verification. Please contact the studio.",
       503,
     );
   const proof = membershipCheckoutProof(actor.customerGid, purchase);

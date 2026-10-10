@@ -350,7 +350,7 @@ export default function Catalog() {
                       defaultValue={pass?.validityMonths ?? ""}
                     />
                     <small>
-                      New one-calendar-month Passes start at the first
+                      Automatic-renewal Passes and one-calendar-month Passes start at the first
                       staff-confirmed attendance, including each renewed Pass.
                       Other Passes start on the date of the first booked class.
                     </small>
@@ -388,9 +388,7 @@ export default function Catalog() {
                     </select>
                     <small>
                       Required: this Pass can only book the selected classes.
-                      For a private monthly Pass, select its Private appointment
-                      classes only and set Calendar months to 1. After saving,
-                      configure monthly renewal in Memberships.
+                      Set Calendar months to 1 for monthly, 3 for quarterly, 6 for half-yearly, or 12 for yearly renewal. For a private Pass, select only its Private appointment classes. After saving, configure automatic renewal in Memberships.
                     </small>
                   </Field>
                   <label>

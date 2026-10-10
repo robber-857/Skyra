@@ -1,3 +1,4 @@
+import { supportsRenewalPeriod } from "./renewal-period";
 import db from "../db.server";
 import { DomainError } from "../lib/errors.server";
 import { z } from "zod";
@@ -63,7 +64,7 @@ export async function bookingPurchaseReview(
       !membershipCapabilities(shop.domain).autoRenewAvailable ||
       !plan?.autoRenewEnabled ||
       !plan.sellingPlanGid ||
-      plan.validityMonths !== 1
+      !supportsRenewalPeriod(plan.validityMonths)
     )
       throw new DomainError(
         "AUTO_RENEW_UNAVAILABLE",

@@ -61,10 +61,11 @@ const targetSchema = z
     sellingPlanGid: gid("SellingPlan"),
     priceCents: z.number().int().positive().safe(),
     currency: z.literal("AUD"),
+    validityMonths: z.number().int().min(1).max(120).default(1),
     association: z.enum(["ASSIGNED", "DETACHED"]).optional(),
   })
   .strict();
-export type MembershipSellingPlanTarget = z.infer<typeof targetSchema>;
+export type MembershipSellingPlanTarget = z.input<typeof targetSchema>;
 const pageInfo = z.object({ hasNextPage: z.boolean() });
 const dataSchema = z.object({
   shop: z.object({ currencyCode: z.string() }),
@@ -101,7 +102,7 @@ const dataSchema = z.object({
 const billingSchema = z.object({
   __typename: z.literal("SellingPlanRecurringBillingPolicy"),
   interval: z.literal("MONTH"),
-  intervalCount: z.literal(1),
+  intervalCount: z.number().int().min(1).max(120),
   anchors: z.array(z.unknown()).length(0),
   minCycles: z.number().int().min(0).max(1).nullable(),
   maxCycles: z.null(),
@@ -109,7 +110,7 @@ const billingSchema = z.object({
 const deliverySchema = z.object({
   __typename: z.literal("SellingPlanRecurringDeliveryPolicy"),
   interval: z.literal("MONTH"),
-  intervalCount: z.literal(1),
+  intervalCount: z.number().int().min(1).max(120),
   anchors: z.array(z.unknown()).length(0),
   cutoff: z.literal(0).nullable(),
   intent: z.literal("FULFILLMENT_BEGIN"),
@@ -165,14 +166,14 @@ function safePricing(policies: unknown[], priceCents: number) {
 function unavailable() {
   return new DomainError(
     "MEMBERSHIP_SELLING_PLAN_UNAVAILABLE",
-    "We could not verify this monthly renewal plan. Please contact the studio before paying.",
+    "We could not verify this renewal plan. Please contact the studio before paying.",
     503,
   );
 }
 function mismatch() {
   return new DomainError(
     "MEMBERSHIP_SELLING_PLAN_MISMATCH",
-    "This renewal plan does not match the monthly Pass terms. Please contact the studio before paying.",
+    "This renewal plan does not match the Pass terms. Please contact the studio before paying.",
     409,
   );
 }
@@ -246,6 +247,10 @@ export async function assertMembershipSellingPlan(
     plan?.category !== "SUBSCRIPTION" ||
     !billingSchema.safeParse(plan.billingPolicy).success ||
     !deliverySchema.safeParse(plan.deliveryPolicy).success ||
+    (plan.billingPolicy as { intervalCount: number }).intervalCount !==
+      expected.validityMonths ||
+    (plan.deliveryPolicy as { intervalCount: number }).intervalCount !==
+      expected.validityMonths ||
     !safePricing(plan.pricingPolicies, expected.priceCents)
   )
     throw mismatch();

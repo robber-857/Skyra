@@ -927,3 +927,12 @@ test("order reconciliation provides authoritative line/contract, refunds and cus
     await expect(readMembershipOrder(client, value.id)).resolves.toBeNull();
   }
 });
+
+
+test.each([3, 6, 12])("billing context requires the agreed %s-month contract interval", async (months) => {
+  const value = activeContract();
+  value.billingPolicy.intervalCount = months;
+  await expect(readMembershipBillingContext(contextClient(value), contractGid, billingContextNow, months)).resolves.toMatchObject({ billingCycleSelector: { index: 9 } });
+  value.billingPolicy.intervalCount = 1;
+  await expect(readMembershipBillingContext(contextClient(value), contractGid, billingContextNow, months)).rejects.toMatchObject({ code: "BILLING_CONTEXT_UNSAFE" });
+});

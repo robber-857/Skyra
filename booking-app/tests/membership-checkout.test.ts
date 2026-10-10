@@ -68,7 +68,7 @@ beforeEach(() => {
 });
 afterAll(() => db.$disconnect());
 
-async function fixture() {
+async function fixture(months = 1) {
   const shop = await db.shop.create({
     data: {
       domain: `membership-${randomUUID()}.myshopify.com`,
@@ -90,7 +90,7 @@ async function fixture() {
       name: "Monthly Pass",
       credits: 12,
       validityDays: 30,
-      validityMonths: 1,
+      validityMonths: months,
       status: "ACTIVE",
       requestedPriceCents: 29900,
       standalonePurchaseEnabled: true,
@@ -210,6 +210,7 @@ test("selling plan validation receives only the immutable subscription target", 
     variantGid: f.mapping.variantGid,
     sellingPlanGid: f.plan.sellingPlanGid,
     priceCents: 29900,
+    validityMonths: 1,
     currency: "AUD",
   });
 });
@@ -511,8 +512,8 @@ test("payment challenge is returned only to its owner after verifying the existi
   ).rejects.toMatchObject({ code: "BILLING_ACTION_UNAVAILABLE" });
 });
 
-test("renewal-only Membership rejects one-time requests before cart creation and still requires consent", async () => {
-  const f = await fixture();
+test.each([1, 3, 6, 12])("%s-month renewal-only Membership rejects one-time requests and requires consent", async (months) => {
+  const f = await fixture(months);
   await db.passPlan.update({ where: { id: f.plan.id }, data: { oneTimePurchaseEnabled: false } });
   const catalog = await membershipCatalog(f.actor, {});
   expect(catalog.passes[0]).toMatchObject({ oneTimePurchaseEnabled: false, autoRenew: { available: true } });
@@ -521,10 +522,11 @@ test("renewal-only Membership rejects one-time requests before cart creation and
   expect(mocked.create).not.toHaveBeenCalled();
   expect(await db.passPurchase.count({ where: { shopId: f.shop.id } })).toBe(0);
   await expect(f.run()).resolves.toHaveProperty("checkoutUrl");
+  expect(mocked.sellingPlan).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ validityMonths: months }));
 });
 
-test("renewal-only Booking rejects one-time review and checkout, but permits consented renewal", async () => {
-  const f = await fixture();
+test.each([1, 3, 6, 12])("%s-month renewal-only Booking permits only consented renewal", async (months) => {
+  const f = await fixture(months);
   await db.passPlan.update({ where: { id: f.plan.id }, data: { oneTimePurchaseEnabled: false } });
   const input = await bookingInput(f);
   const options = await bookingPassOptions(f.actor, { token: input.token, purchaseKind: "NEW_PASS", passPlanId: f.plan.id });

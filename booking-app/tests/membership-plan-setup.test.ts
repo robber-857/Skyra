@@ -7,6 +7,7 @@ import {
   eligibleEntitlements,
   grantEntitlement,
 } from "../app/services/entitlements.server";
+import { METAFIELDS_SET } from "../app/services/shopify-catalog.server";
 import { DomainError } from "../app/lib/errors.server";
 import { paidFixture } from "./paid-fixture";
 
@@ -35,8 +36,8 @@ test("Basic plan creation leaves the public template variant detached", async ()
   expect(mocks.verify).toHaveBeenCalledWith(f.admin, expect.objectContaining({ association: "DETACHED" }));
 });
 
-async function fixture() {
-  const f = await paidFixture("NEW_PASS", false, "APPOINTMENT", 1);
+async function fixture(months = 1) {
+  const f = await paidFixture("NEW_PASS", false, "APPOINTMENT", months);
   const actor = {
     shopId: f.shop.id,
     actorId: randomUUID(),
@@ -52,8 +53,8 @@ async function fixture() {
       productStatus: "ACTIVE",
     },
   });
-  const admin = vi.fn(async () =>
-    Response.json({
+  const admin = vi.fn(async (query: string) =>
+    query === METAFIELDS_SET ? Response.json({ data: { metafieldsSet: { userErrors: [], metafields: [{ key: "managed_monthly_pass", jsonValue: true }] } } }) : Response.json({
       data: {
         sellingPlanGroupCreate: {
           sellingPlanGroup: {
@@ -89,7 +90,7 @@ async function fixture() {
 test("admin creates the plan for exactly the mapped variant, verifies it and retains per-Pass trust", async () => {
   const f = await fixture();
   await f.run();
-  expect(f.admin).toHaveBeenCalledTimes(1);
+  expect(f.admin.mock.calls.filter(([query]) => query !== METAFIELDS_SET)).toHaveLength(1);
   expect(f.admin).toHaveBeenCalledWith(
     expect.any(String),
     expect.objectContaining({
@@ -113,14 +114,14 @@ test("admin creates the plan for exactly the mapped variant, verifies it and ret
     autoRenewEnabled: false,
   });
   await f.run();
-  expect(f.admin).toHaveBeenCalledTimes(1);
+  expect(f.admin.mock.calls.filter(([query]) => query !== METAFIELDS_SET)).toHaveLength(1);
 });
 
 test("concurrent submissions create only one Shopify plan", async () => {
   const f = await fixture();
   const results = await Promise.allSettled([f.run(), f.run()]);
   expect(results.some((r) => r.status === "fulfilled")).toBe(true);
-  expect(f.admin).toHaveBeenCalledTimes(1);
+  expect(f.admin.mock.calls.filter(([query]) => query !== METAFIELDS_SET)).toHaveLength(1);
 });
 
 test("readback failure retains creator IDs and retries verification without another creation", async () => {
@@ -136,7 +137,7 @@ test("readback failure retains creator IDs and retries verification without anot
     autoRenewEnabled: false,
   });
   await f.run();
-  expect(f.admin).toHaveBeenCalledTimes(1);
+  expect(f.admin.mock.calls.filter(([query]) => query !== METAFIELDS_SET)).toHaveLength(1);
   expect((await f.current()).renewalSetupState).toBe("READY");
 });
 
@@ -149,7 +150,7 @@ test("lost creation response blocks any blind retry", async () => {
   await expect(f.run()).rejects.toMatchObject({
     code: "RENEWAL_SETUP_PENDING",
   });
-  expect(f.admin).toHaveBeenCalledTimes(1);
+  expect(f.admin.mock.calls.filter(([query]) => query !== METAFIELDS_SET)).toHaveLength(1);
   expect(await f.current()).toMatchObject({
     renewalSetupState: "UNKNOWN",
     sellingPlanGid: null,
@@ -329,4 +330,40 @@ test("paid private monthly credits are usable only for explicitly selected cours
     });
     expect(await eligible(other.id)).toHaveLength(0);
   }
+});
+
+
+test.each([3, 6, 12])("Admin configures and verifies a %s-month renewal with matching billing and delivery", async (months) => {
+  const f = await fixture(months);
+  await f.run();
+  expect(f.admin).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+    variables: expect.objectContaining({ input: expect.objectContaining({
+      sellingPlansToCreate: [expect.objectContaining({
+        billingPolicy: { recurring: { interval: "MONTH", intervalCount: months, minCycles: 1 } },
+        deliveryPolicy: { recurring: { interval: "MONTH", intervalCount: months, intent: "FULFILLMENT_BEGIN", preAnchorBehavior: "ASAP" } },
+      })],
+    }) }),
+  }));
+  expect(mocks.verify).toHaveBeenCalledWith(f.admin, expect.objectContaining({ validityMonths: months }));
+  expect((await f.current()).renewalSetupState).toBe("READY");
+  await expect(savePass(f.actor, {
+    id: f.plan.id, version: 1, name: f.plan.name, status: "ACTIVE",
+    requestedPriceCents: 22000, credits: 5, validityDays: 90, validityMonths: 1,
+    serviceIds: [f.service.id],
+  })).rejects.toMatchObject({ code: "INVALID_RENEWAL_PLAN" });
+});
+
+
+test("checkout protection failure keeps verification retryable without another plan", async () => {
+  const f = await fixture(3);
+  const original = f.admin.getMockImplementation()!;
+  f.admin.mockImplementation(async (query) => query === METAFIELDS_SET
+    ? Response.json({ data: { metafieldsSet: { userErrors: [], metafields: [] } } })
+    : original(query));
+  await expect(f.run()).rejects.toMatchObject({ code: "RENEWAL_PROTECTION_UNVERIFIED" });
+  expect((await f.current()).renewalSetupState).toBe("VERIFYING");
+  f.admin.mockImplementation(original);
+  await f.run();
+  expect((await f.current()).renewalSetupState).toBe("READY");
+  expect(f.admin.mock.calls.filter(([query]) => query !== METAFIELDS_SET)).toHaveLength(1);
 });

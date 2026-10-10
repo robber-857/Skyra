@@ -372,3 +372,17 @@ test("an unanswered read aborts without authorizing or issuing another request",
   expect(client).toHaveBeenCalledOnce();
   expect(client.mock.calls[0][1].signal.aborted).toBe(true);
 });
+
+
+test.each([3, 6, 12])("verifies %s-month plans and rejects either provider interval drifting", async (months) => {
+  const value = data();
+  const plan = value.sellingPlanGroups.nodes[0].sellingPlans.nodes[0];
+  plan.billingPolicy.intervalCount = months;
+  plan.deliveryPolicy.intervalCount = months;
+  await expect(assertMembershipSellingPlan(clientFor(value), { ...target, validityMonths: months })).resolves.toBeDefined();
+  plan.billingPolicy.intervalCount = 1;
+  await expect(assertMembershipSellingPlan(clientFor(value), { ...target, validityMonths: months })).rejects.toMatchObject(mismatch);
+  plan.billingPolicy.intervalCount = months;
+  plan.deliveryPolicy.intervalCount = 1;
+  await expect(assertMembershipSellingPlan(clientFor(value), { ...target, validityMonths: months })).rejects.toMatchObject(mismatch);
+});

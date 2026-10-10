@@ -209,7 +209,7 @@ export async function syncCatalogEvent(eventId: string, graphql: GraphQL) {
           },
           ...(ownerType === "PASS_PLAN" &&
           "validityMonths" in owner &&
-          owner.validityMonths === 1
+          (owner.validityMonths === 1 || ("sellingPlanGid" in owner && Boolean(owner.sellingPlanGid)))
             ? [
                 {
                   ownerId: product.id,

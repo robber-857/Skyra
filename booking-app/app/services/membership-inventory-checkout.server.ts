@@ -1,3 +1,4 @@
+import { requiresMembershipProtection } from "./membership-protection.server";
 import type { PassPurchase } from "@prisma/client";
 import { z } from "zod";
 import db from "../db.server";
@@ -76,7 +77,7 @@ export async function prepareInventoryPass(
   purchase: PassPurchase,
   admin: GraphQL,
 ) {
-  if (!inventoryMembershipCheckout() || purchase.validityMonths !== 1)
+  if (!inventoryMembershipCheckout() || !(await requiresMembershipProtection(purchase)))
     return purchase;
   let resource = await db.membershipCheckoutResource.findUnique({
     where: { purchaseId: purchase.id },

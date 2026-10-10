@@ -1,3 +1,4 @@
+import { supportsRenewalPeriod } from "../services/renewal-period";
 import { z } from "zod";
 import {
   Form,
@@ -319,7 +320,7 @@ export async function action({ request }: ActionFunctionArgs) {
       );
       return {
         message:
-          "Monthly renewal plan created and verified. You can now enable automatic renewal below.",
+          "Renewal plan created and verified. You can now enable automatic renewal below.",
       };
     }
     if (form.get("intent") === "refresh-mail-status") {
@@ -371,7 +372,7 @@ export async function action({ request }: ActionFunctionArgs) {
         );
       if (
         input.autoRenewEnabled &&
-        (current.validityMonths !== 1 ||
+        (!supportsRenewalPeriod(current.validityMonths) ||
           current.introOnly ||
           !current.sellingPlanGid ||
           !current.sellingPlanGroupGid ||
@@ -379,7 +380,7 @@ export async function action({ request }: ActionFunctionArgs) {
       )
         throw new DomainError(
           "INVALID_RENEWAL_PLAN",
-          "Configure and verify monthly renewal first. A one-calendar-month Pass without a first-time-customer restriction is required.",
+          "Configure and verify automatic renewal first. A calendar-month Pass without a first-time-customer restriction is required.",
           422,
         );
       // Provider identities are assigned only by the server-side setup flow.
@@ -389,7 +390,7 @@ export async function action({ request }: ActionFunctionArgs) {
       )
         throw new DomainError(
           "SELLING_PLAN_READ_ONLY",
-          "Use Configure monthly renewal to manage this Pass's plan.",
+          "Use Configure automatic renewal to manage this Pass's plan.",
           409,
         );
       const next = {
@@ -455,7 +456,7 @@ export default function Memberships() {
           <p className="muted">
             Choose which Passes can be bought from Membership and which offer
             automatic renewal during Membership or Booking checkout. Select the
-            eligible classes when creating a Pass, then configure monthly
+            eligible classes when creating a Pass, then configure automatic
             renewal below. Shopify plans are created and verified automatically.
             Create and edit Pass information here through the shared Classes
             &amp; Passes catalogue. Changes appear in the Membership purchase
@@ -587,18 +588,19 @@ export default function Memberships() {
                 disabled={
                   !data.canEdit ||
                   busy ||
-                  plan.validityMonths !== 1 ||
+                  !supportsRenewalPeriod(plan.validityMonths) ||
                   plan.introOnly ||
                   ["CREATING", "UNKNOWN"].includes(plan.renewalSetupState)
                 }
               >
                 {plan.sellingPlanGid
-                  ? "Verify monthly renewal"
-                  : "Configure monthly renewal"}
+                  ? "Verify automatic renewal"
+                  : "Configure automatic renewal"}
               </button>
               <p className="muted">
                 Save the Pass and wait for product synchronization first. Each
                 paid period starts at its first staff-confirmed attendance.
+                {supportsRenewalPeriod(plan.validityMonths) && ` Each renewal buys ${plan.credits} classes for ${plan.validityMonths} calendar month${plan.validityMonths === 1 ? "" : "s"} at A$${(plan.requestedPriceCents / 100).toFixed(2)}.`}
               </p>
             </Form>
             <Form method="post" key={`${plan.id}:${plan.updatedAt}`}>
@@ -653,10 +655,10 @@ export default function Memberships() {
                   purchase section. Existing paid Passes and renewal agreements
                   are retained.
                 </p>
-                {(plan.validityMonths !== 1 || plan.introOnly) && (
+                {(!supportsRenewalPeriod(plan.validityMonths) || plan.introOnly) && (
                   <p className="muted">
                     Automatic renewal is currently available only for
-                    one-calendar-month Passes without a first-time-customer
+                    calendar-month Passes without a first-time-customer
                     restriction.
                   </p>
                 )}

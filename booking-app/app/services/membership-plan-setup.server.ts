@@ -1,10 +1,11 @@
+import { supportsRenewalPeriod } from "./renewal-period";
 import { z } from "zod";
 import db from "../db.server";
 import { DomainError } from "../lib/errors.server";
 import type { Actor } from "./authorization";
 import { audit, lockShop } from "./catalog.server";
 import { priceInCents } from "./purchase-mapping.server";
-import type { GraphQL } from "./shopify-catalog.server";
+import { METAFIELDS_SET, type GraphQL } from "./shopify-catalog.server";
 import { assertMembershipSellingPlan } from "./membership-selling-plan.server";
 import { inventoryMembershipCheckout } from "./membership-inventory-checkout.server";
 
@@ -71,7 +72,7 @@ export async function configureMonthlyPlan(
         409,
       );
     if (
-      pass.validityMonths !== 1 ||
+      !supportsRenewalPeriod(pass.validityMonths) ||
       pass.introOnly ||
       pass.requestedPriceCents <= 0 ||
       !pass.services.length ||
@@ -80,7 +81,7 @@ export async function configureMonthlyPlan(
     )
       throw new DomainError(
         "INVALID_RENEWAL_PLAN",
-        "Choose at least one active eligible class of one type, a positive price and one calendar month, without a first-time-customer restriction.",
+        "Choose at least one active eligible class of one type, a positive price and a validity of 1–120 calendar months, without a first-time-customer restriction.",
       );
     if (["CREATING", "UNKNOWN"].includes(pass.renewalSetupState))
       throw new DomainError(
@@ -131,27 +132,26 @@ export async function configureMonthlyPlan(
         signal: AbortSignal.timeout(12000),
         variables: {
           input: {
-            name: `${pass.name} — monthly renewal`,
+            name: `${pass.name} — automatic renewal`,
             merchantCode: `skyra-pass-${pass.id}`,
             options: ["Pass renewal"],
             sellingPlansToCreate: [
               {
                 name: "Renew after the activated Pass expires",
-                options: ["Monthly Pass renewal"],
+                options: [`${pass.validityMonths}-month Pass renewal`],
                 category: "SUBSCRIPTION",
-                description:
-                  "Each paid Pass starts at its first staff-confirmed attendance and lasts one calendar month. The renewed Pass waits for its own first attendance. Cancel to stop future renewals.",
+                description: `Each paid Pass starts at its first staff-confirmed attendance and lasts ${pass.validityMonths} calendar month${pass.validityMonths === 1 ? "" : "s"}. The renewed Pass waits for its own first attendance. Cancel to stop future renewals.`,
                 billingPolicy: {
                   recurring: {
                     interval: "MONTH",
-                    intervalCount: 1,
+                    intervalCount: pass.validityMonths,
                     minCycles: 1,
                   },
                 },
                 deliveryPolicy: {
                   recurring: {
                     interval: "MONTH",
-                    intervalCount: 1,
+                    intervalCount: pass.validityMonths,
                     intent: "FULFILLMENT_BEGIN",
                     preAnchorBehavior: "ASAP",
                   },
@@ -231,11 +231,48 @@ export async function configureMonthlyPlan(
     productGid: mapping.productGid!,
     variantGid: mapping.variantGid!,
     priceCents: pass.requestedPriceCents,
+    validityMonths: pass.validityMonths!,
     currency: "AUD",
     ...(inventoryMembershipCheckout()
       ? { association: "DETACHED" as const }
       : {}),
   });
+  // The existing Function reads this stable legacy key for every renewal period.
+  // Retrying verification also retries this idempotent write, never plan creation.
+  if (!inventoryMembershipCheckout()) {
+    const response = await admin(METAFIELDS_SET, {
+      tries: 1,
+      signal: AbortSignal.timeout(12000),
+      variables: {
+        metafields: [
+          {
+            ownerId: mapping.productGid!,
+            namespace: "$app",
+            key: "managed_monthly_pass",
+            type: "boolean",
+            value: "true",
+          },
+        ],
+      },
+    });
+    const payload = await response.json();
+    if (
+      !response.ok ||
+      payload.errors?.length ||
+      !payload.data?.metafieldsSet ||
+      payload.data.metafieldsSet.userErrors?.length ||
+      !payload.data.metafieldsSet.metafields?.some(
+        (field: { key: string; jsonValue: unknown }) =>
+          field.key === "managed_monthly_pass" && field.jsonValue === true,
+      )
+    ) {
+      throw new DomainError(
+        "RENEWAL_PROTECTION_UNVERIFIED",
+        "Checkout protection could not be configured. Retry verification before enabling renewal.",
+        503,
+      );
+    }
+  }
   await db.$transaction(async (tx) => {
     await lockShop(tx, actor.shopId);
     const updated = await tx.passPlan.updateMany({

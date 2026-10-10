@@ -1,3 +1,4 @@
+import { supportsRenewalPeriod } from "./renewal-period";
 import { z } from "zod";
 import type { PassPurchase, Prisma } from "@prisma/client";
 import db from "../db.server";
@@ -101,10 +102,10 @@ async function readPlan(
     fail("PASS_UNAVAILABLE", "This Pass is not available for purchase.");
   if (!autoRenew && !plan.oneTimePurchaseEnabled)
     fail("ONE_TIME_PURCHASE_DISABLED", "This Pass is available only with automatic renewal. Please review and accept the renewal terms.");
-  if (plan.validityMonths === 1 && !capabilities.checkoutGuardReady)
+  if ((autoRenew || plan.validityMonths === 1 || plan.sellingPlanGid) && !capabilities.checkoutGuardReady)
     fail(
       "MEMBERSHIP_CHECKOUT_GUARD_UNAVAILABLE",
-      "Monthly Pass payments are awaiting checkout verification.",
+      "Pass payments are awaiting checkout verification.",
       503,
     );
   if (
@@ -112,7 +113,7 @@ async function readPlan(
     (!capabilities.autoRenewAvailable ||
       !plan.autoRenewEnabled ||
       !plan.sellingPlanGid ||
-      plan.validityMonths !== 1)
+      !supportsRenewalPeriod(plan.validityMonths))
   )
     fail(
       "AUTO_RENEW_UNAVAILABLE",
@@ -334,6 +335,7 @@ export async function preparePassPurchaseCart(
         productGid: purchase.productGid,
         variantGid: purchase.variantGid,
         priceCents: purchase.priceCents,
+        validityMonths: purchase.validityMonths ?? 1,
         sellingPlanGid: purchase.sellingPlanGid || "",
         currency: "AUD",
         trustedGroupGid:

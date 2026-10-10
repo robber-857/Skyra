@@ -158,7 +158,7 @@ export async function savePass(actor: Actor, raw: unknown) {
     if (old && ["CREATING", "UNKNOWN"].includes(old.renewalSetupState))
       throw new DomainError(
         "RENEWAL_SETUP_PENDING",
-        "Monthly plan creation is being checked. Resolve it before editing this Pass.",
+        "Renewal plan creation is being checked. Resolve it before editing this Pass.",
         409,
       );
     if (old?.sellingPlanGid) {
@@ -179,10 +179,10 @@ export async function savePass(actor: Actor, raw: unknown) {
           "This renewal Pass already has members. Create a new Pass to change its eligible classes.",
           409,
         );
-      if (input.validityMonths !== 1 || input.introOnly)
+      if (input.validityMonths !== old.validityMonths || input.introOnly)
         throw new DomainError(
           "INVALID_RENEWAL_PLAN",
-          "A configured renewal Pass must remain one calendar month without a first-time restriction. Create a new Pass for different terms.",
+          "A configured renewal Pass must retain its configured calendar-month duration without a first-time restriction. Create a new Pass for different terms.",
           409,
         );
     }

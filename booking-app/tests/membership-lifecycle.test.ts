@@ -189,6 +189,7 @@ async function fixture(
   const contract = {
     id: "gid://shopify/SubscriptionContract/100",
     status: "ACTIVE",
+    billingPolicy: { interval: "MONTH", intervalCount: plan.validityMonths ?? 1 },
     originOrder: { id: f.payload.admin_graphql_api_id },
     customer: { id: f.customer.shopifyCustomerGid },
     currencyCode: "AUD",
@@ -797,8 +798,8 @@ test("first managed booking payment continues booking fulfillment but recurring 
   ).toBe(1);
 });
 
-test("provider success through worker grants exactly one next pass awaiting activation", async () => {
-  const f = await fixture(false);
+test.each([1, 3, 6, 12])("%s-month renewal grants exactly one next pass awaiting its own activation", async (months) => {
+  const f = await fixture(false, { validityMonths: months });
   await expire(f);
   const renewal = (await claimDueMembershipCycle(f.member.id))!;
   const billing = {
@@ -830,10 +831,12 @@ test("provider success through worker grants exactly one next pass awaiting acti
   ]);
   await processMembershipBilling(renewal.id, vi.fn());
   expect(sdk.submit).toHaveBeenCalledTimes(1);
+  expect(sdk.context).toHaveBeenCalledWith(expect.anything(), f.contract.id, expect.any(Date), months);
   const paid = await db.passPurchase.findUniqueOrThrow({
     where: { id: renewal.id },
   });
   expect(paid.status).toBe("PAID");
+  expect(paid.validityMonths).toBe(months);
   expect(
     await db.entitlement.findUnique({ where: { id: paid.entitlementId! } }),
   ).toMatchObject({
@@ -1353,4 +1356,19 @@ test("bank challenge takes precedence over an order and only the original attemp
   expect(
     await db.passPurchase.findUnique({ where: { id: renewal.id } }),
   ).toMatchObject({ status: "PAID", billingAttemptGid: billing.id });
+});
+
+
+test.each([3, 6, 12])("%s-month renewal Pass activates at attendance and waits until calendar expiry", async (months) => {
+  const f = await fixture(true, { validityMonths: months });
+  expect(f.entitlement.startsAt).toBeNull();
+  expect(await claimDueMembershipCycle(f.member.id)).toBeNull();
+  const start = await classAt(f, -7200000, 3600000);
+  await change(f, "CHECK_IN");
+  const pass = await db.entitlement.findUniqueOrThrow({ where: { id: f.entitlement.id } });
+  const expected = DateTime.fromJSDate(start, { zone: "Australia/Sydney" }).startOf("day").plus({ months });
+  expect(pass.expiresAt!.getTime()).toBe(expected.toMillis());
+  expect(await claimDueMembershipCycle(f.member.id)).toBeNull();
+  const wrongContract = { ...f.contract, billingPolicy: { interval: "MONTH", intervalCount: 1 } };
+  await expect(bindMembershipContract(f.shop.id, f.contract.id, vi.fn(), wrongContract as never)).rejects.toMatchObject({ code: "SUBSCRIPTION_CONTRACT_MISMATCH" });
 });

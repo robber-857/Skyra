@@ -328,7 +328,9 @@ test.each([
 
 test.each([
   { introOnly: true },
-  { validityMonths: 3 },
+  { validityMonths: null },
+  { validityMonths: 0 },
+  { validityMonths: 121 },
   { status: "DRAFT" },
   { saleable: false },
 ])("cannot enable renewal on an ineligible Pass (%j)", async (change) => {
@@ -398,4 +400,11 @@ test("admin can save renewal-only without removing the Membership offer", async 
   expect(fixture.updatePass).toHaveBeenCalledWith(expect.objectContaining({ data: {
     standalonePurchaseEnabled: true, oneTimePurchaseEnabled: false, autoRenewEnabled: true,
   } }));
+});
+
+
+test.each([3, 6, 12])("Admin can enable a verified %s-month renewal", async (months) => {
+  fixture.findPass.mockResolvedValue({ ...pass, validityMonths: months });
+  await expect(save()).resolves.toHaveProperty("message");
+  expect(fixture.updatePass).toHaveBeenCalled();
 });

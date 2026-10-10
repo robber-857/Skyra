@@ -1,3 +1,4 @@
+import { supportsRenewalPeriod } from "./renewal-period";
 import {
   bookingTerms,
   requireBookingTerms,
@@ -254,10 +255,10 @@ function managedMonthlyPass(context: Context) {
   // Owner-only standalone UAT leaves the existing Booking purchase path intact.
   if (process.env.SKYRA_MEMBERSHIPS_UAT_CUSTOMER_GID && process.env.SKYRA_MEMBERSHIPS_ENABLED !== "true") return false;
   return (
-    context.plan?.validityMonths === 1 &&
+    context.plan && supportsRenewalPeriod(context.plan.validityMonths) &&
     (Boolean(context.plan.sellingPlanGid) ||
       context.plan.autoRenewEnabled ||
-      membershipCapabilities(context.domain).checkoutAvailable)
+      (context.plan.validityMonths === 1 && membershipCapabilities(context.domain).checkoutAvailable))
   );
 }
 
@@ -270,7 +271,7 @@ function requireRenewalAvailable(context: Context, autoRenew: boolean) {
   )
     fail(
       "MEMBERSHIP_CHECKOUT_GUARD_UNAVAILABLE",
-      "Monthly Pass payments are awaiting checkout verification.",
+      "Pass payments are awaiting checkout verification.",
       503,
     );
   if (
@@ -278,7 +279,7 @@ function requireRenewalAvailable(context: Context, autoRenew: boolean) {
     (!context.plan ||
       !context.plan.autoRenewEnabled ||
       !context.plan.sellingPlanGid ||
-      context.plan.validityMonths !== 1 ||
+      !supportsRenewalPeriod(context.plan.validityMonths) ||
       !membershipCapabilities(context.domain).autoRenewAvailable)
   )
     fail(

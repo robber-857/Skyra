@@ -27,6 +27,7 @@ const mocked = vi.hoisted(() => ({
 
 vi.mock("../app/db.server", () => ({
   default: {
+    passMembership: { findUnique: async () => null },
     passPurchase: {
       findFirst: mocked.findPurchase,
       update: mocked.update,
@@ -547,4 +548,11 @@ test("an unknown renewal closure propagates rather than reporting permission to 
   expect(mocked.authorize).not.toHaveBeenCalled();
   expect(mocked.updateMany).not.toHaveBeenCalled();
   expect(mocked.createCart).not.toHaveBeenCalled();
+});
+
+
+test.each([3, 6, 12])("%s-month automatic renewal cannot bypass checkout protection", async (months) => {
+  mocked.capabilities.mockReturnValue({ checkoutGuardReady: false });
+  await expect(prepareMembershipCheckoutAuthorization(actor, purchase({ validityMonths: months, mode: "AUTO_RENEW" }), domain, admin)).rejects.toMatchObject({ code: "MEMBERSHIP_CHECKOUT_GUARD_UNAVAILABLE" });
+  expect(mocked.authorize).not.toHaveBeenCalled();
 });

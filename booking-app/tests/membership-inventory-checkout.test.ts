@@ -9,24 +9,28 @@ import {
   PRIVATE_PASS_CONTEXT,
   PRIVATE_PASS_CREATE,
   PRIVATE_PASS_READ,
+  PRIVATE_PASS_ATTACH,
 } from "../app/services/membership-inventory-checkout.server";
 import { PUBLIC_MEMBERSHIP_STOREFRONT_TOKENS } from "../app/services/membership-checkout-authorization.server";
 
 afterEach(() => vi.unstubAllEnvs());
 afterAll(() => db.$disconnect());
-async function fixture() {
+async function fixture(months = 1, autoRenew = false) {
   vi.stubEnv("SKYRA_MEMBERSHIPS_CHECKOUT_PROTECTION", "INVENTORY");
   vi.stubEnv(
     "SKYRA_MEMBERSHIPS_INVENTORY_LOCATION_GID",
     "gid://shopify/Location/1",
   );
-  const f = await paidFixture("NEW_PASS", false, "CLASS", 1);
+  const f = await paidFixture("NEW_PASS", false, "CLASS", months);
+  if (autoRenew) await db.passPlan.update({ where: { id: f.plan.id }, data: { autoRenewEnabled: true, sellingPlanGid: "gid://shopify/SellingPlan/789", sellingPlanGroupGid: "gid://shopify/SellingPlanGroup/700" } });
   const { purchase } = await db.$transaction((tx) =>
     claimPassPurchaseInTransaction(tx, {
       shopId: f.shop.id,
       customerId: f.customer.id,
       passPlanId: f.plan.id,
-      mode: "ONCE",
+      mode: autoRenew ? "AUTO_RENEW" : "ONCE",
+      sellingPlanGid: autoRenew ? "gid://shopify/SellingPlan/789" : null,
+      autoRenewTermsVersion: autoRenew ? "test" : undefined,
       bookingCheckoutId: f.checkout.id,
       idempotencyKey: randomUUID(),
       productMappingId: f.mapping.id,
@@ -36,7 +40,7 @@ async function fixture() {
       currency: "AUD",
       credits: f.plan.credits,
       validityDays: f.plan.validityDays,
-      validityMonths: 1,
+      validityMonths: months,
       timezone: "Australia/Sydney",
       termsVersion: "test",
     }),
@@ -52,7 +56,7 @@ async function fixture() {
       id: `gid://shopify/Product/${serial}`,
       status: "UNLISTED",
       handle: `skyra-checkout-${purchase.id}`,
-      requiresSellingPlan: false,
+      requiresSellingPlan: autoRenew,
       resourcePublications: {
         nodes: [
           {
@@ -117,6 +121,7 @@ async function fixture() {
           },
         },
       });
+    if (query === PRIVATE_PASS_ATTACH) return Response.json({ data: { sellingPlanGroupAddProductVariants: { userErrors: [] } } });
     if (query === PRIVATE_PASS_READ)
       return Response.json({ data: { productVariant: item } });
     return Response.json({ data: { publishablePublish: { userErrors: [] } } });
@@ -218,4 +223,24 @@ test.each([
   await expect(
     assertInventoryPassClosedOrOpen(f.purchase.id, f.admin, "CLOSED"),
   ).rejects.toMatchObject({ code: "MEMBERSHIP_INVENTORY_UNVERIFIED" });
+});
+
+
+test.each([3, 6, 12])("%s-month auto-renew uses a protected subscription-only private product", async (months) => {
+  const f = await fixture(months, true);
+  const ready = await prepareInventoryPass(f.purchase, f.admin);
+  expect(ready.variantGid).toBe(f.item.id);
+  expect(ready.validityMonths).toBe(months);
+  expect(f.admin.mock.calls.some(([query]) => query === PRIVATE_PASS_ATTACH)).toBe(true);
+  await prepareInventoryPass(ready, f.admin);
+  expect(f.admin.mock.calls.filter(([query]) => query === PRIVATE_PASS_CREATE)).toHaveLength(1);
+});
+
+
+test.each([3, 6, 12])("one-time purchase of a configured %s-month Pass still uses checkout protection", async (months) => {
+  const f = await fixture(months);
+  await db.passPlan.update({ where: { id: f.plan.id }, data: { sellingPlanGid: "gid://shopify/SellingPlan/789", sellingPlanGroupGid: "gid://shopify/SellingPlanGroup/700" } });
+  const ready = await prepareInventoryPass(f.purchase, f.admin);
+  expect(ready.variantGid).toBe(f.item.id);
+  expect(f.admin.mock.calls.some(([query]) => query === PRIVATE_PASS_ATTACH)).toBe(false);
 });

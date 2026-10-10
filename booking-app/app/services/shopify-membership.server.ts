@@ -1,3 +1,4 @@
+import { supportsRenewalPeriod } from "./renewal-period";
 import { z } from "zod";
 import { isDeepStrictEqual } from "node:util";
 import type { MembershipCheckoutAuthorization } from "./membership-checkout-authorization.server";
@@ -602,6 +603,7 @@ export async function readMembershipBillingContext(
   client: GraphQL,
   contractGid: string,
   now: Date,
+  validityMonths = 1,
 ): Promise<MembershipBillingContext> {
   if (!(now instanceof Date) || !Number.isFinite(now.getTime()))
     throw unsafeBillingContext();
@@ -611,7 +613,8 @@ export async function readMembershipBillingContext(
   if (
     contract.status !== "ACTIVE" ||
     contract.billingPolicy.interval !== "MONTH" ||
-    contract.billingPolicy.intervalCount !== 1 ||
+    !supportsRenewalPeriod(validityMonths) ||
+    contract.billingPolicy.intervalCount !== validityMonths ||
     contract.discounts.nodes.some(
       (discount) =>
         discount.recurringCycleLimit !== 1 || (discount.usageCount ?? 0) < 1,

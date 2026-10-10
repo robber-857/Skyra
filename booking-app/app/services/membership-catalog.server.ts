@@ -1,3 +1,4 @@
+import { supportsRenewalPeriod } from "./renewal-period";
 import { z } from "zod";
 import db from "../db.server";
 import { DomainError } from "../lib/errors.server";
@@ -101,7 +102,7 @@ export async function membershipCatalog(actor: BookingActor, raw: unknown) {
         capabilities.autoRenewAvailable &&
         plan.autoRenewEnabled &&
         Boolean(plan.sellingPlanGid) &&
-        plan.validityMonths === 1;
+        supportsRenewalPeriod(plan.validityMonths);
       if (!plan.oneTimePurchaseEnabled && !available) return [];
       return [
         {

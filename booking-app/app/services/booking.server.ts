@@ -1,3 +1,4 @@
+import { supportsRenewalPeriod } from "./renewal-period";
 import { createHash, randomBytes } from "node:crypto";
 import { Prisma, type BookingAttempt, type Shop } from "@prisma/client";
 import { z } from "zod";
@@ -650,7 +651,7 @@ export async function bookingPassOptions(actor: BookingActor, raw: unknown) {
       if (plan.introOnly && !canUseIntro) return [];
       const mapping = mappings.find((m) => m.ownerId === plan.id);
       if (!purchaseMappingReady(mapping, plan)) return [];
-      const renewalAvailable = plan.autoRenewEnabled && plan.validityMonths === 1 &&
+      const renewalAvailable = plan.autoRenewEnabled && supportsRenewalPeriod(plan.validityMonths) &&
         membershipCapabilities(shop.domain).autoRenewAvailable && Boolean(plan.sellingPlanGid);
       if (!plan.oneTimePurchaseEnabled && !renewalAvailable) return [];
       return [

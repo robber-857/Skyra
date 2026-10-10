@@ -71,6 +71,8 @@ export async function bindMembershipContract(
   if (
     contract.customer?.id !== customer.shopifyCustomerGid ||
     contract.currencyCode !== purchase.currency ||
+    contract.billingPolicy.interval !== "MONTH" ||
+    contract.billingPolicy.intervalCount !== (purchase.validityMonths ?? 1) ||
     contract.lines.nodes.length !== 1 ||
     contract.lines.pageInfo.hasNextPage ||
     !line ||
@@ -209,6 +211,7 @@ export async function processMembershipBilling(
       admin,
       first.membership.contractGid,
       billingNow,
+      first.validityMonths ?? 1,
     );
     const bound = await bindMembershipContract(
       first.shopId,
