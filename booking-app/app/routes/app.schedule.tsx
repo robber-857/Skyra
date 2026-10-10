@@ -21,6 +21,7 @@ import {
 } from "../services/schedule.server";
 import { publicError } from "../lib/errors.server";
 import { Feedback, Field, Status } from "../components/admin-ui";
+import { DeleteSessionForm } from "../components/delete-session-form";
 import {
   SCHEDULE_MIN_DATE,
   SCHEDULE_MAX_DATE,
@@ -594,25 +595,13 @@ export default function Schedule() {
           </Form>
           {(editing.status === "DRAFT" ||
             new Date(editing.startsAt) > new Date()) && (
-            <Form
-              method="post"
-              className="schedule-remove-form"
-              onSubmit={(event) => {
-                if (
-                  !window.confirm(
-                    `Delete ${editing.service.name} from Weekly Schedule? This removes this session only.`,
-                  )
-                )
-                  event.preventDefault();
-              }}
-            >
-              <input name="intent" type="hidden" value="remove" />
-              <input name="id" type="hidden" value={editing.id} />
-              <input name="version" type="hidden" value={editing.version} />
-              <button className="danger-text" disabled={busy}>
-                Delete session
-              </button>
-            </Form>
+            <DeleteSessionForm
+              key={`${editing.id}:${editing.version}`}
+              name={editing.service.name}
+              id={editing.id}
+              version={editing.version}
+              busy={busy}
+            />
           )}
         </section>
       )}
