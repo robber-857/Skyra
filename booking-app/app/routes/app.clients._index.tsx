@@ -41,6 +41,7 @@ export async function action({ request }: ActionFunctionArgs) {
         firstName: form.get("firstName"),
         lastName: form.get("lastName"),
         email: form.get("email"),
+        phone: form.get("phone") || "",
       });
       return redirect(`/app/clients/${client.id}`);
     }

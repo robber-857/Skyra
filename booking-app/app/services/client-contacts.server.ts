@@ -7,13 +7,13 @@ import type { GraphQL } from "./shopify-catalog.server";
 const contactsQuery = `#graphql
   query ClientContacts($ids: [ID!]!) {
     nodes(ids: $ids) {
-      ... on Customer { id firstName lastName defaultEmailAddress { emailAddress } }
+      ... on Customer { id firstName lastName defaultEmailAddress { emailAddress } defaultPhoneNumber { phoneNumber } }
     }
   }`;
 const importQuery = `#graphql
   query ClientImport($after: String) {
     customers(first: 100, after: $after) {
-      nodes { id firstName lastName defaultEmailAddress { emailAddress } }
+      nodes { id firstName lastName defaultEmailAddress { emailAddress } defaultPhoneNumber { phoneNumber } }
       pageInfo { hasNextPage endCursor }
     }
   }`;
@@ -22,11 +22,12 @@ const contact = z.object({
   firstName: z.string().nullable(),
   lastName: z.string().nullable(),
   defaultEmailAddress: z.object({ emailAddress: z.string() }).nullable(),
+  defaultPhoneNumber: z.object({ phoneNumber: z.string() }).nullable(),
 });
 const unavailable = () =>
   new DomainError(
     "CUSTOMER_DATA_UNAVAILABLE",
-    "Shopify customer details could not be read. Grant Skyra Booking access to customers, names and email, then refresh. Existing profiles and Pass balances are still available.",
+    "Shopify customer details could not be read. Grant Skyra Booking access to customers, names, email and phone, then refresh. Existing profiles and Pass balances are still available.",
     503,
   );
 async function read(
@@ -59,20 +60,29 @@ async function activeShop(actor: Actor) {
 const values = (node: z.infer<typeof contact>) => ({
   shopifyName: [node.firstName, node.lastName].filter(Boolean).join(" ").trim(),
   email: node.defaultEmailAddress?.emailAddress || null,
+  phone: node.defaultPhoneNumber?.phoneNumber || null,
   contactSyncedAt: new Date(),
 });
 
 export const findClientQuery = `#graphql
   query FindClient($query: String!) {
     customers(first: 100, query: $query) {
-      nodes { id firstName lastName defaultEmailAddress { emailAddress } }
+      nodes { id firstName lastName defaultEmailAddress { emailAddress } defaultPhoneNumber { phoneNumber } }
       pageInfo { hasNextPage }
     }
   }`;
 export const createClientMutation = `#graphql
   mutation CreateClient($input: CustomerInput!) {
     customerCreate(input: $input) {
-      customer { id firstName lastName defaultEmailAddress { emailAddress } }
+      customer { id firstName lastName defaultEmailAddress { emailAddress } defaultPhoneNumber { phoneNumber } }
+      userErrors { field message }
+    }
+  }`;
+
+export const updateClientPhoneMutation = `#graphql
+  mutation UpdateClientPhone($input: CustomerInput!) {
+    customerUpdate(input: $input) {
+      customer { id firstName lastName defaultEmailAddress { emailAddress } defaultPhoneNumber { phoneNumber } }
       userErrors { field message }
     }
   }`;
@@ -88,6 +98,16 @@ export async function addAdminClient(
       firstName: z.string().trim().min(1, "First name is required.").max(100),
       lastName: z.string().trim().max(100),
       email: z.string().trim().toLowerCase().email().max(254),
+      phone: z
+        .string()
+        .trim()
+        .max(40)
+        .default("")
+        .transform((value) => value.replace(/[\s().-]/g, ""))
+        .refine(
+          (value) => !value || /^\+[1-9]\d{6,14}$/.test(value),
+          "Enter a phone number with country code, for example +61 412 345 678.",
+        ),
     })
     .strict()
     .parse(raw);
@@ -113,13 +133,29 @@ export async function addAdminClient(
       "Multiple Shopify customers use this email. Resolve the duplicate customers in Shopify first.",
     );
   let customer = exact[0];
-  if (!customer) {
+  const updatingPhone = !!customer;
+  if (
+    !customer ||
+    (input.phone && input.phone !== customer.defaultPhoneNumber?.phoneNumber)
+  ) {
+    const operation = updatingPhone ? "customerUpdate" : "customerCreate";
+    const mutationInput = updatingPhone
+      ? { id: customer.id, phone: input.phone }
+      : {
+          firstName: input.firstName,
+          lastName: input.lastName,
+          email: input.email,
+          ...(input.phone ? { phone: input.phone } : {}),
+        };
     let body;
     try {
-      const response = await graphql(createClientMutation, {
-        variables: { input },
-        signal: AbortSignal.timeout(8000),
-      });
+      const response = await graphql(
+        updatingPhone ? updateClientPhoneMutation : createClientMutation,
+        {
+          variables: { input: mutationInput },
+          signal: AbortSignal.timeout(8000),
+        },
+      );
       body = await response.json();
       if (!response.ok || body.errors?.length || !body.data) throw new Error();
     } catch {
@@ -131,21 +167,21 @@ export async function addAdminClient(
     }
     const payload = z
       .object({
-        customerCreate: z.object({
+        [operation]: z.object({
           customer: contact.nullable(),
           userErrors: z.array(z.object({ message: z.string() })),
         }),
       })
       .safeParse(body.data);
     if (!payload.success) throw unavailable();
-    if (payload.data.customerCreate.userErrors.length) {
+    if (payload.data[operation].userErrors.length) {
       throw new DomainError(
         "CLIENT_CREATE_FAILED",
-        payload.data.customerCreate.userErrors.map((e) => e.message).join("; "),
+        payload.data[operation].userErrors.map((e) => e.message).join("; "),
       );
     }
-    if (!payload.data.customerCreate.customer) throw unavailable();
-    customer = payload.data.customerCreate.customer;
+    if (!payload.data[operation].customer) throw unavailable();
+    customer = payload.data[operation].customer;
   }
   try {
     return await db.customerProfile.upsert({
@@ -215,7 +251,12 @@ export async function refreshClientContacts(
         where: { shopId: actor.shopId, id: row.id },
         data: node
           ? values(node)
-          : { shopifyName: "", email: null, contactSyncedAt: new Date() },
+          : {
+              shopifyName: "",
+              email: null,
+              phone: null,
+              contactSyncedAt: new Date(),
+            },
       });
     }),
   );

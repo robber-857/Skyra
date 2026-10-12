@@ -15,7 +15,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (shop) {
       await tx.customerProfile.updateMany({
         where: { shopId: shop.id },
-        data: { shopifyName: "", email: null, contactSyncedAt: null },
+        data: { shopifyName: "", email: null, phone: null, contactSyncedAt: null },
       });
       await tx.shop.update({
         where: { id: shop.id },

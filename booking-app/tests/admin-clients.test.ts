@@ -23,6 +23,7 @@ const node = (id = "gid://shopify/Customer/123", firstName = "Alice") => ({
   id,
   firstName,
   lastName: "Chen",
+  defaultPhoneNumber: null,
   defaultEmailAddress: { emailAddress: "alice@example.com" },
 });
 beforeAll(() => {
@@ -76,6 +77,7 @@ test("directory and profiles isolate shops, reject Coaches and derive reserved/r
     data: {
       shopifyName: "Alice Chen",
       email: "alice@example.com",
+      phone: "+61412345678",
       trainingGoals: "Strength",
       signature: "Hello",
     },
@@ -93,6 +95,7 @@ test("directory and profiles isolate shops, reject Coaches and derive reserved/r
   expect((await adminClients(actor, { q: "Chen" })).total).toBe(1);
   expect((await adminClients(actor, { q: "nobody" })).clients).toEqual([]);
   const detail = await adminClientDetail(actor, f.customer.id);
+  expect(detail.client.phone).toBe("+61412345678");
   expect(detail.client).toMatchObject({
     name: "Alice Chen",
     trainingGoals: "Strength",

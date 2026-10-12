@@ -60,7 +60,8 @@ export function AdminClientsView({
           <h2 id="add-client-title">Add client</h2>
           <p className="muted">
             Enter the client’s name and email. If this email already exists in
-            Shopify, their existing profile will be linked.
+            Shopify, their existing profile will be linked. An entered phone
+            number will also update their Shopify contact details.
           </p>
           <Form method="post" className="form-grid">
             <input type="hidden" name="intent" value="create" />
@@ -90,6 +91,19 @@ export function AdminClientsView({
                 required
                 maxLength={254}
               />
+            </label>
+            <label className="field">
+              Phone (optional)
+              <input
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+                placeholder="+61 412 345 678"
+                maxLength={40}
+              />
+              <small>
+                Include the country code, for example +61 for Australia.
+              </small>
             </label>
             <div className="catalog-page-controls">
               <button className="primary" disabled={busy}>
@@ -305,6 +319,16 @@ export function AdminClientDetailView({
           <div>
             <dt>Email</dt>
             <dd>{c.email || "Not available"}</dd>
+          </div>
+          <div>
+            <dt>Phone</dt>
+            <dd>
+              {c.phone ? (
+                <a href={`tel:${c.phone}`}>{c.phone}</a>
+              ) : (
+                "Not provided"
+              )}
+            </dd>
           </div>
           <div>
             <dt>Added to Booking</dt>

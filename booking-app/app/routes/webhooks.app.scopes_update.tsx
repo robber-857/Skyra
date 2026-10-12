@@ -22,7 +22,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (studio)
       await db.customerProfile.updateMany({
         where: { shopId: studio.id },
-        data: { shopifyName: "", email: null, contactSyncedAt: null },
+        data: { shopifyName: "", email: null, phone: null, contactSyncedAt: null },
       });
   }
   return new Response();

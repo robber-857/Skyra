@@ -31,19 +31,19 @@ All services require ADMIN/OPERATIONS and an active shop. Customer, Coach and
 cross-shop access is rejected. Responses use private/no-store cache headers.
 Names/emails stay in Admin responses; existing Customer and Coach APIs keep
 explicit field allowlists. Uninstall or removal of read_customers clears the
-Shopify name/email cache.
+Shopify name/email/phone cache.
 
 ## Shopify permission
 
 Add client creates a Shopify customer from first name, optional last name and
-email, or links the existing exact email match. It opens the resulting Booking
+email and optional phone, or links the existing exact email match. It opens the resulting Booking
 profile and preserves existing profile content. Creating customers requires
 write_customers in both the app release and runtime scopes; the owner may need
 to approve the updated installation permissions.
 
 The app release adds read_customers. A store owner may need to accept the updated
 installation permissions when reopening the app. Skyra Booking must also have
-protected customer fields Name and Email selected in the Dev/Partner Dashboard.
+protected customer fields Name, Email and Phone selected in the Dev/Partner Dashboard.
 If those fields cannot be read, Admin shows an actionable warning while existing
 profile data and credit history remain accessible. No invented names or emails.
 
@@ -57,3 +57,11 @@ Shopify import retries, search/pagination, report names and ledger balances.
 `npm run check` verifies types, lint and production build. Interactive Chrome
 verification uses test fixtures at 1440px and 390px; real installation permissions
 and actual Shopify customer data must be verified in the authenticated store.
+
+Phone numbers appear in the client profile with a call link. Add client accepts
+international numbers with a country code (for example +61 412 345 678), strips
+formatting and saves through Shopify before caching the returned number. For an
+existing exact email match, a supplied phone updates that customer; leaving it
+blank preserves the current number. Sync imports phone numbers, including removal
+of a number in Shopify. Apply the client_phone migration before starting this
+version. Live phone access and creation/update require authenticated store UAT.

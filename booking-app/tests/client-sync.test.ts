@@ -23,6 +23,7 @@ const customer = {
   id: "gid://shopify/Customer/123",
   firstName: "Mandy",
   lastName: "Wu",
+  defaultPhoneNumber: null,
   defaultEmailAddress: { emailAddress: "mandy@example.com" },
 };
 
@@ -113,6 +114,7 @@ test("205 customers are imported across three pages, stopping at the final curso
               id: `gid://shopify/Customer/${offset + i + 1}`,
               firstName: "Test",
               lastName: "Client",
+              defaultPhoneNumber: null,
               defaultEmailAddress: null,
             })),
             pageInfo: {
@@ -189,4 +191,112 @@ test("empty stores finish and coaches cannot initiate a sync", async () => {
     importShopifyClients({ ...actor, role: "COACH" }, graphql, {}),
   ).rejects.toMatchObject({ code: "FORBIDDEN" });
   expect(graphql).toHaveBeenCalledTimes(1);
+});
+
+const withPhone = {
+  ...customer,
+  defaultPhoneNumber: { phoneNumber: "+61412345678" },
+};
+const lookup = (nodes: unknown[]) =>
+  Response.json({
+    data: { customers: { nodes, pageInfo: { hasNextPage: false } } },
+  });
+
+test("new client phone is normalized, sent to Shopify and cached from its response", async () => {
+  const graphql = vi
+    .fn()
+    .mockResolvedValueOnce(lookup([]))
+    .mockResolvedValueOnce(
+      Response.json({
+        data: { customerCreate: { customer: withPhone, userErrors: [] } },
+      }),
+    );
+  await addAdminClient(actor, graphql, {
+    ...newClient,
+    phone: " +61 412-345-678 ",
+  });
+  expect(graphql.mock.calls[1][1].variables.input.phone).toBe("+61412345678");
+  const write = storage.customerProfile.upsert.mock.calls[0][0];
+  expect(write.create.phone).toBe("+61412345678");
+  expect(write.update.phone).toBe("+61412345678");
+});
+
+test("existing client phone is updated without recreating the customer", async () => {
+  const graphql = vi
+    .fn()
+    .mockResolvedValueOnce(lookup([customer]))
+    .mockResolvedValueOnce(
+      Response.json({
+        data: { customerUpdate: { customer: withPhone, userErrors: [] } },
+      }),
+    );
+  await addAdminClient(actor, graphql, { ...newClient, phone: "+61412345678" });
+  expect(graphql.mock.calls[1][0]).toContain("customerUpdate");
+  expect(graphql.mock.calls[1][1].variables.input).toEqual({
+    id: customer.id,
+    phone: "+61412345678",
+  });
+  expect(storage.customerProfile.upsert.mock.calls[0][0].update.phone).toBe(
+    "+61412345678",
+  );
+});
+
+test.each(["", "+61 412 345 678"])(
+  "blank or unchanged phone preserves the existing number (%s)",
+  async (phone) => {
+    const graphql = vi.fn().mockResolvedValueOnce(lookup([withPhone]));
+    await addAdminClient(actor, graphql, { ...newClient, phone });
+    expect(graphql).toHaveBeenCalledTimes(1);
+    expect(storage.customerProfile.upsert.mock.calls[0][0].update.phone).toBe(
+      "+61412345678",
+    );
+  },
+);
+
+test("invalid phone is rejected before any Shopify request", async () => {
+  const graphql = vi.fn();
+  await expect(
+    addAdminClient(actor, graphql, { ...newClient, phone: "abc" }),
+  ).rejects.toThrow("country code");
+  expect(graphql).not.toHaveBeenCalled();
+  expect(storage.customerProfile.upsert).not.toHaveBeenCalled();
+});
+
+test("Shopify rejects a duplicate phone without overwriting the local contact", async () => {
+  const graphql = vi
+    .fn()
+    .mockResolvedValueOnce(lookup([customer]))
+    .mockResolvedValueOnce(
+      Response.json({
+        data: {
+          customerUpdate: {
+            customer: null,
+            userErrors: [{ message: "Phone has already been taken" }],
+          },
+        },
+      }),
+    );
+  await expect(
+    addAdminClient(actor, graphql, { ...newClient, phone: "+61412345678" }),
+  ).rejects.toThrow("Phone has already been taken");
+  expect(storage.customerProfile.upsert).not.toHaveBeenCalled();
+});
+
+test("sync imports phone numbers and clears a number removed in Shopify", async () => {
+  for (const node of [withPhone, customer]) {
+    const graphql = vi.fn().mockResolvedValueOnce(
+      Response.json({
+        data: {
+          customers: {
+            nodes: [node],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      }),
+    );
+    await importShopifyClients(actor, graphql, {});
+    expect(storage.customerProfile.upsert.mock.lastCall?.[0].update.phone).toBe(
+      node.defaultPhoneNumber?.phoneNumber || null,
+    );
+  }
 });

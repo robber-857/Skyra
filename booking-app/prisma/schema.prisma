@@ -261,6 +261,7 @@ model CustomerProfile {
   preferredName      String           @default("")
   shopifyName        String           @default("")
   email              String?
+  phone              String?
   contactSyncedAt    DateTime?        @db.Timestamptz
   avatarBytes        Bytes?
   avatarMimeType     String?
