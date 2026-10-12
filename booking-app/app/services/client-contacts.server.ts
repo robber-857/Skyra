@@ -4,6 +4,17 @@ import { DomainError } from "../lib/errors.server";
 import { requireOperations, type Actor } from "./authorization";
 import type { GraphQL } from "./shopify-catalog.server";
 
+const phoneInput = z
+  .string()
+  .trim()
+  .max(40)
+  .default("")
+  .transform((value) => value.replace(/[\s().-]/g, ""))
+  .refine(
+    (value) => !value || /^\+[1-9]\d{6,14}$/.test(value),
+    "Enter a phone number with country code, for example +61 412 345 678.",
+  );
+
 const contactsQuery = `#graphql
   query ClientContacts($ids: [ID!]!) {
     nodes(ids: $ids) {
@@ -79,8 +90,8 @@ export const createClientMutation = `#graphql
     }
   }`;
 
-export const updateClientPhoneMutation = `#graphql
-  mutation UpdateClientPhone($input: CustomerInput!) {
+export const updateClientMutation = `#graphql
+  mutation UpdateClient($input: CustomerInput!) {
     customerUpdate(input: $input) {
       customer { id firstName lastName defaultEmailAddress { emailAddress } defaultPhoneNumber { phoneNumber } }
       userErrors { field message }
@@ -98,16 +109,7 @@ export async function addAdminClient(
       firstName: z.string().trim().min(1, "First name is required.").max(100),
       lastName: z.string().trim().max(100),
       email: z.string().trim().toLowerCase().email().max(254),
-      phone: z
-        .string()
-        .trim()
-        .max(40)
-        .default("")
-        .transform((value) => value.replace(/[\s().-]/g, ""))
-        .refine(
-          (value) => !value || /^\+[1-9]\d{6,14}$/.test(value),
-          "Enter a phone number with country code, for example +61 412 345 678.",
-        ),
+      phone: phoneInput,
     })
     .strict()
     .parse(raw);
@@ -150,7 +152,7 @@ export async function addAdminClient(
     let body;
     try {
       const response = await graphql(
-        updatingPhone ? updateClientPhoneMutation : createClientMutation,
+        updatingPhone ? updateClientMutation : createClientMutation,
         {
           variables: { input: mutationInput },
           signal: AbortSignal.timeout(8000),
@@ -313,4 +315,121 @@ export async function importShopifyClients(
     synced: nodes.length,
     nextCursor: pageInfo.hasNextPage ? pageInfo.endCursor : null,
   };
+}
+
+async function editableProfile(actor: Actor, rawId: unknown) {
+  await activeShop(actor);
+  const id = z.string().uuid().parse(rawId);
+  const profile = await db.customerProfile.findFirst({
+    where: { shopId: actor.shopId, id },
+    select: { id: true, shopifyCustomerGid: true, preferredName: true },
+  });
+  if (!profile) throw new DomainError("NOT_FOUND", "Client not found.", 404);
+  return profile;
+}
+
+export async function adminClientEdit(
+  actor: Actor,
+  graphql: GraphQL,
+  rawId: unknown,
+) {
+  const profile = await editableProfile(actor, rawId);
+  const data = await read(graphql, contactsQuery, {
+    ids: [profile.shopifyCustomerGid],
+  });
+  const parsed = z
+    .object({ nodes: z.array(contact.nullable()).length(1) })
+    .safeParse(data);
+  if (!parsed.success) throw unavailable();
+  const customer = parsed.data.nodes[0];
+  if (!customer || customer.id !== profile.shopifyCustomerGid)
+    throw new DomainError(
+      "NOT_FOUND",
+      "This Shopify customer is no longer available.",
+      404,
+    );
+  return {
+    id: profile.id,
+    firstName: customer.firstName || "",
+    lastName: customer.lastName || "",
+    email: customer.defaultEmailAddress?.emailAddress || "",
+    phone: customer.defaultPhoneNumber?.phoneNumber || "",
+    preferredName: profile.preferredName,
+  };
+}
+
+export async function updateAdminClient(
+  actor: Actor,
+  graphql: GraphQL,
+  rawId: unknown,
+  raw: unknown,
+) {
+  const profile = await editableProfile(actor, rawId);
+  const input = z
+    .object({
+      firstName: z.string().trim().min(1, "First name is required.").max(100),
+      lastName: z.string().trim().max(100),
+      email: z.string().trim().toLowerCase().email().max(254),
+      phone: phoneInput,
+      preferredName: z.string().trim().max(100),
+    })
+    .strict()
+    .parse(raw);
+  let body;
+  try {
+    const response = await graphql(updateClientMutation, {
+      variables: {
+        input: {
+          id: profile.shopifyCustomerGid,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          email: input.email,
+          phone: input.phone || null,
+        },
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    body = await response.json();
+    if (!response.ok || body.errors?.length || !body.data) throw new Error();
+  } catch {
+    throw new DomainError(
+      "CLIENT_UPDATE_UNAVAILABLE",
+      "Could not confirm the Shopify update. Check customer access (write_customers), then reload the client before retrying.",
+      503,
+    );
+  }
+  const parsed = z
+    .object({
+      customerUpdate: z.object({
+        customer: contact.nullable(),
+        userErrors: z.array(z.object({ message: z.string() })),
+      }),
+    })
+    .safeParse(body.data);
+  if (!parsed.success) throw unavailable();
+  const payload = parsed.data.customerUpdate;
+  if (payload.userErrors.length)
+    throw new DomainError(
+      "CLIENT_UPDATE_FAILED",
+      payload.userErrors.map((e) => e.message).join("; "),
+    );
+  if (!payload.customer || payload.customer.id !== profile.shopifyCustomerGid)
+    throw unavailable();
+  try {
+    const saved = await db.customerProfile.updateMany({
+      where: {
+        shopId: actor.shopId,
+        id: profile.id,
+        shopifyCustomerGid: profile.shopifyCustomerGid,
+      },
+      data: { ...values(payload.customer), preferredName: input.preferredName },
+    });
+    if (saved.count !== 1) throw new Error();
+  } catch {
+    throw new DomainError(
+      "CLIENT_SAVE_FAILED",
+      "Shopify was updated, but Booking could not save the profile. Reload and retry to save the preferred name.",
+      503,
+    );
+  }
 }

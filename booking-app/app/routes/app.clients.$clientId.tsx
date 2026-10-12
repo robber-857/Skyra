@@ -15,6 +15,7 @@ import { randomUUID } from "node:crypto";
 import {
   useActionData,
   useLoaderData,
+  useSearchParams,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
 } from "react-router";
@@ -129,6 +130,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 export default function Client() {
   const data = useLoaderData<typeof loader>();
+  const [searchParams] = useSearchParams();
+  const result = useActionData<typeof action>();
   return (
     <AdminClientDetailView
       {...data}
@@ -141,7 +144,14 @@ export default function Client() {
       )}
       creditForm={
         <>
-          <Feedback result={useActionData<typeof action>()} />
+          <Feedback
+            result={
+              result ??
+              (searchParams.get("updated") === "1"
+                ? { message: "Client details updated." }
+                : undefined)
+            }
+          />
           <StaffBookingForm
             key={`booking:${data.idempotencyKey}`}
             options={data.bookingOptions}

@@ -65,3 +65,12 @@ existing exact email match, a supplied phone updates that customer; leaving it
 blank preserves the current number. Sync imports phone numbers, including removal
 of a number in Shopify. Apply the client_phone migration before starting this
 version. Live phone access and creation/update require authenticated store UAT.
+
+## Edit client
+
+Use Edit in the directory or Edit client on a profile. The edit page reads the
+current Shopify first/last name, email and phone, and the local preferred name.
+Save updates the same Shopify customer and then the tenant-scoped Booking cache.
+Blank phone explicitly removes the number; Cancel makes no changes. Failed saves
+show an error and keep the form available. ADMIN/OPERATIONS access is required;
+Shopify writes require write_customers. Passes and bookings remain unchanged.

@@ -2,7 +2,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 
 const storage = vi.hoisted(() => ({
   shop: { findFirst: vi.fn() },
-  customerProfile: { upsert: vi.fn() },
+  customerProfile: { upsert: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },
   $transaction: vi.fn(async (writes: Promise<unknown>[]) =>
     Promise.all(writes),
   ),
@@ -10,6 +10,8 @@ const storage = vi.hoisted(() => ({
 vi.mock("../app/db.server", () => ({ default: storage }));
 import {
   addAdminClient,
+  adminClientEdit,
+  updateAdminClient,
   importShopifyClients,
 } from "../app/services/client-contacts.server";
 
@@ -299,4 +301,132 @@ test("sync imports phone numbers and clears a number removed in Shopify", async 
       node.defaultPhoneNumber?.phoneNumber || null,
     );
   }
+});
+
+const profileId = "10000000-0000-4000-8000-000000000001";
+const edits = { ...newClient, phone: "+61 412 345 678", preferredName: "M" };
+const storedProfile = {
+  id: profileId,
+  shopifyCustomerGid: customer.id,
+  preferredName: "M",
+};
+
+test("edit loads separate Shopify names and the local preferred name", async () => {
+  storage.customerProfile.findFirst.mockResolvedValue(storedProfile);
+  const graphql = vi
+    .fn()
+    .mockResolvedValue(Response.json({ data: { nodes: [withPhone] } }));
+  expect(await adminClientEdit(actor, graphql, profileId)).toEqual({
+    id: profileId,
+    ...newClient,
+    phone: "+61412345678",
+    preferredName: "M",
+  });
+  expect(storage.customerProfile.findFirst).toHaveBeenCalledWith(
+    expect.objectContaining({ where: { shopId: actor.shopId, id: profileId } }),
+  );
+});
+
+test("edit saves to the existing Shopify identity then updates the scoped local profile", async () => {
+  storage.customerProfile.findFirst.mockResolvedValue(storedProfile);
+  storage.customerProfile.updateMany.mockResolvedValue({ count: 1 });
+  const graphql = vi
+    .fn()
+    .mockResolvedValue(
+      Response.json({
+        data: { customerUpdate: { customer: withPhone, userErrors: [] } },
+      }),
+    );
+  await updateAdminClient(actor, graphql, profileId, edits);
+  expect(graphql.mock.calls[0][1].variables.input).toEqual({
+    ...newClient,
+    id: customer.id,
+    phone: "+61412345678",
+  });
+  expect(storage.customerProfile.updateMany).toHaveBeenCalledWith({
+    where: {
+      shopId: actor.shopId,
+      id: profileId,
+      shopifyCustomerGid: customer.id,
+    },
+    data: expect.objectContaining({
+      phone: "+61412345678",
+      preferredName: "M",
+    }),
+  });
+  expect(storage.customerProfile.upsert).not.toHaveBeenCalled();
+});
+
+test("editing can explicitly remove a phone number", async () => {
+  storage.customerProfile.findFirst.mockResolvedValue(storedProfile);
+  storage.customerProfile.updateMany.mockResolvedValue({ count: 1 });
+  const graphql = vi
+    .fn()
+    .mockResolvedValue(
+      Response.json({ data: { customerUpdate: { customer, userErrors: [] } } }),
+    );
+  await updateAdminClient(actor, graphql, profileId, { ...edits, phone: "" });
+  expect(graphql.mock.calls[0][1].variables.input.phone).toBeNull();
+  expect(
+    storage.customerProfile.updateMany.mock.calls[0][0].data.phone,
+  ).toBeNull();
+});
+
+test("edit rejects other shops and coaches before accessing Shopify", async () => {
+  storage.customerProfile.findFirst.mockResolvedValue(null);
+  const graphql = vi.fn();
+  await expect(
+    updateAdminClient(actor, graphql, profileId, edits),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  await expect(
+    adminClientEdit(actor, graphql, profileId),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  await expect(
+    updateAdminClient({ ...actor, role: "COACH" }, graphql, profileId, edits),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  expect(graphql).not.toHaveBeenCalled();
+});
+
+test("edit surfaces Shopify errors without changing the local profile", async () => {
+  storage.customerProfile.findFirst.mockResolvedValue(storedProfile);
+  const graphql = vi
+    .fn()
+    .mockResolvedValue(
+      Response.json({
+        data: {
+          customerUpdate: {
+            customer: null,
+            userErrors: [{ message: "Email has already been taken" }],
+          },
+        },
+      }),
+    );
+  await expect(
+    updateAdminClient(actor, graphql, profileId, edits),
+  ).rejects.toThrow("Email has already been taken");
+  expect(storage.customerProfile.updateMany).not.toHaveBeenCalled();
+});
+
+test("edit validates fields and reports partial save failure", async () => {
+  storage.customerProfile.findFirst.mockResolvedValue(storedProfile);
+  const graphql = vi
+    .fn()
+    .mockResolvedValue(
+      Response.json({
+        data: { customerUpdate: { customer: withPhone, userErrors: [] } },
+      }),
+    );
+  await expect(
+    updateAdminClient(actor, graphql, profileId, {
+      ...edits,
+      email: "invalid",
+    }),
+  ).rejects.toThrow();
+  expect(graphql).not.toHaveBeenCalled();
+  storage.customerProfile.updateMany.mockRejectedValueOnce(
+    new Error("db unavailable"),
+  );
+  await expect(
+    updateAdminClient(actor, graphql, profileId, edits),
+  ).rejects.toMatchObject({ code: "CLIENT_SAVE_FAILED" });
 });

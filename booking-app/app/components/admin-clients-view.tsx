@@ -166,6 +166,7 @@ export function AdminClientsView({
                   <th scope="col">Classes left</th>
                   <th scope="col">Next expiry</th>
                   <th scope="col">Bookings</th>
+                  <th scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -189,6 +190,14 @@ export function AdminClientsView({
                       {c.nextExpiry ? date(c.nextExpiry, data.timezone) : "—"}
                     </td>
                     <td>{c.bookings}</td>
+                    <td>
+                      <Link
+                        to={`/app/clients/${c.id}/edit`}
+                        aria-label={`Edit ${c.name}`}
+                      >
+                        Edit
+                      </Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -296,9 +305,14 @@ export function AdminClientDetailView({
             )}
           </div>
         </div>
-        <Link className="button" to={`/app/reports?customer=${c.id}`}>
-          View spending report
-        </Link>
+        <div className="catalog-page-controls">
+          <Link className="button" to={`/app/clients/${c.id}/edit`}>
+            Edit client
+          </Link>
+          <Link className="button" to={`/app/reports?customer=${c.id}`}>
+            View spending report
+          </Link>
+        </div>
       </header>
       {warning && (
         <p className="feedback error" role="alert">
