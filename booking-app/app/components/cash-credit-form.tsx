@@ -12,7 +12,10 @@ export function CashCreditForm({
   const [target, setTarget] = useState(options[0]?.value || "");
   const [confirmed, setConfirmed] = useState(false);
   const option = options.find((o) => o.value === target);
-  const busy = useNavigation().state !== "idle";
+  const navigation = useNavigation();
+  const busy = navigation.state !== "idle";
+  const submitting =
+    busy && navigation.formData?.get("intent") === "add-credits";
   return (
     <section className="panel" aria-labelledby="cash-credits-title">
       <h2 id="cash-credits-title">Add credits — cash payment</h2>
@@ -24,6 +27,7 @@ export function CashCreditForm({
         <p>Create an active class or Pass in Classes &amp; Passes first.</p>
       ) : (
         <Form method="post" className="booking-action-form">
+          <input type="hidden" name="intent" value="add-credits" />
           <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
           <Field label="Class or Pass">
             <select
@@ -79,14 +83,8 @@ export function CashCreditForm({
               required
             />
           </Field>
-          <Field label="Reason / receipt reference">
-            <textarea
-              name="reason"
-              minLength={3}
-              maxLength={500}
-              required
-              rows={2}
-            />
+          <Field label="Reason / receipt reference (optional)">
+            <textarea name="reason" maxLength={500} rows={2} />
           </Field>
           <label className="booking-confirm-check">
             <input
@@ -99,8 +97,12 @@ export function CashCreditForm({
             I have received the cash and checked the client, credits and
             validity.
           </label>
-          <button className="primary" disabled={busy || !confirmed}>
-            {busy ? "Saving…" : "Add credits"}
+          <button
+            className="primary"
+            aria-busy={submitting}
+            disabled={busy || !confirmed}
+          >
+            {submitting ? "Saving…" : "Add credits"}
           </button>
         </Form>
       )}

@@ -17,7 +17,10 @@ export function StaffBookingForm({
   const [sessionId, setSessionId] = useState(options[0]?.id ?? "");
   const [confirmed, setConfirmed] = useState(false);
   const session = options.find((s) => s.id === sessionId);
-  const busy = useNavigation().state !== "idle";
+  const navigation = useNavigation();
+  const busy = navigation.state !== "idle";
+  const submitting =
+    busy && navigation.formData?.get("intent") === "book-class";
   return (
     <section className="panel">
       <h2>Book a class for {clientName}</h2>
@@ -76,18 +79,12 @@ export function StaffBookingForm({
             </Field>
           ) : (
             <p role="status">
-              No eligible Pass with available credits. Add or adjust credits
-              for this client first, then return to this form.
+              No eligible Pass with available credits. Add or adjust credits for
+              this client first, then return to this form.
             </p>
           )}
-          <Field label="Booking reason">
-            <textarea
-              name="reason"
-              minLength={3}
-              maxLength={500}
-              rows={2}
-              required
-            />
+          <Field label="Booking reason (optional)">
+            <textarea name="reason" maxLength={500} rows={2} />
           </Field>
           <label className="booking-confirm-check">
             <input
@@ -105,9 +102,10 @@ export function StaffBookingForm({
           </label>
           <button
             className="primary"
+            aria-busy={submitting}
             disabled={busy || !confirmed || !session?.passes.length}
           >
-            {busy ? "Booking…" : "Confirm booking"}
+            {submitting ? "Booking…" : "Confirm booking"}
           </button>
         </Form>
       )}

@@ -74,3 +74,9 @@ Save updates the same Shopify customer and then the tenant-scoped Booking cache.
 Blank phone explicitly removes the number; Cancel makes no changes. Failed saves
 show an error and keep the form available. ADMIN/OPERATIONS access is required;
 Shopify writes require write_customers. Passes and bookings remain unchanged.
+
+Booking reason and cash-payment Reason / receipt reference are optional (up to
+500 characters). Empty reasons remain empty in the audit record. Confirmation
+checkboxes, cash amount and Pass eligibility are still required. Disabled buttons
+use a normal cursor; booking/credit buttons show a wait cursor and saving label
+only while their own form submission is pending.

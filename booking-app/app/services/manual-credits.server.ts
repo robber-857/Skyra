@@ -23,7 +23,12 @@ const inputSchema = z
       .string()
       .regex(/^\d+(\.\d{1,2})?$/)
       .refine((v) => Number(v) > 0 && Number(v) <= 100000),
-    reason: z.string().trim().min(3).max(500),
+    reason: z
+      .string()
+      .trim()
+      .max(500)
+      .nullish()
+      .transform((value) => value ?? ""),
     idempotencyKey: z.string().uuid(),
   })
   .strict();

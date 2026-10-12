@@ -120,10 +120,27 @@ test("cash grants enforce staff access, tenant scope and valid cash details", as
     { units: 1.5 },
     { amount: "0" },
     { amount: "1.001" },
-    { reason: "" },
+    { reason: "x".repeat(501) },
   ])
     await expect(
       grantCashCredits(f.actor, { ...f.input, ...patch }),
     ).rejects.toThrow();
   expect(await db.entitlement.count({ where: { shopId: f.shop.id } })).toBe(0);
 });
+
+test.each(["", " ", undefined, null, "OK"])(
+  "cash credits accept optional reason %s without duplicating grants",
+  async (reason) => {
+    const f = await fixture();
+    const input = { ...f.input, reason };
+    const grant = await grantCashCredits(f.actor, input);
+    expect((await grantCashCredits(f.actor, input)).id).toBe(grant.id);
+    const log = await db.auditLog.findFirstOrThrow({
+      where: { entityId: grant.id, action: "CASH_CREDITS_GRANTED" },
+    });
+    expect(log.after).toMatchObject({ reason: reason?.trim() || "" });
+    expect(await db.entitlement.count({ where: { shopId: f.shop.id } })).toBe(
+      1,
+    );
+  },
+);

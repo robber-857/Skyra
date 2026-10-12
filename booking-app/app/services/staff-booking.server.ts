@@ -57,7 +57,12 @@ export async function staffBookingOptions(actor: Actor, customerId: string) {
   const options = [];
   for (const s of sessions) {
     if (
-      bookingWindow(shop, s, now, actor.role === "ADMIN" ? "ADMIN" : "CUSTOMER") !== "OPEN" ||
+      bookingWindow(
+        shop,
+        s,
+        now,
+        actor.role === "ADMIN" ? "ADMIN" : "CUSTOMER",
+      ) !== "OPEN" ||
       !capacity.get(s.id) ||
       booked.some((b) => b.sessionId === s.id)
     )
@@ -92,7 +97,12 @@ const schema = z
     customerId: z.string().uuid(),
     sessionId: z.string().uuid(),
     entitlementId: z.string().uuid(),
-    reason: z.string().trim().min(3).max(500),
+    reason: z
+      .string()
+      .trim()
+      .max(500)
+      .nullish()
+      .transform((value) => value ?? ""),
     idempotencyKey: z.string().uuid(),
   })
   .strict();

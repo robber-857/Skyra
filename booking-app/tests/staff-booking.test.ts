@@ -52,7 +52,9 @@ async function moveSessionStart(
 ) {
   const startsAt = new Date(Date.now() + minutesFromNow * 60000);
   const endsAt = new Date(
-    startsAt.getTime() + f.session.endsAt.getTime() - f.session.startsAt.getTime(),
+    startsAt.getTime() +
+      f.session.endsAt.getTime() -
+      f.session.startsAt.getTime(),
   );
   return db.classSession.update({
     where: { id: f.session.id },
@@ -66,7 +68,9 @@ test("ADMIN can book during the final two hours and concurrent retries reserve e
   const options = await staffBookingOptions(f.actor, f.customer.id);
   expect(options.find((s) => s.id === f.session.id)).toMatchObject({
     startsAt: session.startsAt.toISOString(),
-    passes: expect.arrayContaining([expect.objectContaining({ id: f.pass.id })]),
+    passes: expect.arrayContaining([
+      expect.objectContaining({ id: f.pass.id }),
+    ]),
   });
 
   const ids = await Promise.all(
@@ -97,7 +101,10 @@ test("ADMIN can book during the final two hours and concurrent retries reserve e
   await moveSessionStart(f, -1);
   expect(await bookClientIntoSession(f.actor, f.input)).toBe(ids[0]);
   await expect(
-    bookClientIntoSession(f.actor, { ...f.input, idempotencyKey: randomUUID() }),
+    bookClientIntoSession(f.actor, {
+      ...f.input,
+      idempotencyKey: randomUUID(),
+    }),
   ).rejects.toMatchObject({ code: "BOOKING_CLOSED" });
   expect(await db.booking.count({ where: { shopId: f.shop.id } })).toBe(1);
   expect(await entitlementBalance(db, f.shop.id, f.pass.id)).toEqual({
@@ -116,16 +123,20 @@ test("OPERATIONS cannot select or book during the final two hours, and COACH has
       (s) => s.id === f.session.id,
     ),
   ).toBe(false);
-  await expect(bookClientIntoSession(operations, f.input)).rejects.toMatchObject({
+  await expect(
+    bookClientIntoSession(operations, f.input),
+  ).rejects.toMatchObject({
     code: "BOOKING_CLOSED",
   });
   await expect(
     bookClientIntoSession(operations, { ...f.input, mode: "ADMIN" }),
   ).rejects.toThrow();
   const coach = { ...f.actor, role: "COACH" as const };
-  await expect(staffBookingOptions(coach, f.customer.id)).rejects.toMatchObject({
-    code: "FORBIDDEN",
-  });
+  await expect(staffBookingOptions(coach, f.customer.id)).rejects.toMatchObject(
+    {
+      code: "FORBIDDEN",
+    },
+  );
   await expect(bookClientIntoSession(coach, f.input)).rejects.toMatchObject({
     code: "FORBIDDEN",
   });
@@ -171,9 +182,11 @@ test.each(["live-hold", "confirmed-booking"])(
         (s) => s.id === f.session.id,
       ),
     ).toBe(false);
-    await expect(bookClientIntoSession(f.actor, f.input)).rejects.toMatchObject({
-      code: "SOLD_OUT",
-    });
+    await expect(bookClientIntoSession(f.actor, f.input)).rejects.toMatchObject(
+      {
+        code: "SOLD_OUT",
+      },
+    );
     expect(
       await db.booking.count({
         where: { shopId: f.shop.id, customerId: f.customer.id },
@@ -279,7 +292,9 @@ test("staff can select and reserve a published class more than 14 days away", as
   const f = await fixture();
   const startsAt = new Date(Date.now() + 20 * 86400000);
   const endsAt = new Date(
-    startsAt.getTime() + f.session.endsAt.getTime() - f.session.startsAt.getTime(),
+    startsAt.getTime() +
+      f.session.endsAt.getTime() -
+      f.session.startsAt.getTime(),
   );
   await db.classSession.update({
     where: { id: f.session.id },
@@ -289,7 +304,9 @@ test("staff can select and reserve a published class more than 14 days away", as
   const options = await staffBookingOptions(f.actor, f.customer.id);
   expect(options.find((session) => session.id === f.session.id)).toMatchObject({
     startsAt: startsAt.toISOString(),
-    passes: expect.arrayContaining([expect.objectContaining({ id: f.pass.id })]),
+    passes: expect.arrayContaining([
+      expect.objectContaining({ id: f.pass.id }),
+    ]),
   });
   const bookingId = await bookClientIntoSession(f.actor, f.input);
   expect(
@@ -375,5 +392,23 @@ test.each(["past", "draft", "expired-pass", "ineligible-pass"])(
     expect(
       await db.bookingNotification.count({ where: { shopId: f.shop.id } }),
     ).toBe(0);
+  },
+);
+
+test.each(["", " ", undefined, null, "OK"])(
+  "staff booking accepts optional reason %s and reserves only one credit",
+  async (reason) => {
+    const f = await fixture();
+    const input = { ...f.input, reason };
+    const id = await bookClientIntoSession(f.actor, input);
+    expect(await bookClientIntoSession(f.actor, input)).toBe(id);
+    const log = await db.auditLog.findFirstOrThrow({
+      where: { entityId: id, action: "STAFF_BOOKING_CONFIRMED" },
+    });
+    expect(log.after).toMatchObject({ reason: reason?.trim() || "" });
+    expect(await entitlementBalance(db, f.shop.id, f.pass.id)).toMatchObject({
+      availableUnits: 4,
+      reservedUnits: 1,
+    });
   },
 );
