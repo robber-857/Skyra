@@ -1,6 +1,6 @@
 # Skyra Booking
 
-> Family accounts (local implementation): [2026-10-14 family Clients, Admin management and release boundary](../docs/booking-system/family-accounts-2026-10-14.md). This change has not been deployed.
+> Family accounts: [independent child Clients and Admin management](../docs/booking-system/family-accounts-2026-10-14.md), released on 2026-10-15. See the [production release evidence](../docs/booking-system/family-accounts-release-2026-10-15.md).
 
 > Latest verified implementation and launch gates: [2026-09-20 launch status](../docs/booking-system/launch-status-2026-09-20.md). The historical current-state paragraph below is retained for implementation chronology.
 

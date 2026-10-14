@@ -2,7 +2,7 @@
 
 本轮范围从 2026-10-14 开始，按用户确认的规则实现：家长登录一个 Shopify Customer Account，在 Booking 中管理两个或更多孩子；每个孩子是真实、独立的 Shopify Customer 和 Booking Client，Admin 可以分别预约、修改资料及管理 Pass。
 
-**发布状态：本地代码与验证阶段，尚未部署本轮家庭账号变更。** 本地测试、浏览器 fixture、Shopify API schema 验证与正式店真实用户验收分别记录。历史文档中的已部署状态不代表家庭账号功能已经上线。
+**发布状态：2026-10-15 已上线。** 后端提交 `3600e08`、数据库迁移、Shopify 扩展版本与正式主题会员脚本均已发布。线上版本、文件一致性和已登录 Admin 入口已验证；真实家长创建孩子、邮件收件与付款 UAT 尚未执行。详细证据见 [家庭账号上线记录](family-accounts-release-2026-10-15.md)。
 
 ## 已确认的产品规则
 
@@ -97,8 +97,8 @@ Shopify import / refresh 按已记录的 Customer GID 更新联系资料，保�
 - 浏览器证据：`output/playwright/family-admin/results.json`、`output/playwright/customer-account/results.json`、`output/playwright/family-storefront/results.json`。
 - 三条家庭 GraphQL 操作通过 Shopify Admin API 2026-07 schema 验证。独立的官方 UI 组件验证器受其隔离类型缓存缺少 Customer Account / Preact 依赖影响，三次修复尝试后未能完成；项目内固定 SDK 类型检查和 Shopify extension build 已通过。
 
-工具记录：第一次 `shopify app build` 成功后，CLI 自带更新流程将本机 Shopify CLI 从 4.8.5 更新至 4.9.4；随后最终 extension build 也成功。没有执行 app deploy 或 theme push。
+本地验证阶段工具记录：第一次 `shopify app build` 成功后，CLI 自带更新流程将本机 Shopify CLI 从 4.8.5 更新至 4.9.4；随后最终 extension build 也成功。该阶段未执行 app deploy 或 theme push；用户随后要求上线，正式发布结果见上方上线记录。
 
-**自动化测试通过不等于真实 Shopify 家长登录、实际创建两个孩子、真实邮件收件或支付 UAT 完成。** 本轮没有创建或编辑正式客户，没有发送真实通知，也没有部署线上变更。
+**自动化测试通过不等于真实 Shopify 家长登录、实际创建两个孩子、真实邮件收件或支付 UAT 完成。** 本轮没有创建或编辑正式客户，也没有发送真实通知；应用与扩展已按用户后续“上线”的指示发布。
 
 部署本轮功能时，必须把数据库 migration、App / Worker、Theme App Extension 与 Customer Account extension 作为同一发布范围，并验证现有购买与续订的兼容性。本文件不授权生产迁移、发布主题、真实付款、邮件群发或修改现有正式客户资料。
