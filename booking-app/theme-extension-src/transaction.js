@@ -54,6 +54,7 @@ window.SkyraBookingTransaction = function ({
     selectedId,
     autoRenew = false,
     revision = 0;
+  let familyLoaded = false;
   shell(host);
   const exit = () => {
     revision++;
@@ -102,6 +103,7 @@ window.SkyraBookingTransaction = function ({
     const heading = el("h3", "skyra-booking__step-title", title);
     heading.tabIndex = -1;
     main.append(heading);
+    if (attempt.family?.member()) main.append(el("p", "skyra-booking__notice", "Attendee: " + (attempt.family.member().name || attempt.family.member().email)));
     layout.append(main, aside());
     host.append(layout);
     heading.focus({ preventScroll: true });
@@ -137,6 +139,7 @@ window.SkyraBookingTransaction = function ({
         },
         body: JSON.stringify({
           token: attempt.token(),
+          ...(attempt.familyMemberId?.() ? { familyMemberId: attempt.familyMemberId() } : {}),
           ...(option
             ? kind(option) === "OWNED_PASS" ? {purchaseKind:"OWNED_PASS", entitlementId:option.id} : kind(option) === "DROP_IN"
               ? { purchaseKind: "DROP_IN" }
@@ -162,6 +165,19 @@ window.SkyraBookingTransaction = function ({
   }
   function choices() {
     const main = frame("Select a Pass");
+    const familySelect = attempt.family?.control({ element: el, className: "skyra-booking__note", onChange: async (id) => {
+      const version = ++revision;
+      frame("Loading this family member's Passes");
+      try {
+        const authenticated = await attempt.changeFamilyMember(id);
+        if (version !== revision || !root.contains(host)) return;
+        if (!authenticated) return signIn();
+        selectedId = null; autoRenew = false; comment = ""; commentLoaded = false;
+        attempt.customerComment = "";
+        await load();
+      } catch (error) { if (version === revision && root.contains(host)) errorView(error, load); }
+    } });
+    if (familySelect) main.append(familySelect);
     main.append(
       el(
         "p",
@@ -223,7 +239,7 @@ window.SkyraBookingTransaction = function ({
     const response = await fetch((root.dataset.proxyBase || "/apps/skyra-booking") + path, {
       method:"POST", credentials:"same-origin", cache:"no-store", referrerPolicy:"no-referrer",
       headers:{"Content-Type":"application/json", Accept:"application/json", "X-Skyra-Booking":"1"},
-      body:JSON.stringify({token:attempt.token(), ...body}), signal:AbortSignal.timeout(10000),
+      body:JSON.stringify({token:attempt.token(), ...body, ...(attempt.familyMemberId?.() ? { familyMemberId: attempt.familyMemberId() } : {})}), signal:AbortSignal.timeout(10000),
     });
     const data = await response.json();
     if (!response.ok) { const error = new Error(data.error || "We could not check your booking."); error.code=data.code; error.status=response.status; error.bookingError=true; throw error; }
@@ -281,6 +297,18 @@ window.SkyraBookingTransaction = function ({
       main.append(proceed);
     }
     if(data.bookingReference) main.append(el("p", "", "Booking reference: " + data.bookingReference));
+    if (data.status === "CONFIRMED") main.append(button("Book for another family member", "skyra-booking__primary", async () => {
+      const version = ++revision;
+      frame("Starting another booking");
+      try {
+        attempt.forget(true); attempt.select(session.id);
+        const authenticated = await attempt.check();
+        if (version !== revision || !root.contains(host)) return;
+        if (!authenticated) return signIn();
+        selectedId = null; autoRenew = false; comment = ""; commentLoaded = false; attempt.customerComment = "";
+        await load();
+      } catch (error) { if (version === revision && root.contains(host)) errorView(error, load); }
+    }));
     if (!["CONFIRMED","ATTENDED","CANCELLED","LATE_CANCEL","NO_SHOW"].includes(data.status))
       main.append(button("Check booking status", "skyra-booking__primary", ()=>checkResult(false, retry)));
     if(data.status === "NOT_CONFIRMED" && retry) main.append(button("Try this Pass again", "skyra-booking__primary", retry));
@@ -369,6 +397,7 @@ window.SkyraBookingTransaction = function ({
       el("p", "skyra-booking__notice", "Loading available Passes…"),
     );
     try {
+      if (!familyLoaded && attempt.family) { await attempt.family.load(); familyLoaded = true; }
       const data = await request();
       if (version !== revision || !root.contains(host)) return;
       payload = data;

@@ -52,7 +52,9 @@ export async function resumeBookingCheckout(
           "Your payment hold has ended. Check your booking status.",
           409,
         );
-      if (recordConsent) await recordBookingTerms(tx, shop.id, actor.customerGid!, hold.checkout.id, now);
+      if ((hold.checkout.payerCustomerGid ?? actor.customerGid) !== (actor.accountCustomerGid ?? actor.customerGid))
+        throw new DomainError("CHECKOUT_PAYER_MISMATCH", "Return to the account that started this payment.", 403);
+      if (recordConsent) await recordBookingTerms(tx, shop.id, actor.accountCustomerGid ?? actor.customerGid!, hold.checkout.id, now);
       return {
         checkout: hold.checkout,
         expiresAt: hold.expiresAt,

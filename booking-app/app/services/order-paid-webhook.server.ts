@@ -177,6 +177,7 @@ function validationCodes(
     productGid: string;
     variantGid: string;
     priceCents: number;
+    payerCustomerGid?: string | null;
     hold: { purchaseKind: string; customer: { shopifyCustomerGid: string } };
   } | null,
 ) {
@@ -185,7 +186,7 @@ function validationCodes(
   if (checkout && checkout.status !== "READY") codes.push("CHECKOUT_NOT_READY");
   if (
     !order.customerGid ||
-    order.customerGid !== checkout?.hold.customer.shopifyCustomerGid
+    order.customerGid !== (checkout?.payerCustomerGid ?? checkout?.hold.customer.shopifyCustomerGid)
   )
     codes.push("CUSTOMER_MISMATCH");
   if (line.productGid !== checkout?.productGid) codes.push("PRODUCT_MISMATCH");

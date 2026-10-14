@@ -69,7 +69,7 @@ export async function bindMembershipContract(
   const cents = (amount: string) =>
     /^\d+(?:\.\d{1,2})?$/.test(amount) ? Math.round(Number(amount) * 100) : NaN;
   if (
-    contract.customer?.id !== customer.shopifyCustomerGid ||
+    contract.customer?.id !== (purchase.payerCustomerGid ?? customer.shopifyCustomerGid) ||
     contract.currencyCode !== purchase.currency ||
     contract.billingPolicy.interval !== "MONTH" ||
     contract.billingPolicy.intervalCount !== (purchase.validityMonths ?? 1) ||
@@ -157,6 +157,7 @@ export async function claimDueMembershipCycle(membershipId: string) {
         reference: randomBytes(32).toString("base64url"),
         idempotencyKey: randomUUID(),
         productMappingId: old.productMappingId,
+        payerCustomerGid: old.payerCustomerGid,
         productGid: old.productGid,
         variantGid: old.variantGid,
         sellingPlanGid: old.sellingPlanGid,
@@ -287,6 +288,7 @@ export async function processMembershipBilling(
       });
       const agreedFields = [
         "productMappingId",
+        "payerCustomerGid",
         "productGid",
         "variantGid",
         "sellingPlanGid",

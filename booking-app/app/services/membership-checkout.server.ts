@@ -80,7 +80,7 @@ async function readPlan(
     where: { id: actor.shopId, status: "ACTIVE" },
   });
   if (!shop) fail("NOT_FOUND", "Memberships are unavailable.", 404);
-  const capabilities = membershipCapabilities(shop.domain, actor.customerGid);
+  const capabilities = membershipCapabilities(shop.domain, actor.accountCustomerGid ?? actor.customerGid);
   if (process.env.SKYRA_MEMBERSHIPS_UAT_PASS_PLAN_ID && passPlanId !== process.env.SKYRA_MEMBERSHIPS_UAT_PASS_PLAN_ID)
     fail("PASS_UNAVAILABLE", "This Pass is not part of the checkout test.");
   if (!capabilities.checkoutAvailable)
@@ -161,6 +161,7 @@ export async function prepareMembershipCheckout(
     if (
       replay.shopId !== actor.shopId ||
       replay.membership.customerId !== customer?.id ||
+      (replay.payerCustomerGid ?? actor.customerGid) !== (actor.accountCustomerGid ?? actor.customerGid) ||
       replay.membership.passPlanId !== input.passPlanId ||
       replay.mode !== (choice.autoRenew ? "AUTO_RENEW" : "ONCE") ||
       replay.bookingCheckoutId
@@ -245,6 +246,7 @@ export async function prepareMembershipCheckout(
       const result = await claimPassPurchaseInTransaction(tx, {
         shopId: actor.shopId,
         customerId: customer.id,
+        payerCustomerGid: actor.accountCustomerGid ?? actor.customerGid!,
         passPlanId: current.plan.id,
         mode: choice.autoRenew ? "AUTO_RENEW" : "ONCE",
         idempotencyKey: input.idempotencyKey,
@@ -266,7 +268,7 @@ export async function prepareMembershipCheckout(
       await recordBookingTerms(
         tx,
         actor.shopId,
-        actor.customerGid!,
+        actor.accountCustomerGid ?? actor.customerGid!,
         result.purchase.id,
         await databaseNow(tx),
       );

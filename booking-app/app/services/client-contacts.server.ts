@@ -322,7 +322,13 @@ async function editableProfile(actor: Actor, rawId: unknown) {
   const id = z.string().uuid().parse(rawId);
   const profile = await db.customerProfile.findFirst({
     where: { shopId: actor.shopId, id },
-    select: { id: true, shopifyCustomerGid: true, preferredName: true },
+    select: {
+      id: true,
+      shopifyCustomerGid: true,
+      preferredName: true,
+      familyParentId: true,
+      email: true,
+    },
   });
   if (!profile) throw new DomainError("NOT_FOUND", "Client not found.", 404);
   return profile;
@@ -355,6 +361,9 @@ export async function adminClientEdit(
     email: customer.defaultEmailAddress?.emailAddress || "",
     phone: customer.defaultPhoneNumber?.phoneNumber || "",
     preferredName: profile.preferredName,
+    ...(profile.familyParentId
+      ? { familyParentId: profile.familyParentId }
+      : {}),
   };
 }
 
@@ -375,6 +384,12 @@ export async function updateAdminClient(
     })
     .strict()
     .parse(raw);
+  if (profile.familyParentId && input.email !== profile.email?.toLowerCase())
+    throw new DomainError(
+      "FAMILY_EMAIL_LOCKED",
+      "A family member's email alias is fixed. Update the parent's contact email to change where notifications are sent.",
+      409,
+    );
   let body;
   try {
     const response = await graphql(updateClientMutation, {

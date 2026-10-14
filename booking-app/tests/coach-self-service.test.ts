@@ -194,6 +194,7 @@ test("Booking mail resolves current Admin, assigned Coach and Shopify Customer d
   expect(resolveCustomer).toHaveBeenCalledWith(
     f.shop.domain,
     f.customer.shopifyCustomerGid,
+    f.shop.id,
   );
   const customer = jobs.find(
     (job) =>

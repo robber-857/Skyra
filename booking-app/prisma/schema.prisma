@@ -267,6 +267,10 @@ model CustomerProfile {
   avatarMimeType     String?
   signature          String           @default("")
   trainingGoals      String           @default("")
+  familyParentId     String?          @db.Uuid
+  familyParent       CustomerProfile? @relation("CustomerFamily", fields: [shopId, familyParentId], references: [shopId, id], onDelete: Restrict, onUpdate: NoAction)
+  familyMembers      CustomerProfile[] @relation("CustomerFamily")
+  familyCreations    FamilyMemberCreation[]
   attempts           BookingAttempt[]
   holds              BookingHold[]
   bookings           Booking[]
@@ -275,8 +279,30 @@ model CustomerProfile {
   updatedAt          DateTime         @updatedAt @db.Timestamptz
 
   @@unique([shopId, shopifyCustomerGid])
+  @@index([shopId, familyParentId])
   @@index([shopId, createdAt])
   @@unique([shopId, id])
+}
+
+// A durable, tenant-scoped creation intent; provider tags prove retry ownership.
+model FamilyMemberCreation {
+  id                 String @id @default(uuid()) @db.Uuid
+  shopId             String @db.Uuid
+  parentId           String @db.Uuid
+  idempotencyKey     String @db.Uuid
+  inputHash          String
+  email              String
+  status             String @default("PENDING")
+  shopifyCustomerGid String?
+  customerId         String? @db.Uuid
+  claimedAt          DateTime? @db.Timestamptz
+  createdAt          DateTime @default(now()) @db.Timestamptz
+  updatedAt          DateTime @updatedAt @db.Timestamptz
+  parent             CustomerProfile @relation(fields: [shopId, parentId], references: [shopId, id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@unique([shopId, parentId, idempotencyKey])
+  @@unique([shopId, email])
+  @@index([shopId, status])
 }
 
 model BookingAttempt {
@@ -338,6 +364,7 @@ model LegacyCheckoutClosure {
 }
 
 model BookingCheckout {
+  payerCustomerGid   String?
   id                 String         @id @default(uuid()) @db.Uuid
   shopId             String         @db.Uuid
   holdId             String         @unique @db.Uuid
@@ -420,6 +447,7 @@ model Entitlement {
 
 // Shared purchase ownership for Membership and Booking; no payment credentials.
 model PassMembership {
+  payerCustomerGid String?
   id           String @id @default(uuid()) @db.Uuid
   shopId       String @db.Uuid
   customerId   String @db.Uuid
@@ -453,6 +481,7 @@ model MembershipCheckoutResource {
 }
 
 model PassPurchase {
+  payerCustomerGid      String?
   paidPriceCents        Int?
   id                    String @id @default(uuid()) @db.Uuid
   shopId                String @db.Uuid

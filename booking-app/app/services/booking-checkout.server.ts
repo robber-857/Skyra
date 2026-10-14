@@ -425,6 +425,8 @@ export async function prepareBookingCheckout(
     sameCatalog(before, context);
     requireRenewalAvailable(context, choice.autoRenew);
     assertReplayable(context);
+    if (context.checkout && (context.checkout.payerCustomerGid ?? actor.customerGid) !== (actor.accountCustomerGid ?? actor.customerGid))
+      fail("CHECKOUT_PAYER_MISMATCH", "Return to the account that started this payment.", 403);
     await guardManagedPassCheckout(tx, actor.shopId, context, choice.autoRenew);
     if (
       managedPassPurchase &&
@@ -451,6 +453,7 @@ export async function prepareBookingCheckout(
           catalogFingerprint: context.fingerprint,
           purchaseTerms: context.purchaseTerms,
           handoffMode,
+          payerCustomerGid: actor.accountCustomerGid ?? actor.customerGid,
         },
       }));
     if (!context.checkout)
@@ -466,7 +469,7 @@ export async function prepareBookingCheckout(
     await recordBookingTerms(
       tx,
       actor.shopId,
-      actor.customerGid!,
+      actor.accountCustomerGid ?? actor.customerGid!,
       intent.id,
       new Date(),
     );
@@ -476,6 +479,7 @@ export async function prepareBookingCheckout(
       ? await claimPassPurchaseInTransaction(tx, {
           shopId: actor.shopId,
           customerId: context.customerId!,
+          payerCustomerGid: actor.accountCustomerGid ?? actor.customerGid!,
           passPlanId: context.plan!.id,
           mode: choice.autoRenew ? "AUTO_RENEW" : "ONCE",
           bookingCheckoutId: intent.id,

@@ -85,6 +85,7 @@ const clients = { admin, storefront: vi.fn() };
 
 function purchase(overrides: Partial<PassPurchase> = {}): PassPurchase {
   return {
+    payerCustomerGid: null,
     id: "a3de9e40-948f-48e0-86e0-6ab3ea11c884",
     shopId: actor.shopId,
     membershipId: "c2cbeff6-8853-499f-9ed1-c05a55169061",
@@ -132,6 +133,22 @@ function previousPaidPurchase() {
     membership: { customerId: "671a1d79-cffb-4d43-a3b4-06d3736b695f" },
   };
 }
+
+test("family Pass checkout proof belongs to the authenticated guardian while the Pass owner stays the child", async () => {
+  const guardianGid = "gid://shopify/Customer/456";
+  const childActor = { ...actor, accountCustomerGid: guardianGid };
+  const stored = purchase({ payerCustomerGid: guardianGid });
+  const proof = await prepareMembershipCheckoutAuthorization(childActor, stored, domain, admin);
+  expect(proof?.customerGid).toBe(guardianGid);
+  expect(mocked.read).toHaveBeenCalledWith(admin, guardianGid);
+  expect(mocked.authorize).toHaveBeenCalledWith(admin, proof);
+  expect(stored.membershipId).toBe(purchase().membershipId);
+});
+
+test("the child's direct login cannot resume a checkout started by its guardian", async () => {
+  await expect(prepareMembershipCheckoutAuthorization(actor, purchase({ payerCustomerGid: "gid://shopify/Customer/456" }), domain, admin)).rejects.toMatchObject({ code: "CHECKOUT_PAYER_MISMATCH" });
+  expect(mocked.authorize).not.toHaveBeenCalled();
+});
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -321,7 +338,7 @@ test("only a PAID prior purchase owned by the current customer releases its exac
   const next = purchase();
   mocked.read.mockResolvedValue({ authorization: oldProof });
   mocked.findPurchase.mockResolvedValue(old);
-  mocked.findCustomer.mockResolvedValue({ id: old.membership.customerId });
+  mocked.findCustomer.mockResolvedValue({ id: old.membership.customerId, shopifyCustomerGid: actor.customerGid });
   const proof = await prepareMembershipCheckoutAuthorization(
     actor,
     next,
@@ -332,7 +349,6 @@ test("only a PAID prior purchase owned by the current customer releases its exac
     where: {
       id: old.membership.customerId,
       shopId: actor.shopId,
-      shopifyCustomerGid: actor.customerGid,
     },
   });
   expect(mocked.close).toHaveBeenCalledExactlyOnceWith(admin, oldProof);
@@ -355,7 +371,7 @@ test.each(["wrong customer", "wrong proof"])(
     });
     mocked.findPurchase.mockResolvedValue(old);
     mocked.findCustomer.mockResolvedValue(
-      mismatch === "wrong customer" ? null : { id: old.membership.customerId },
+      mismatch === "wrong customer" ? { id: old.membership.customerId, shopifyCustomerGid: "gid://shopify/Customer/999" } : { id: old.membership.customerId, shopifyCustomerGid: actor.customerGid },
     );
     await expect(
       prepareMembershipCheckoutAuthorization(actor, purchase(), domain, admin),
@@ -384,7 +400,7 @@ test("an ambiguous close response blocks authorization and creation of a replace
     authorization: membershipCheckoutProof(actor.customerGid, old),
   });
   mocked.findPurchase.mockResolvedValue(old);
-  mocked.findCustomer.mockResolvedValue({ id: old.membership.customerId });
+  mocked.findCustomer.mockResolvedValue({ id: old.membership.customerId, shopifyCustomerGid: actor.customerGid });
   mocked.close.mockRejectedValue(
     new DomainError("MEMBERSHIP_AUTHORIZATION_UNKNOWN", "unknown", 503),
   );

@@ -6,6 +6,7 @@ type Tx = Prisma.TransactionClient;
 export type PassPurchaseClaim = {
   shopId: string;
   customerId: string;
+  payerCustomerGid?: string;
   passPlanId: string;
   mode: "ONCE" | "AUTO_RENEW";
   bookingCheckoutId?: string;
@@ -33,9 +34,12 @@ export async function claimPassPurchaseInTransaction(
   input: PassPurchaseClaim,
 ) {
   const owner = await tx.$queryRaw<
-    { id: string }[]
-  >`SELECT id FROM "CustomerProfile" WHERE id = ${input.customerId}::uuid AND "shopId" = ${input.shopId}::uuid FOR UPDATE`;
+    { id: string; shopifyCustomerGid: string }[]
+  >`SELECT id, "shopifyCustomerGid" FROM "CustomerProfile" WHERE id = ${input.customerId}::uuid AND "shopId" = ${input.shopId}::uuid FOR UPDATE`;
   if (!owner.length) fail("NOT_FOUND", "Customer not found.");
+  // Pre-family purchases stored no separate payer. Their original owner stays
+  // the payer, including on retries after the additive migration.
+  const requestedPayer = input.payerCustomerGid ?? owner[0].shopifyCustomerGid;
   const plan = await tx.passPlan.findFirst({
     where: {
       id: input.passPlanId,
@@ -75,6 +79,7 @@ export async function claimPassPurchaseInTransaction(
       shopId: input.shopId,
       customerId: input.customerId,
       passPlanId: input.passPlanId,
+      payerCustomerGid: input.payerCustomerGid ?? null,
     },
     update: {},
   });
@@ -86,7 +91,8 @@ export async function claimPassPurchaseInTransaction(
     prior &&
     (prior.membershipId !== membership.id ||
       prior.mode !== input.mode ||
-      prior.bookingCheckoutId !== (input.bookingCheckoutId ?? null))
+      prior.bookingCheckoutId !== (input.bookingCheckoutId ?? null) ||
+      (prior.payerCustomerGid ?? owner[0].shopifyCustomerGid) !== requestedPayer)
   )
     fail(
       "IDEMPOTENCY_CONFLICT",
@@ -105,7 +111,8 @@ export async function claimPassPurchaseInTransaction(
     if (existing.status !== "PAID") {
       if (
         existing.mode !== input.mode ||
-        existing.bookingCheckoutId !== (input.bookingCheckoutId ?? null)
+        existing.bookingCheckoutId !== (input.bookingCheckoutId ?? null) ||
+        (existing.payerCustomerGid ?? owner[0].shopifyCustomerGid) !== requestedPayer
       )
         fail(
           "PASS_PAYMENT_IN_PROGRESS",

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from "vitest";
 import db from "../app/db.server";
 import { DomainError } from "../app/lib/errors.server";
@@ -155,6 +155,25 @@ test("standalone checkout requires authenticated customer and explicit renewal c
   ).rejects.toMatchObject({ code: "AUTO_RENEW_TERMS_REQUIRED" });
   expect(mocked.create).not.toHaveBeenCalled();
   expect(await db.passPurchase.count({ where: { shopId: f.shop.id } })).toBe(0);
+});
+
+test("a pre-family checkout with no separate payer resumes for its original owner without creating another cart", async () => {
+  const f = await fixture();
+  const membership = await db.passMembership.create({ data: { shopId: f.shop.id, customerId: f.customer.id, passPlanId: f.plan.id } });
+  const legacy = await db.passPurchase.create({ data: {
+    shopId: f.shop.id, membershipId: membership.id, cycle: 1, mode: "AUTO_RENEW", status: "CHECKOUT_READY",
+    reference: randomBytes(32).toString("base64url"), idempotencyKey: f.input.idempotencyKey,
+    productMappingId: f.mapping.id, productGid: f.mapping.productGid!, variantGid: f.mapping.variantGid!,
+    sellingPlanGid: f.plan.sellingPlanGid, priceCents: f.plan.requestedPriceCents, currency: "AUD",
+    credits: f.plan.credits, validityDays: f.plan.validityDays, validityMonths: f.plan.validityMonths,
+    timezone: "Australia/Sydney", termsVersion: bookingTerms.version, autoRenewTermsVersion: AUTO_RENEW_TERMS_VERSION,
+    cartId: `gid://shopify/Cart/${randomUUID()}?key=test-only`,
+  } });
+  expect(await f.run()).toMatchObject({ status: "CHECKOUT_READY", purchaseId: legacy.id });
+  expect(mocked.create).not.toHaveBeenCalled();
+  expect(mocked.read).toHaveBeenCalledTimes(1);
+  expect((await db.passPurchase.findUniqueOrThrow({ where: { id: legacy.id } })).payerCustomerGid).toBeNull();
+  await expect(prepareMembershipCheckout({ ...f.actor, accountCustomerGid: "gid://shopify/Customer/999" }, f.input, f.clients)).rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT" });
 });
 
 test("an unknown Shopify authorization cannot create a cart or authorize a replacement", async () => {

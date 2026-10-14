@@ -954,6 +954,18 @@ button.danger-text:hover {
 .clients-table td { padding: 18px; border-top: 1px solid #e3e7e4; vertical-align: top; }
 .clients-table td:nth-child(2) { max-width: 270px; overflow-wrap: anywhere; }
 .clients-table .client-name { font-weight: 600; }
+.client-family-directory { margin: 8px 0 0; font-size: 12px; }
+.client-family .report-block-head { flex-wrap: wrap; }
+.client-family-contact { overflow-wrap: anywhere; }
+.client-family-members { list-style: none; padding: 0; margin: 0; }
+.client-family-member { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0; border-top: 1px solid #e3e7e4; }
+.client-family-member > div:first-child { min-width: 0; }
+.client-family-member .client-name { font-weight: 600; overflow-wrap: anywhere; }
+.client-family-member p { margin: 6px 0 0; overflow-wrap: anywhere; }
+.client-family-add { margin-top: 20px; padding-top: 18px; border-top: 1px solid #e3e7e4; }
+@media(max-width: 700px) {
+  .client-family-member { flex-direction: column; align-items: stretch; }
+}
 .clients-list .empty { padding: 22px; margin: 0; }
 .client-back { display: inline-block; margin-bottom: 24px; }
 .client-identity { display: flex; align-items: center; gap: 18px; min-width: 0; }

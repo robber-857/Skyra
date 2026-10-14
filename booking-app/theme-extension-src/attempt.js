@@ -1,9 +1,11 @@
 import { storefrontLoginUrl } from "./storefront-login.js";
+import { familyController } from "./family.js";
 
 // Server-owned recovery context; storage remembers only the opaque token.
 window.SkyraBookingAttempt = function (root) {
   const surface = (root.dataset.surface || "programs").toUpperCase();
   const storageKey = "skyra-booking:" + surface.toLowerCase() + ":attempt";
+  const memberStorageKey = storageKey + ":member";
   const storefront = (() => {
     const node = document.querySelector("[data-skyra-booking-config]");
     try {
@@ -14,12 +16,13 @@ window.SkyraBookingAttempt = function (root) {
     } catch { return { shopDomain: "", themeId: "" }; }
   })();
   let current, sessionId, generation = 0;
+  const family = familyController(root);
   const terminal = data => !data.resultAvailable && ["EXPIRED", "RECOVERY"].includes(data.status);
-  async function request(path, body) {
+  async function request(path, body, selectedMember = family.data() ? family.id() : "") {
     const response = await fetch((root.dataset.proxyBase || "/apps/skyra-booking") + path, {
       method: "POST", credentials: "same-origin", cache: "no-store", referrerPolicy: "no-referrer",
       headers: { "Content-Type": "application/json", Accept: "application/json", "X-Skyra-Booking": "1" },
-      body: JSON.stringify(body), signal: AbortSignal.timeout(10000)
+      body: JSON.stringify({ ...body, ...(selectedMember ? { familyMemberId: selectedMember } : {}) }), signal: AbortSignal.timeout(10000)
     });
     const data = await response.json();
     if (!response.ok) {
@@ -42,10 +45,18 @@ window.SkyraBookingAttempt = function (root) {
   }
   function forget(reset = false) {
     if (reset) { generation++; current = null; }
-    try { sessionStorage.removeItem(storageKey); } catch { /* Recovery still works from the return URL. */ }
+    try { sessionStorage.removeItem(storageKey); sessionStorage.removeItem(memberStorageKey); } catch { /* Recovery still works from the return URL. */ }
     cleanUrl();
   }
   return {
+    family,
+    familyMemberId: () => family.id(),
+    async changeFamilyMember(id) {
+      if (current?.resultAvailable) throw new Error("Check the existing booking or payment before choosing another family member.");
+      family.select(id);
+      forget(true);
+      return this.check();
+    },
     select(id) {
       generation++;
       if (sessionId !== id || (current && terminal(current))) current = null;
@@ -53,8 +64,17 @@ window.SkyraBookingAttempt = function (root) {
     },
     async check() {
       const revision = generation;
-      const data = await request(current ? "/attempt" : "/start", current ? { token: current.token } : { sessionId, surface });
+      let data = await request(current ? "/attempt" : "/start", current ? { token: current.token } : { sessionId, surface });
       if (revision !== generation) throw new Error("Booking selection changed");
+      if (!data.requiresLogin) {
+        await family.load(data.resultAvailable ? data.familyMemberId : undefined);
+        if (revision !== generation) throw new Error("Booking selection changed");
+        const boundMember = data.familyMemberId === family.data().account.id ? "" : data.familyMemberId || "";
+        if (!data.resultAvailable && boundMember !== family.id()) {
+          data = await request("/start", { sessionId: data.session.id, surface });
+          if (revision !== generation) throw new Error("Booking selection changed");
+        }
+      }
       current = data;
       if (terminal(data)) {
         const error = new Error(data.status === "EXPIRED" ? "Your booking attempt expired. Choose a class to check the latest availability." : "This booking needs to be restarted. Choose a class to check the latest availability.");
@@ -79,7 +99,7 @@ window.SkyraBookingAttempt = function (root) {
     },
     remember() {
       if (!current) return;
-      try { sessionStorage.setItem(storageKey, current.token); } catch { /* Token also travels in the server-generated Shopify return URL. */ }
+      try { sessionStorage.setItem(storageKey, current.token); if (family.id()) sessionStorage.setItem(memberStorageKey, family.id()); else sessionStorage.removeItem(memberStorageKey); } catch { /* Token also travels in the server-generated Shopify return URL. */ }
     },
     forget,
     token: () => current?.token,
@@ -88,10 +108,12 @@ window.SkyraBookingAttempt = function (root) {
       // A page with two mounts restores only the originating surface.
       if (url.hash && url.hash !== "#" + root.id) return null;
       let token = url.searchParams.get("skyra_attempt");
-      try { token ||= sessionStorage.getItem(storageKey); } catch { /* Storage is optional. */ }
+      let savedMember = "";
+      try { token ||= sessionStorage.getItem(storageKey); if (token === sessionStorage.getItem(storageKey)) savedMember = sessionStorage.getItem(memberStorageKey) || ""; } catch { /* Storage is optional. */ }
       if (!token) return null;
       try {
-        current = await request("/attempt", { token });
+        current = await request("/attempt", { token }, savedMember);
+        if (!current.requiresLogin) await family.load(current.familyMemberId);
         if (terminal(current)) {
           forget(true);
           const error = new Error("Your booking attempt has ended. Choose a class to check the latest availability.");

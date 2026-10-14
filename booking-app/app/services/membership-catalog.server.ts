@@ -18,7 +18,7 @@ export async function membershipCatalog(actor: BookingActor, raw: unknown) {
   });
   if (!shop)
     throw new DomainError("NOT_FOUND", "Memberships are unavailable.", 404);
-  const capabilities = membershipCapabilities(shop.domain, actor.customerGid);
+  const capabilities = membershipCapabilities(shop.domain, actor.accountCustomerGid ?? actor.customerGid);
   const now = await databaseNow(db);
   const customer = actor.customerGid
     ? await db.customerProfile.findUnique({

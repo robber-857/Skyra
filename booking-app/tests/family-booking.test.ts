@@ -1,0 +1,81 @@
+import { randomBytes, randomUUID } from "node:crypto";
+import { afterAll, beforeAll, expect, test } from "vitest";
+import db from "../app/db.server";
+import { paidFixture, queuePaid } from "./paid-fixture";
+import { resolveFamilyActor } from "../app/services/family-accounts.server";
+import { startAttempt, resumeAttempt } from "../app/services/booking.server";
+import { confirmOwnedBooking } from "../app/services/owned-booking.server";
+import { bookClientIntoSession } from "../app/services/staff-booking.server";
+import { grantCashCredits } from "../app/services/manual-credits.server";
+import { entitlementBalance } from "../app/services/entitlements.server";
+import { customerAccountData } from "../app/services/customer-account.server";
+import { customerChangeBooking } from "../app/services/booking-lifecycle.server";
+import { processPaidBookingEvent } from "../app/services/paid-booking.server";
+import { receiveOrderPaidWebhook } from "../app/services/order-paid-webhook.server";
+import { settlePassPurchasePayment } from "../app/services/membership-payments.server";
+import { adminClientDetail } from "../app/services/admin-clients.server";
+import { previewBookingNotification } from "../app/services/booking-notifications.server";
+
+beforeAll(() => { if (new URL(process.env.DATABASE_URL!).pathname !== "/skyra_booking_test") throw Error("Dedicated test database required"); });
+afterAll(() => db.$disconnect());
+
+test("parent and Admin book two independent children into one class and cancel only the selected child's credit", async () => {
+  const f = await paidFixture("NEW_PASS", true);
+  await db.shop.update({ where: { id: f.shop.id }, data: { rules: { ...(f.shop.rules as object), onlineBookingsEnabled: true } } });
+  const admin = { shopId: f.shop.id, actorId: randomUUID(), role: "ADMIN" as const };
+  const parent = { shopId: f.shop.id, customerGid: f.customer.shopifyCustomerGid };
+  const children = await Promise.all(["456", "789"].map((gid, index) => db.customerProfile.create({ data: { shopId: f.shop.id, shopifyCustomerGid: `gid://shopify/Customer/${gid}`, familyParentId: f.customer.id, shopifyName: `Child ${index + 1}`, email: `parent+child${index + 1}@example.com` } })));
+  const credit = async (customerId: string) => grantCashCredits(admin, { customerId, target: `PASS_PLAN:${f.plan.id}`, units: 5, validityDays: 30, amount: "100", reason: "Family test", idempotencyKey: randomUUID() });
+  const passes = await Promise.all(children.map((child) => credit(child.id)));
+  const parentPass = await credit(f.customer.id);
+  const selected = await resolveFamilyActor(parent, children[0].id);
+  const attempt = await startAttempt(selected, { sessionId: f.session.id, surface: "HOME" });
+  const result = await confirmOwnedBooking(selected, { token: attempt.token, entitlementId: passes[0].id });
+  const secondId = await bookClientIntoSession(admin, { customerId: children[1].id, sessionId: f.session.id, entitlementId: passes[1].id, reason: "", idempotencyKey: randomUUID() });
+  expect(await db.booking.count({ where: { shopId: f.shop.id, sessionId: f.session.id, status: "CONFIRMED" } })).toBe(2);
+  expect(await entitlementBalance(db, f.shop.id, parentPass.id)).toMatchObject({ availableUnits: 5, reservedUnits: 0 });
+  for (const pass of passes) expect(await entitlementBalance(db, f.shop.id, pass.id)).toMatchObject({ availableUnits: 4, reservedUnits: 1 });
+  expect((await customerAccountData(selected, {})).bookings.map((booking) => booking.id)).toEqual([result.bookingReference]);
+  expect((await customerAccountData(await resolveFamilyActor(parent, children[1].id), {})).bookings.map((booking) => booking.id)).toEqual([secondId]);
+  expect((await customerAccountData(parent, {})).bookings).toEqual([]);
+  expect(await resumeAttempt(parent, attempt.token)).toMatchObject({ familyMemberId: children[0].id, attendeeName: "Child 1" });
+  await expect(resumeAttempt({ ...parent, customerGid: children[1].shopifyCustomerGid }, attempt.token)).rejects.toMatchObject({ code: "FORBIDDEN" });
+  const another = await startAttempt(selected, { sessionId: f.session.id, surface: "HOME" });
+  await expect(confirmOwnedBooking(selected, { token: another.token, entitlementId: passes[0].id })).rejects.toMatchObject({ code: "ALREADY_BOOKED" });
+  const notification = await db.bookingNotification.findFirstOrThrow({ where: { bookingId: result.bookingReference, recipientKind: "CUSTOMER", template: "BOOKING_CONFIRMED_V1" } });
+  expect((await previewBookingNotification(f.shop.id, notification.id)).text).toContain("Attendee: Child 1");
+  const booking = await db.booking.findUniqueOrThrow({ where: { id: result.bookingReference } });
+  await customerChangeBooking(selected, { bookingId: booking.id, expectedVersion: booking.version, action: "CANCEL", reason: "Parent requested cancellation", idempotencyKey: randomUUID() });
+  expect(await entitlementBalance(db, f.shop.id, passes[0].id)).toMatchObject({ availableUnits: 5, reservedUnits: 0 });
+  expect(await entitlementBalance(db, f.shop.id, passes[1].id)).toMatchObject({ availableUnits: 4, reservedUnits: 1 });
+  expect((await adminClientDetail(admin, children[1].id)).passes[0].reserved).toBe(1);
+});
+
+test("paid booking verifies guardian as payer and grants the Pass and seat only to the child", async () => {
+  const parentGid = "gid://shopify/Customer/456";
+  const f = await paidFixture("NEW_PASS", false, "CLASS", undefined, parentGid);
+  const parent = await db.customerProfile.create({ data: { shopId: f.shop.id, shopifyCustomerGid: parentGid } });
+  await db.customerProfile.update({ where: { id: f.customer.id }, data: { familyParentId: parent.id } });
+  const rejected = await receiveOrderPaidWebhook({ shopDomain: f.shop.domain, webhookId: randomUUID(), topic: "orders/paid", rawBody: JSON.stringify(f.payload), payload: f.payload });
+  expect(rejected.status).toBe("NEEDS_ATTENTION");
+  f.payload.customer.admin_graphql_api_id = parentGid;
+  expect((await processPaidBookingEvent((await queuePaid(f, "3301")).id)).status).toBe("CONFIRMED");
+  expect(await db.booking.count({ where: { shopId: f.shop.id, customerId: f.customer.id } })).toBe(1);
+  expect(await db.entitlement.count({ where: { shopId: f.shop.id, customerId: parent.id } })).toBe(0);
+  expect(await db.entitlement.count({ where: { shopId: f.shop.id, customerId: f.customer.id } })).toBe(1);
+});
+
+test("managed Pass settlement keeps child's independent balance while matching the recorded guardian payer", async () => {
+  const f = await paidFixture();
+  const parent = await db.customerProfile.create({ data: { shopId: f.shop.id, shopifyCustomerGid: "gid://shopify/Customer/456" } });
+  await db.customerProfile.update({ where: { id: f.customer.id }, data: { familyParentId: parent.id, shopifyName: "Mia" } });
+  const membership = await db.passMembership.create({ data: { shopId: f.shop.id, customerId: f.customer.id, passPlanId: f.plan.id, payerCustomerGid: parent.shopifyCustomerGid } });
+  const purchase = await db.passPurchase.create({ data: { shopId: f.shop.id, membershipId: membership.id, cycle: 1, mode: "ONCE", status: "CHECKOUT_READY", payerCustomerGid: parent.shopifyCustomerGid, idempotencyKey: randomUUID(), reference: randomBytes(32).toString("base64url"), productMappingId: f.mapping.id, productGid: f.mapping.productGid!, variantGid: f.mapping.variantGid!, priceCents: 22000, currency: "AUD", credits: 5, validityDays: 30, timezone: "Australia/Sydney", termsVersion: "test" } });
+  const payment = { orderGid: "gid://shopify/Order/4501", lineItemGid: "gid://shopify/LineItem/4501", customerGid: parent.shopifyCustomerGid, productGid: purchase.productGid, variantGid: purchase.variantGid, priceCents: 22000, currency: "AUD", quantity: 1 };
+  expect((await settlePassPurchasePayment(purchase.id, payment)).status).toBe("PAID");
+  const saved = await db.passPurchase.findUniqueOrThrow({ where: { id: purchase.id } });
+  expect(await db.entitlement.findUniqueOrThrow({ where: { id: saved.entitlementId! } })).toMatchObject({ customerId: f.customer.id, grantedUnits: 5 });
+  expect(await db.entitlement.count({ where: { customerId: parent.id } })).toBe(0);
+  expect((await db.membershipNotification.findFirstOrThrow({ where: { purchaseId: purchase.id } })).bodyText).toContain("Pass holder: Mia");
+  await expect(db.passPurchase.update({ where: { id: purchase.id }, data: { payerCustomerGid: f.customer.shopifyCustomerGid } })).rejects.toThrow();
+});

@@ -13,6 +13,7 @@ import { PassCreditAdjustmentForm } from "../components/pass-credit-adjustment-f
 import { adjustClientPassCredits } from "../services/pass-credit-adjustment.server";
 import { randomUUID } from "node:crypto";
 import {
+  redirect,
   useActionData,
   useLoaderData,
   useSearchParams,
@@ -29,6 +30,8 @@ import { adminClientDetail } from "../services/admin-clients.server";
 import { refreshClientContacts } from "../services/client-contacts.server";
 import { publicError } from "../lib/errors.server";
 import { AdminClientDetailView } from "../components/admin-clients-view";
+import { AdminFamilySection } from "../components/admin-family-section";
+import { addAdminFamilyMember } from "../services/family-accounts.server";
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { actor, admin } = await adminContext(request),
     url = new URL(request.url);
@@ -57,11 +60,26 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 export const headers = () => ({ "Cache-Control": "private, no-store" });
 export async function action({ request, params }: ActionFunctionArgs) {
-  const { actor } = await adminContext(request);
+  const { actor, admin } = await adminContext(request);
   if (request.method !== "POST")
     throw new Response("Method not allowed", { status: 405 });
   const form = await request.formData();
   try {
+    if (form.get("intent") === "add-family-member") {
+      const member = await addAdminFamilyMember(
+        actor,
+        admin.graphql,
+        params.clientId,
+        {
+          firstName: form.get("firstName"),
+          lastName: form.get("lastName"),
+          emailPrefix: form.get("emailPrefix"),
+          phone: form.get("phone"),
+          idempotencyKey: form.get("idempotencyKey"),
+        },
+      );
+      return redirect(`/app/clients/${member.id}?familyCreated=1`);
+    }
     if (form.get("intent") === "backfill-attendance") {
       if (form.get("confirmed") !== "on")
         return {
@@ -124,7 +142,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         "Cash payment recorded and credits added. No Shopify checkout was created.",
     };
   } catch (error) {
-    return publicError(error);
+    return { ...publicError(error), intent: String(form.get("intent") ?? "") };
   }
 }
 
@@ -132,9 +150,22 @@ export default function Client() {
   const data = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
   const result = useActionData<typeof action>();
+  const familyResult =
+    result && "intent" in result && result.intent === "add-family-member"
+      ? result
+      : undefined;
   return (
     <AdminClientDetailView
       {...data}
+      familySection={
+        <AdminFamilySection
+          key={data.data.client.id}
+          client={data.data.client}
+          family={data.data.family}
+          idempotencyKey={data.idempotencyKey}
+          result={familyResult}
+        />
+      }
       passAdjustmentForm={(pass) => (
         <PassCreditAdjustmentForm
           key={`${pass.id}:${data.idempotencyKey}`}
@@ -146,19 +177,26 @@ export default function Client() {
         <>
           <Feedback
             result={
-              result ??
-              (searchParams.get("updated") === "1"
-                ? { message: "Client details updated." }
-                : undefined)
+              (familyResult ? undefined : result) ??
+              (searchParams.get("familyCreated") === "1"
+                ? {
+                    message:
+                      "Family member created. Book classes and manage Passes for this client below.",
+                  }
+                : searchParams.get("updated") === "1"
+                  ? { message: "Client details updated." }
+                  : undefined)
             }
           />
-          <StaffBookingForm
-            key={`booking:${data.idempotencyKey}`}
-            options={data.bookingOptions}
-            clientName={data.data.client.name}
-            idempotencyKey={data.idempotencyKey}
-            canBookUntilStart={data.canBookUntilStart}
-          />
+          <div id="client-book-class">
+            <StaffBookingForm
+              key={`booking:${data.idempotencyKey}`}
+              options={data.bookingOptions}
+              clientName={data.data.client.name}
+              idempotencyKey={data.idempotencyKey}
+              canBookUntilStart={data.canBookUntilStart}
+            />
+          </div>
           <AttendanceBackfillForm
             key={`attendance:${data.idempotencyKey}`}
             data={data.attendanceOptions}

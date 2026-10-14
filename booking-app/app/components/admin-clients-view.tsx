@@ -161,7 +161,7 @@ export function AdminClientsView({
               <thead>
                 <tr>
                   <th scope="col">Client</th>
-                  <th scope="col">Email</th>
+                  <th scope="col">Account email</th>
                   <th scope="col">Active Passes</th>
                   <th scope="col">Classes left</th>
                   <th scope="col">Next expiry</th>
@@ -176,9 +176,21 @@ export function AdminClientsView({
                       <Link to={`/app/clients/${c.id}`} className="client-name">
                         {c.name}
                       </Link>
+                      {c.familyParentId && (
+                        <p className="muted client-family-directory">
+                          Parent:{" "}
+                          <Link
+                            to={`/app/clients/${c.familyParentId}#client-family`}
+                          >
+                            {c.familyParentName}
+                          </Link>
+                        </p>
+                      )}
                     </td>
                     <td>
-                      {c.email ? (
+                      {c.email && c.familyParentId ? (
+                        <span>{c.email}</span>
+                      ) : c.email ? (
                         <a href={`mailto:${c.email}`}>{c.email}</a>
                       ) : (
                         <span className="muted">Not available</span>
@@ -197,6 +209,13 @@ export function AdminClientsView({
                       >
                         Edit
                       </Link>
+                      {!c.familyParentId && (
+                        <p className="client-family-directory">
+                          <Link to={`/app/clients/${c.id}#client-family`}>
+                            Family members
+                          </Link>
+                        </p>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -263,11 +282,13 @@ export function AdminClientsView({
 export function AdminClientDetailView({
   data,
   warning,
+  familySection,
   creditForm,
   passAdjustmentForm,
 }: {
   data: Awaited<ReturnType<typeof adminClientDetail>>;
   warning: string | null;
+  familySection?: ReactNode;
   creditForm?: ReactNode;
   passAdjustmentForm?: (
     pass: Awaited<ReturnType<typeof adminClientDetail>>["passes"][number],
@@ -298,7 +319,9 @@ export function AdminClientDetailView({
           <div>
             <p className="page-kicker">Admin · Client profile</p>
             <h1>{c.name}</h1>
-            {c.email ? (
+            {c.email && data.family.parent ? (
+              <p className="muted">Account email: {c.email}</p>
+            ) : c.email ? (
               <a href={`mailto:${c.email}`}>{c.email}</a>
             ) : (
               <p className="muted">Email not available</p>
@@ -331,9 +354,23 @@ export function AdminClientDetailView({
             <dd>{c.preferredName || "Not provided"}</dd>
           </div>
           <div>
-            <dt>Email</dt>
+            <dt>{data.family.parent ? "Account email" : "Email"}</dt>
             <dd>{c.email || "Not available"}</dd>
           </div>
+          {data.family.parent && (
+            <div>
+              <dt>Parent contact email</dt>
+              <dd>
+                {data.family.parent.email ? (
+                  <a href={`mailto:${data.family.parent.email}`}>
+                    {data.family.parent.email}
+                  </a>
+                ) : (
+                  "Not available"
+                )}
+              </dd>
+            </div>
+          )}
           <div>
             <dt>Phone</dt>
             <dd>
@@ -363,6 +400,7 @@ export function AdminClientDetailView({
           </p>
         )}
       </section>
+      {familySection}
       {creditForm}
       <section className="panel" aria-labelledby="client-passes-title">
         <div className="report-block-head">

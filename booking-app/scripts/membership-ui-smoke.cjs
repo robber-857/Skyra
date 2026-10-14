@@ -35,6 +35,7 @@ const server = http.createServer(async (req, res) => {
     if (route.startsWith("memberships")) membershipRequests.push({ method: req.method, pathname });
     res.setHeader("Content-Type", "application/json");
     const json = (data) => res.end(JSON.stringify(data));
+    if (route === "family") return json({ account: { id: "11111111-1111-4111-8111-111111111111", name: "Parent", email: "parent@example.com" }, members: [{ id: "11111111-1111-4111-8111-111111111111", name: "Parent", email: "parent@example.com", relationship: "SELF" }] });
     if (route === "memberships/catalog") {
       if (state.catalogError) { res.statusCode = 503; return json({ code: "UNAVAILABLE", error: "Passes are temporarily unavailable." }); }
       return json({ passes: state.passes, memberships: state.memberships, authenticated: state.authenticated, checkoutAvailable: state.checkoutAvailable });

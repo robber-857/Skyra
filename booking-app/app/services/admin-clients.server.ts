@@ -64,6 +64,15 @@ export async function adminClients(actor: Actor, raw: unknown) {
           preferredName: true,
           shopifyName: true,
           email: true,
+          familyParentId: true,
+          familyParent: {
+            select: {
+              id: true,
+              preferredName: true,
+              shopifyName: true,
+              email: true,
+            },
+          },
           createdAt: true,
           _count: { select: { bookings: { where: { shopId: shop.id } } } },
         },
@@ -111,6 +120,10 @@ export async function adminClients(actor: Actor, raw: unknown) {
             id: c.id,
             name: clientName(c),
             email: c.email,
+            familyParentId: c.familyParentId,
+            familyParentName: c.familyParent
+              ? clientName(c.familyParent)
+              : null,
             joinedAt: c.createdAt.toISOString(),
             bookings: c._count.bookings,
             activePasses: active.length,
@@ -158,6 +171,15 @@ export async function adminClientDetail(
           preferredName: true,
           shopifyName: true,
           email: true,
+          familyParentId: true,
+          familyParent: {
+            select: {
+              id: true,
+              preferredName: true,
+              shopifyName: true,
+              email: true,
+            },
+          },
           signature: true,
           phone: true,
           trainingGoals: true,
@@ -168,6 +190,19 @@ export async function adminClientDetail(
         },
       });
       if (!client) throw new DomainError("NOT_FOUND", "Client not found.", 404);
+      const familyMembers = await tx.customerProfile.findMany({
+        where: {
+          shopId: shop.id,
+          familyParentId: client.familyParentId || client.id,
+        },
+        select: {
+          id: true,
+          preferredName: true,
+          shopifyName: true,
+          email: true,
+        },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      });
       const where = { shopId: shop.id, customerId: id };
       const total = await tx.entitlement.count({ where }),
         pages = Math.max(1, Math.ceil(total / 5)),
@@ -244,6 +279,20 @@ export async function adminClientDetail(
               : null,
         },
         timezone: shop.timezone,
+        family: {
+          parent: client.familyParent
+            ? {
+                id: client.familyParent.id,
+                name: clientName(client.familyParent),
+                email: client.familyParent.email,
+              }
+            : null,
+          members: familyMembers.map((member) => ({
+            id: member.id,
+            name: clientName(member),
+            email: member.email,
+          })),
+        },
         asOf: now.toISOString(),
         page,
         pages,

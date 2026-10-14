@@ -15,6 +15,7 @@ const session = {
 };
 const server = http.createServer((req, res) => {
   const pathname = new URL(req.url, "http://localhost").pathname;
+  if (pathname === "/apps/skyra-booking/family") { res.setHeader("Content-Type", "application/json"); return res.end(JSON.stringify({ account: { id: "11111111-1111-4111-8111-111111111111", name: "Parent", email: "parent@example.com" }, members: [{ id: "11111111-1111-4111-8111-111111111111", name: "Parent", email: "parent@example.com", relationship: "SELF" }] })); }
   if (pathname === "/apps/skyra-booking/result") {res.setHeader("Content-Type", "application/json");return res.end(JSON.stringify({status:"NOT_CONFIRMED",bookingReference:null}));}
   if (["/booking.js", "/login.js", "/attempt.js", "/calendar.js", "/transaction.js", "/booking.css"].includes(pathname)) {
     res.setHeader("Content-Type", pathname.endsWith("css") ? "text/css" : "text/javascript");

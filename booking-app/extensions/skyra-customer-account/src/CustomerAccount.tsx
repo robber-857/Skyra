@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { restoredPassNavigation, withPassNavigation } from "./pass-navigation";
 
 type View =
-  "overview" | "upcoming" | "history" | "passes" | "appointments" | "profile";
+  "overview" | "upcoming" | "history" | "passes" | "appointments" | "profile" | "family";
 type DataView = "upcoming" | "history" | "passes";
 type Target = {
   id: string;
@@ -68,6 +68,8 @@ type Profile = {
   signature: string;
   trainingGoals: string;
 };
+type FamilyMember = { id: string; name: string; email: string; relationship: "SELF" | "CHILD" };
+type Family = { account: { id: string; name: string; email: string }; members: FamilyMember[]; canAddMembers?: boolean };
 
 const emptyProfile: Profile = {
   preferredName: "",
@@ -97,6 +99,7 @@ const viewLabels: { id: View; label: string }[] = [
   { id: "passes", label: "My passes" },
   { id: "upcoming", label: "Bookings" },
   { id: "profile", label: "Training profile" },
+  { id: "family", label: "Family" },
 ];
 
 export default async () => {
@@ -160,12 +163,14 @@ async function request<T>(
     });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
-      throw Error(
+      const error = new Error(
         response.status === 401
           ? "Please sign in again to view your account."
           : data.error ||
               "We could not update your account. Please refresh and try again.",
       );
+      Object.assign(error, { code: data.code, status: response.status });
+      throw error;
     }
     return await response.json();
   } finally {
@@ -173,30 +178,34 @@ async function request<T>(
   }
 }
 
-function accountData(view: DataView, cursor?: string, page?: number) {
+function accountData(view: DataView, cursor?: string, page?: number, familyMemberId = "") {
   const path = new URL("/api/customer-bookings", apiBase());
   path.searchParams.set("view", view);
   if (cursor) path.searchParams.set("cursor", cursor);
   if (page !== undefined) path.searchParams.set("page", String(page));
+  if (familyMemberId) path.searchParams.set("familyMemberId", familyMemberId);
   return request<Account>(path.href);
 }
 
-function profileData(body?: Profile) {
-  return request<Profile>("/api/customer-profile", {
-    ...(body ? { method: "POST" as const, body } : {}),
+function profileData(body?: Profile, familyMemberId = "") {
+  const path = new URL("/api/customer-profile", apiBase());
+  if (familyMemberId) path.searchParams.set("familyMemberId", familyMemberId);
+  return request<Profile>(path.href, {
+    ...(body ? { method: "POST" as const, body: { ...body, ...(familyMemberId ? { familyMemberId } : {}) } } : {}),
   });
 }
 
-function rescheduleOptions(bookingId: string) {
+function rescheduleOptions(bookingId: string, familyMemberId = "") {
   const path = new URL("/api/customer-reschedule", apiBase());
   path.searchParams.set("bookingId", bookingId);
+  if (familyMemberId) path.searchParams.set("familyMemberId", familyMemberId);
   return request<Account & { options?: Target[] }>(path.href);
 }
 
-function changeBooking(body: unknown, reschedule = false) {
+function changeBooking(body: Record<string, unknown>, reschedule = false, familyMemberId = "") {
   return request<Account>(
     reschedule ? "/api/customer-reschedule" : "/api/customer-bookings",
-    { method: "POST", body },
+    { method: "POST", body: { ...body, ...(familyMemberId ? { familyMemberId } : {}) } },
   );
 }
 
@@ -231,6 +240,13 @@ function AccountPage() {
     initialPassState.active ? "passes" : "overview",
   );
   const passPage = useRef(initialPassState.page);
+  const savedNavigation = navigation.currentEntry.getState() as Record<string, unknown> | null;
+  const [family, setFamily] = useState<Family | null>(null);
+  const [familyMemberId, setFamilyMemberId] = useState(typeof savedNavigation?.skyraFamilyMemberId === "string" ? savedNavigation.skyraFamilyMemberId : "");
+  const [memberDraft, setMemberDraft] = useState({ firstName: "", lastName: "", emailPrefix: "", phone: "" });
+  const memberCreationKey = useRef(crypto.randomUUID());
+  const confirmedMemberCreationFailure = useRef(false);
+  const [memberCreationUncertain, setMemberCreationUncertain] = useState(false);
   const [data, setData] = useState<Account | null>(null);
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [draft, setDraft] = useState<Profile>(emptyProfile);
@@ -244,7 +260,8 @@ function AccountPage() {
   const [targets, setTargets] = useState<Target[]>([]);
   const [target, setTarget] = useState<Target | null>(null);
   const generation = useRef(0);
-  const bookingUrl = findClassUrl();
+  const selectedMember = family?.members.find((member) => member.id === familyMemberId) || family?.members.find((member) => member.relationship === "SELF");
+  const bookingUrl = (() => { const href = findClassUrl(); if (!href || !familyMemberId) return href; const url = new URL(href); url.searchParams.set("skyra_member", familyMemberId); return url.href; })();
 
   async function load(
     nextView: View,
@@ -258,8 +275,18 @@ function AccountPage() {
     setMoving(null);
     setTarget(null);
     try {
-      if (nextView === "profile") {
-        const nextProfile = await profileData();
+      const nextFamily = await request<Family>("/api/customer-family");
+      if (run !== generation.current) return;
+      setFamily(nextFamily);
+      if (familyMemberId && !nextFamily.members.some((member) => member.id === familyMemberId && member.relationship === "CHILD")) {
+        setData(null); setProfile(emptyProfile); setDraft(emptyProfile);
+        setFamilyMemberId("");
+        return;
+      }
+      if (nextView === "family") {
+        setData(null);
+      } else if (nextView === "profile") {
+        const nextProfile = await profileData(undefined, familyMemberId);
         if (run === generation.current) {
           setProfile(nextProfile);
           setDraft(nextProfile);
@@ -267,9 +294,9 @@ function AccountPage() {
         }
       } else if (nextView === "overview") {
         const [upcoming, passes, nextProfile] = await Promise.all([
-          accountData("upcoming"),
-          accountData("passes"),
-          profileData(),
+          accountData("upcoming", undefined, undefined, familyMemberId),
+          accountData("passes", undefined, undefined, familyMemberId),
+          profileData(undefined, familyMemberId),
         ]);
         if (run === generation.current) {
           setData({ ...upcoming, passes: passes.passes, nextCursor: null });
@@ -277,7 +304,7 @@ function AccountPage() {
           setDraft(nextProfile);
         }
       } else if (nextView === "passes") {
-        const next = await accountData("passes", undefined, requestedPage);
+        const next = await accountData("passes", undefined, requestedPage, familyMemberId);
         if (run === generation.current) {
           setData(next);
           passPage.current = next.page;
@@ -291,8 +318,8 @@ function AccountPage() {
         }
       } else if (nextView === "appointments") {
         const [upcoming, history] = await Promise.all([
-          accountData("upcoming"),
-          accountData("history"),
+          accountData("upcoming", undefined, undefined, familyMemberId),
+          accountData("history", undefined, undefined, familyMemberId),
         ]);
         if (run === generation.current)
           setData({
@@ -303,7 +330,7 @@ function AccountPage() {
             nextCursor: null,
           });
       } else {
-        const next = await accountData(nextView, cursor);
+        const next = await accountData(nextView, cursor, undefined, familyMemberId);
         if (run === generation.current)
           setData((previous) =>
             cursor && previous?.view === nextView
@@ -349,7 +376,55 @@ function AccountPage() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
       generation.current++;
     };
-  }, [view]);
+    // Load is deliberately tied to the view and attendee; loading state must not restart it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, familyMemberId]);
+
+  function selectMember(id: string) {
+    if (busy) return;
+    const next = family?.members.find((member) => member.id === id);
+    const memberId = next?.relationship === "CHILD" ? next.id : "";
+    if (memberId === familyMemberId) return;
+    // Block actions in the same render that changes the attendee. The next
+    // profile must load before an old draft can be submitted for another child.
+    setBusy(true); setData(null); setProfile(emptyProfile); setDraft(emptyProfile);
+    setSelected(null); setMoving(null); setTarget(null);
+    passPage.current = 1;
+    navigation.updateCurrentEntry({ state: { ...withPassNavigation(navigation.currentEntry.getState(), view === "passes", 1), skyraFamilyMemberId: memberId } });
+    setFamilyMemberId(memberId);
+  }
+
+  async function addFamilyMember() {
+    if (busy) return;
+    if (!memberDraft.firstName.trim() || !/^[a-z0-9][a-z0-9-]{0,39}$/.test(memberDraft.emailPrefix)) {
+      setError("Enter a first name and an email prefix beginning with a lowercase letter or number. The prefix may also contain hyphens.");
+      return;
+    }
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await request<{ id: string }>("/api/customer-family", { method: "POST", body: { ...memberDraft, idempotencyKey: memberCreationKey.current } });
+      const next = await request<Family>("/api/customer-family");
+      setFamily(next);
+      setMemberDraft({ firstName: "", lastName: "", emailPrefix: "", phone: "" });
+      memberCreationKey.current = crypto.randomUUID();
+      confirmedMemberCreationFailure.current = false;
+      setMemberCreationUncertain(false);
+      setNotice("Family member added. Select their name to manage their own bookings, Passes and training profile.");
+    } catch (caught) {
+      const code = (caught as { code?: string })?.code;
+      const definitive = ["FAMILY_EMAIL_IN_USE", "FAMILY_EMAIL_TOO_LONG", "FAMILY_CREATE_FAILED", "VALIDATION"].includes(code || "");
+      confirmedMemberCreationFailure.current = definitive;
+      setMemberCreationUncertain(!definitive);
+      setError((caught instanceof Error ? caught.message : "Unable to add this family member.") + (definitive ? "" : " Retry with these same details to check the original request."));
+    }
+    finally { setBusy(false); }
+  }
+
+  function updateMemberDraft(field: keyof typeof memberDraft, value: string) {
+    if (memberCreationUncertain) return;
+    if (confirmedMemberCreationFailure.current) { memberCreationKey.current = crypto.randomUUID(); confirmedMemberCreationFailure.current = false; }
+    setMemberDraft((current) => ({ ...current, [field]: value }));
+  }
 
   async function cancel() {
     if (!selected || busy || uncertain) return;
@@ -362,7 +437,7 @@ function AccountPage() {
         action: "CANCEL",
         reason: "Customer requested cancellation in their account",
         idempotencyKey: selected.cancellationKey,
-      });
+      }, false, familyMemberId);
       setUncertain(true);
       setNotice(
         "Your booking has been cancelled. You can find it under Past & cancelled.",
@@ -390,7 +465,7 @@ function AccountPage() {
     setBusy(true);
     setError("");
     try {
-      const response = await rescheduleOptions(booking.id);
+      const response = await rescheduleOptions(booking.id, familyMemberId);
       setTargets(response.options || []);
       setMoving(booking);
     } catch (caught) {
@@ -419,6 +494,7 @@ function AccountPage() {
           reason: "Customer requested another class time",
         },
         true,
+        familyMemberId,
       );
       setUncertain(true);
       setNotice("Your booking has moved to the new class time.");
@@ -474,7 +550,7 @@ function AccountPage() {
     setError("");
     setNotice("");
     try {
-      const saved = await profileData(draft);
+      const saved = await profileData(draft, familyMemberId);
       setProfile(saved);
       setDraft(saved);
       setNotice("Profile saved.");
@@ -522,6 +598,14 @@ function AccountPage() {
               </s-button>
             ))}
           </s-stack>
+          {family && <s-section heading="Family account">
+            <s-stack gap="small">
+              <s-select label="Manage bookings, Passes and profile for" value={selectedMember?.id || family.account.id} disabled={busy} onChange={(event) => selectMember(fieldValue(event))}>
+                {family.members.map((member) => <s-option key={member.id} value={member.id}>{member.name || member.email}{member.relationship === "SELF" ? " (you)" : ""}</s-option>)}
+              </s-select>
+              <s-text color="subdued">{selectedMember?.name || "Your account"} has separate bookings and Pass balances. Family messages are sent to {family.account.email}.</s-text>
+            </s-stack>
+          </s-section>}
           <s-divider />
           {error && (
             <s-stack direction="block" gap="small">
@@ -532,6 +616,24 @@ function AccountPage() {
             </s-stack>
           )}
           {notice && <s-banner tone="success">{notice}</s-banner>}
+          {view === "family" && family && <s-stack gap="base">
+            <s-section heading="Family members"><s-stack gap="base">
+              <s-text>Use your existing login to manage each child&apos;s own bookings, Passes and training profile.</s-text>
+              {family.members.map((member) => <s-box key={member.id} padding="base" background="subdued" borderRadius="base"><s-stack gap="small">
+                <s-heading>{member.name || member.email}</s-heading><s-text>{member.email}</s-text>
+                <s-text color="subdued">{member.relationship === "SELF" ? "Account holder" : "Child · independent bookings and Passes"}</s-text>
+                <s-button disabled={busy} onClick={() => { selectMember(member.id); setView("overview"); }}>Manage {member.name || "member"}</s-button>
+              </s-stack></s-box>)}
+            </s-stack></s-section>
+            {family.canAddMembers === false ? <s-banner>Sign into the parent account to add family members.</s-banner> : <s-section heading="Add a child"><s-stack gap="base">
+              <s-text>Choose a unique prefix for the child&apos;s client email. Notifications go to your account email.</s-text>
+              <s-text-field label="First name" value={memberDraft.firstName} required maxLength={80} disabled={busy || memberCreationUncertain} onInput={(event) => updateMemberDraft("firstName", fieldValue(event))} />
+              <s-text-field label="Last name (optional)" value={memberDraft.lastName} maxLength={80} disabled={busy || memberCreationUncertain} onInput={(event) => updateMemberDraft("lastName", fieldValue(event))} />
+              <s-text-field label="Email prefix (for example child1)" value={memberDraft.emailPrefix} required maxLength={40} disabled={busy || memberCreationUncertain} onInput={(event) => updateMemberDraft("emailPrefix", fieldValue(event))} />
+              <s-phone-field label="Phone (optional)" value={memberDraft.phone} disabled={busy || memberCreationUncertain} onInput={(event) => updateMemberDraft("phone", fieldValue(event))} />
+              <s-button variant="primary" disabled={busy} loading={busy} onClick={() => void addFamilyMember()}>Add family member</s-button>
+            </s-stack></s-section>}
+          </s-stack>}
           {busy && (
             <s-box padding="base" background="subdued" borderRadius="base">
               <s-stack direction="inline" gap="small" alignItems="center">
@@ -655,9 +757,7 @@ function AccountPage() {
           {view === "profile" && (
             <s-stack gap="base">
               <s-banner>
-                Shopify continues to manage your account name, email and
-                addresses. Training profile stores only your Skyra photo,
-                preferred name, signature and training goals.
+                {familyMemberId ? "The studio can update this child's client name, contact information and Passes. This training profile stores their Skyra photo, preferred name, signature and training goals." : "Shopify continues to manage your account name, email and addresses. Training profile stores your Skyra photo, preferred name, signature and training goals."}
               </s-banner>
               <s-section heading="Training profile">
                 <s-stack gap="base">
@@ -761,7 +861,7 @@ function AccountPage() {
               Load more
             </s-button>
           )}
-          {!bookingUrl && view !== "profile" && (
+          {!bookingUrl && view !== "profile" && view !== "family" && (
             <s-banner tone="warning">
               The studio still needs to configure the Find a class storefront
               URL for this account page.

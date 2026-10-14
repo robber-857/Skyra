@@ -3,6 +3,7 @@ import db from "../db.server";
 import { authenticate } from "../shopify.server";
 import { DomainError } from "../lib/errors.server";
 import type { BookingActor } from "./booking.server";
+import { familyRequestContext } from "./family-request.server";
 
 export function bookingJson(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -45,6 +46,7 @@ export async function bookingRequest(
   request: Request,
   run: (actor: BookingActor, input: unknown) => Promise<unknown>,
   maxBodyLength = 2048,
+  resolveMember = true,
 ) {
   try {
     const actor = await proxyBookingActor(request);
@@ -67,7 +69,8 @@ export async function bookingRequest(
     const body = await request.text();
     if (body.length > maxBodyLength)
       return bookingJson({ code: "INVALID_REQUEST" }, 413);
-    return bookingJson(await run(actor, JSON.parse(body)));
+    const context = await familyRequestContext(actor, JSON.parse(body), resolveMember);
+    return bookingJson(await run(context.actor, context.input));
   } catch (error) {
     if (error instanceof DomainError)
       return bookingJson(

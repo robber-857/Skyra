@@ -7,6 +7,7 @@ export async function paidFixture(
   expiredHold = false,
   serviceKind: "CLASS" | "APPOINTMENT" = "CLASS",
   validityMonths?: number,
+  payerCustomerGid?: string,
 ) {
   const shop = await db.shop.create({
     data: {
@@ -119,6 +120,7 @@ export async function paidFixture(
       variantGid: mapping.variantGid!,
       priceCents: kind === "NEW_PASS" ? 22000 : 4900,
       catalogFingerprint: "a".repeat(64),
+      payerCustomerGid,
       status: "READY",
       cartId: `gid://shopify/Cart/${randomUUID()}?key=test-only`,
       createdAt: new Date(Date.now() - 20000),

@@ -9,6 +9,7 @@ import {
   PRODUCTION_BOOKING_SHOP,
 } from "./commerce-capabilities.server";
 import { resolveShopifyCustomerEmail } from "./customer-notification-email.server";
+import { clientName } from "./client-identity";
 import {
   sendTransactionalMail,
   transactionalMailReady,
@@ -23,7 +24,7 @@ export function membershipManagementUrl(domain: string) {
   return `https://${domain}/pages/membership#membership-options`;
 }
 
-function paidEmail(receipt: MembershipReceipt, domain: string) {
+function paidEmail(receipt: MembershipReceipt, domain: string, attendeeName?: string) {
   const renewal = receipt.cycle > 1;
   const amount = `${receipt.currency} ${(receipt.priceCents / 100).toFixed(2)}`;
   const manage = membershipManagementUrl(domain);
@@ -37,6 +38,7 @@ function paidEmail(receipt: MembershipReceipt, domain: string) {
   return {
     subject: `${renewal ? "Pass renewal" : "Pass purchase"} confirmed: ${receipt.passName}`,
     bodyText: [
+      ...(attendeeName ? [`Pass holder: ${attendeeName}.`] : []),
       `Your ${renewal ? "renewal" : "purchase"} payment of ${amount} for ${receipt.passName} is confirmed.`,
       `Period ${receipt.cycle}: ${receipt.credits} class credits.`,
       start,
@@ -130,7 +132,8 @@ export async function retainPaidMembershipReceipt(
   const shop = await tx.shop.findUniqueOrThrow({
     where: { id: purchase.shopId },
   });
-  const email = paidEmail(receipt, shop.domain);
+  const holder = await tx.customerProfile.findFirstOrThrow({ where: { id: receipt.customerId, shopId: shop.id } });
+  const email = paidEmail(receipt, shop.domain, holder.familyParentId ? clientName(holder) : undefined);
   const id = randomUUID();
   const notification = await tx.membershipNotification.upsert({
     where: { purchaseId_event: { purchaseId, event: "PAID" } },
@@ -163,14 +166,16 @@ function deliveryAllowed(domain: string) {
 export type MembershipCustomerEmailResolver = (
   domain: string,
   customerGid: string,
+  shopId?: string,
 ) => Promise<string | null>;
 const shopifyEmail: MembershipCustomerEmailResolver = async (
   domain,
   customerGid,
+  shopId,
 ) => {
   const { unauthenticated } = await import("../shopify.server");
   const { admin } = await unauthenticated.admin(domain);
-  return resolveShopifyCustomerEmail(admin.graphql, customerGid);
+  return resolveShopifyCustomerEmail(admin.graphql, customerGid, shopId);
 };
 
 export async function deliverMembershipNotification(
@@ -195,7 +200,7 @@ export async function deliverMembershipNotification(
   });
   const to =
     notification.recipientEmail ??
-    (await resolveCustomer(shop.domain, customer.shopifyCustomerGid));
+    (await resolveCustomer(shop.domain, customer.shopifyCustomerGid, shop.id));
   if (
     !z.email().safeParse(to).success ||
     !transactionalMailRecipientAllowed(to!)

@@ -1,6 +1,7 @@
 import bookingTerms from "../app/lib/booking-terms.json";
 import { passValidity, renewalChoice, renewalDescription, renewalTermsVersion } from "./pass-purchase-ui.js";
 import { storefrontLoginUrl } from "./storefront-login.js";
+import { familyController } from "./family.js";
 
 const storageKey = "skyra-memberships:purchase";
 const node = (tag, className, text) => {
@@ -41,12 +42,14 @@ function mount(root) {
     const saved = JSON.parse(sessionStorage.getItem(storageKey) || "null");
     if (saved && typeof saved.passPlanId === "string" && /^[0-9a-f-]{36}$/i.test(saved.idempotencyKey || "") && typeof saved.autoRenew === "boolean") pending = saved;
   } catch { /* Storage is optional; the catalog remains authoritative. */ }
+  const family = familyController(root);
+  if (pending) family.restore(pending.familyMemberId || "");
 
   async function request(path, body) {
     const response = await fetch(base + "/memberships/" + path, {
       method: "POST", credentials: "same-origin", cache: "no-store", referrerPolicy: "no-referrer",
       headers: { "Content-Type": "application/json", Accept: "application/json", "X-Skyra-Booking": "1" },
-      body: JSON.stringify(body), signal: AbortSignal.timeout(15000),
+      body: JSON.stringify({ ...body, ...(family.data() && family.id() ? { familyMemberId: family.id() } : {}) }), signal: AbortSignal.timeout(15000),
     });
     const data = await response.json();
     if (!response.ok) {
@@ -63,6 +66,7 @@ function mount(root) {
     const heading = node("h3", "membership-shop__title", title);
     heading.tabIndex = -1;
     root.append(heading);
+    if (family.member()) root.append(node("p", "membership-shop__notice", "Passes for: " + (family.member().name || family.member().email)));
     return root;
   }
 
@@ -82,9 +86,15 @@ function mount(root) {
     const current = ++revision;
     frame("Membership passes").append(notice("Loading passes and checking your account…"));
     try {
-      const data = await request("catalog", {});
+      let data = await request("catalog", {});
       if (current !== revision || !root.isConnected) return;
       if (!Array.isArray(data.passes) || !Array.isArray(data.memberships) || typeof data.authenticated !== "boolean") throw new Error("Pass availability could not be verified. Please try again.");
+      if (data.authenticated) {
+        await family.load(pending ? pending.familyMemberId || null : undefined);
+        if (current !== revision || !root.isConnected) return;
+        data = await request("catalog", {});
+        if (current !== revision || !root.isConnected) return;
+      }
       catalog = data;
       renderCatalog();
     } catch (error) {
@@ -129,6 +139,8 @@ function mount(root) {
   function renderCatalog() {
     frame("Choose your pass");
     root.append(node("p", "membership-shop__intro", "Buy a pass now and choose your classes later. Available passes, prices and renewal options are checked before payment."));
+    const memberSelect = family.control({ element: node, className: "membership-shop__consent", label: "Passes for", disabled: !!pending, onChange: (id) => { if (pending) return; family.select(id); void load(); } });
+    if (catalog.authenticated && memberSelect) root.append(memberSelect);
     if (!catalog.authenticated) root.append(notice("Sign in to check your existing passes before purchasing."), button("Sign in", signIn));
     if (catalog.authenticated && pending) {
       const recovery = node("div", "membership-shop__recovery");
@@ -178,11 +190,12 @@ function mount(root) {
     root.append(button("Back to passes", renderCatalog, true));
     const summary = node("div", "membership-shop__review");
     summary.append(node("h4", "", pass.name), node("p", "", passValidity(pass)), node("strong", "membership-shop__price", money(pass)));
+    if (family.member()) summary.prepend(node("p", "", "Pass owner: " + (family.member().name || family.member().email)));
     summary.append(notice(autoRenew ? renewalDescription(pass, money(pass)) : "One-time purchase. No automatic renewal payment will be taken. This purchase does not reserve a class."));
     root.append(summary);
     const proceed = button("Continue to Shopify Checkout", () => {
       if (!terms.checked || (renewal && !renewal.checked)) return;
-      pending = { passPlanId: pass.id, expectedVersion: pass.version, expectedPriceCents: pass.priceCents, autoRenew, idempotencyKey: crypto.randomUUID(), termsAcceptance: { accepted: true, version: bookingTerms.version }, ...(autoRenew ? { autoRenewAcceptance: { accepted: true, version: pass.autoRenew.termsVersion || renewalTermsVersion } } : {}) };
+      pending = { passPlanId: pass.id, expectedVersion: pass.version, expectedPriceCents: pass.priceCents, autoRenew, idempotencyKey: crypto.randomUUID(), ...(family.id() ? { familyMemberId: family.id() } : {}), termsAcceptance: { accepted: true, version: bookingTerms.version }, ...(autoRenew ? { autoRenewAcceptance: { accepted: true, version: pass.autoRenew.termsVersion || renewalTermsVersion } } : {}) };
       remember();
       purchase(pending);
     });

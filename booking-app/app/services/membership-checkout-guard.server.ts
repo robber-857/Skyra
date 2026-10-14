@@ -83,7 +83,7 @@ export async function closeMembershipCheckoutForRenewal(
   // closure response stops billing; an idempotent reread can confirm CLOSED.
   await closeMembershipCheckout(
     admin,
-    membershipCheckoutProof(customer.shopifyCustomerGid, original),
+    membershipCheckoutProof(original.payerCustomerGid ?? customer.shopifyCustomerGid, original),
   );
 }
 
@@ -93,18 +93,21 @@ export async function prepareMembershipCheckoutAuthorization(
   domain: string,
   admin: GraphQL,
 ) {
+  const payerCustomerGid = actor.accountCustomerGid ?? actor.customerGid;
+  if (purchase.payerCustomerGid && purchase.payerCustomerGid !== payerCustomerGid)
+    throw new DomainError("CHECKOUT_PAYER_MISMATCH", "Return to the account that started this payment.", 403);
   if (!(await requiresMembershipProtection(purchase))) return undefined;
   if (
     !actor.customerGid ||
     purchase.currency !== "AUD" ||
-    !membershipCapabilities(domain, actor.customerGid).checkoutGuardReady
+    !membershipCapabilities(domain, payerCustomerGid).checkoutGuardReady
   )
     throw new DomainError(
       "MEMBERSHIP_CHECKOUT_GUARD_UNAVAILABLE",
       "Pass payments are awaiting checkout verification. Please contact the studio.",
       503,
     );
-  const proof = membershipCheckoutProof(actor.customerGid, purchase);
+  const proof = membershipCheckoutProof(payerCustomerGid!, purchase);
   if (inventoryMembershipCheckout()) {
     await assertInventoryPassClosedOrOpen(purchase.id, admin, "OPEN");
     return undefined;
@@ -119,7 +122,7 @@ export async function prepareMembershipCheckoutAuthorization(
   );
   const current = await readMembershipCheckoutAuthorization(
     admin,
-    actor.customerGid,
+    payerCustomerGid!,
   );
   if (
     current.authorization?.state === "OPEN" &&
@@ -138,15 +141,15 @@ export async function prepareMembershipCheckoutAuthorization(
           where: {
             id: old.membership.customerId,
             shopId: actor.shopId,
-            shopifyCustomerGid: actor.customerGid,
           },
         })
       : null;
     if (
       !old ||
       !owner ||
+      (old.payerCustomerGid ?? owner.shopifyCustomerGid) !== payerCustomerGid ||
       !isDeepStrictEqual(
-        membershipCheckoutProof(actor.customerGid, old),
+        membershipCheckoutProof(payerCustomerGid!, old),
         current.authorization,
       )
     )

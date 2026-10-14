@@ -3,6 +3,7 @@ import db from "../db.server";
 import { databaseNow } from "./booking.server";
 import { DateTime } from "luxon";
 import { DomainError } from "../lib/errors.server";
+import { clientName } from "./client-identity";
 import {
   lockSessionMail,
   SESSION_TIME_CHANGED,
@@ -91,6 +92,7 @@ const escape = (value: string) =>
       ]!,
   );
 export type BookingEmailDetails = {
+  attendeeName?: string;
   previousTime?: { startsAt: Date; endsAt: Date; timezone: string };
   cancellation?: "CANCELLED" | "LATE_CANCEL";
   reminder?: boolean;
@@ -131,6 +133,7 @@ export function renderBookingEmail(details: BookingEmailDetails) {
       " ",
     );
   const rows = [
+    ...(details.attendeeName ? [["Attendee", details.attendeeName]] : []),
     ["Class", details.className],
     ...(details.previousTime
       ? [
@@ -205,6 +208,7 @@ async function prepareBookingNotification(
   const booking = await db.booking.findFirst({
     where: { shopId, id: notification.bookingId },
     include: {
+      customer: true,
       session: { include: { service: true, coach: true, location: true } },
     },
   });
@@ -251,6 +255,7 @@ async function prepareBookingNotification(
     where: { shopId, sessionId: booking.sessionId, status: "CONFIRMED" },
   });
   return renderBookingEmail({
+    attendeeName: booking.customer.familyParentId ? clientName(booking.customer) : undefined,
     cancellation:
       notification.template === "BOOKING_CANCELLED_V1"
         ? booking.status === "LATE_CANCEL"

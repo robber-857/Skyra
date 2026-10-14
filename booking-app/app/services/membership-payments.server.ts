@@ -122,7 +122,7 @@ export async function settlePassPurchasePayment(
         return review(tx, purchase.id, purchase.shopId, "DUPLICATE_PAID_ORDER");
       }
       if (
-        payment.customerGid !== customer.shopifyCustomerGid ||
+        payment.customerGid !== (purchase.payerCustomerGid ?? customer.shopifyCustomerGid) ||
         payment.productGid !== purchase.productGid ||
         payment.variantGid !== purchase.variantGid ||
         payment.currency !== purchase.currency ||

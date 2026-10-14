@@ -4,6 +4,7 @@ import { authenticate } from "../shopify.server";
 import { DomainError } from "../lib/errors.server";
 import { bookingJson } from "./booking-proxy.server";
 import type { BookingActor } from "./booking.server";
+import { familyRequestContext } from "./family-request.server";
 const claims = z.object({
   aud: z.string(),
   sub: z.string().regex(/^gid:\/\/shopify\/Customer\/[1-9]\d*$/),
@@ -74,7 +75,7 @@ export function customerTokenContext(
 export async function customerAccountRequest(
   request: Request,
   run: (actor: BookingActor, input: unknown) => Promise<unknown>,
-  options: { maxBodyBytes?: number } = {},
+  options: { maxBodyBytes?: number; resolveMember?: boolean } = {},
 ) {
   // Shopify verifies the HMAC signature and temporal claims. Its public extension
   // helper skips audience validation; require our exact client ID here as well.
@@ -109,7 +110,10 @@ export async function customerAccountRequest(
         return cors(bookingJson({ code: "INVALID_REQUEST" }, 413));
       input = JSON.parse(body);
     }
-    return cors(bookingJson(await run(actor, input)));
+    if (request.method === "GET" && new URL(request.url).searchParams.getAll("familyMemberId").length > 1)
+      throw new DomainError("VALIDATION", "Choose one family member.", 400);
+    const selected = await familyRequestContext(actor, input, options.resolveMember !== false);
+    return cors(bookingJson(await run(selected.actor, selected.input)));
   } catch (error) {
     if (error instanceof DomainError)
       return cors(

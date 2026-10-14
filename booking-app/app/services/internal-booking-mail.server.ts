@@ -14,14 +14,15 @@ import {
 export type CustomerEmailResolver = (
   shopDomain: string,
   shopifyCustomerGid: string,
+  shopId?: string,
 ) => Promise<string | null>;
 
-const shopifyCustomerEmail: CustomerEmailResolver = async (domain, gid) => {
+const shopifyCustomerEmail: CustomerEmailResolver = async (domain, gid, shopId) => {
   // Load Shopify only when a live Customer job is due. This keeps pure mail
   // tests and disabled transports independent from Shopify runtime secrets.
   const { unauthenticated } = await import("../shopify.server");
   const { admin } = await unauthenticated.admin(domain);
-  return resolveShopifyCustomerEmail(admin.graphql, gid);
+  return resolveShopifyCustomerEmail(admin.graphql, gid, shopId);
 };
 
 // Destinations are resolved from trusted server records at send time. Customer
@@ -53,7 +54,7 @@ async function destination(
       select: { shopifyCustomerGid: true },
     });
     return customer
-      ? resolveCustomer(shop.domain, customer.shopifyCustomerGid)
+      ? resolveCustomer(shop.domain, customer.shopifyCustomerGid, shopId)
       : null;
   }
   return null;

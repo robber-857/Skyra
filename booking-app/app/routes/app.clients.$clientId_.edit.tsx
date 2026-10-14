@@ -15,6 +15,7 @@ import {
 } from "../services/client-contacts.server";
 import { publicError } from "../lib/errors.server";
 import { Feedback } from "../components/admin-ui";
+import { adminClientDetail } from "../services/admin-clients.server";
 
 export const headers = () => ({ "Cache-Control": "private, no-store" });
 
@@ -22,6 +23,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const { actor, admin } = await adminContext(request);
   return {
     client: await adminClientEdit(actor, admin.graphql, params.clientId),
+    family: (await adminClientDetail(actor, params.clientId)).family,
   };
 }
 
@@ -45,7 +47,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function EditClient() {
-  const { client } = useLoaderData<typeof loader>();
+  const { client, family } = useLoaderData<typeof loader>();
   const result = useActionData<typeof action>();
   const navigation = useNavigation();
   const busy = navigation.state !== "idle";
@@ -57,7 +59,12 @@ export default function EditClient() {
       <header className="page-head">
         <div>
           <p className="page-kicker">Admin · Clients</p>
-          <h1>Edit client</h1>
+          <h1>
+            Edit{" "}
+            {client.preferredName ||
+              [client.firstName, client.lastName].filter(Boolean).join(" ") ||
+              "client"}
+          </h1>
         </div>
       </header>
       <section className="panel">
@@ -65,6 +72,17 @@ export default function EditClient() {
           Name, email and phone are saved to Shopify. Preferred name is used in
           Booking.
         </p>
+        {family.parent && (
+          <p className="muted">
+            Family member of{" "}
+            <Link to={`/app/clients/${family.parent.id}#client-family`}>
+              {family.parent.name}
+            </Link>
+            . This member’s account email identifies their separate Client
+            profile. Booking emails go to the parent’s contact email:{" "}
+            {family.parent.email || "not available"}.
+          </p>
+        )}
         <Feedback result={result} />
         <Form method="post" className="form-grid">
           <label className="field">
@@ -95,7 +113,7 @@ export default function EditClient() {
             />
           </label>
           <label className="field">
-            Email
+            {family.parent ? "Account email" : "Email"}
             <input
               name="email"
               type="email"
@@ -103,7 +121,14 @@ export default function EditClient() {
               defaultValue={client.email}
               required
               maxLength={254}
+              readOnly={!!family.parent}
             />
+            {family.parent && (
+              <small>
+                This alias stays with the member’s profile. Update the parent’s
+                email in their own Client profile to change booking contact.
+              </small>
+            )}
           </label>
           <label className="field">
             Phone (optional)

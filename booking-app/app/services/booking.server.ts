@@ -11,12 +11,16 @@ import {
 import { purchaseMappingReady } from "./purchase-mapping.server";
 import { commerceCapabilities } from "./commerce-capabilities.server";
 import { AUTO_RENEW_TERMS_VERSION, membershipCapabilities } from "./membership-capabilities.server";
+import { clientName } from "./client-identity";
 
 type Tx = Prisma.TransactionClient;
 export type BookingActor = {
   shopId: string;
   shopDomain?: string;
   customerGid: string | null;
+  // Set only after server-side family authorization. The selected customer is
+  // the attendee/Pass owner; this is the signed-in purchaser and guardian.
+  accountCustomerGid?: string;
 };
 const tokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 const hash = (token: string) =>
@@ -176,8 +180,13 @@ async function snapshot(
     [session.id],
     tx,
   );
+  const attendee = !requiresLogin && attempt.customerId
+    ? await tx.customerProfile.findFirst({ where: { shopId: attempt.shopId, id: attempt.customerId } })
+    : null;
   return {
     token,
+    familyMemberId: attendee?.id ?? null,
+    attendeeName: attendee ? clientName(attendee) : null,
     surface: attempt.surface,
     status: attempt.status,
     requiresLogin,
@@ -273,8 +282,10 @@ export async function withAttempt<T>(
     if (attempt.customerId && actor.customerGid) {
       const owner = await tx.customerProfile.findUniqueOrThrow({
         where: { id: attempt.customerId },
+        include: { familyParent: true },
       });
-      if (owner.shopifyCustomerGid !== actor.customerGid)
+      if (owner.shopifyCustomerGid !== actor.customerGid &&
+          !(owner.familyParent?.shopId === actor.shopId && owner.familyParent.shopifyCustomerGid === actor.customerGid))
         fail("FORBIDDEN", "This booking belongs to another account.", 403);
     }
     return fn(tx, attempt, shop, await databaseNow(tx));

@@ -1,5 +1,7 @@
 # Skyra Booking
 
+> Family accounts (local implementation): [2026-10-14 family Clients, Admin management and release boundary](../docs/booking-system/family-accounts-2026-10-14.md). This change has not been deployed.
+
 > Latest verified implementation and launch gates: [2026-09-20 launch status](../docs/booking-system/launch-status-2026-09-20.md). The historical current-state paragraph below is retained for implementation chronology.
 
 Booking V3 application for the Skyra Shopify storefront. Generated from the official Shopify React Router TypeScript template; PostgreSQL + Prisma, Redis + BullMQ.
