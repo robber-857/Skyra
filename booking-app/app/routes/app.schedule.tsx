@@ -21,6 +21,7 @@ import {
 } from "../services/schedule.server";
 import { publicError } from "../lib/errors.server";
 import { Feedback, Field, Status } from "../components/admin-ui";
+import { CopyWeekForm } from "../components/copy-week-form";
 import { DeleteSessionForm } from "../components/delete-session-form";
 import {
   SCHEDULE_MIN_DATE,
@@ -112,7 +113,6 @@ export default function Schedule() {
       "",
   );
   const [coachFilter, setCoachFilter] = useState("");
-  const [copyMode, setCopyMode] = useState("skip");
   const activeCoachIds = new Set(
     data.coaches
       .filter((coach) => coach.status === "ACTIVE")
@@ -312,38 +312,7 @@ export default function Schedule() {
           </label>
         </div>
         <div className="schedule-actions">
-          <Form
-            method="post"
-            className="schedule-copy-form"
-            onSubmit={(event) => {
-              if (
-                !window.confirm(
-                  copyMode === "skip"
-                    ? "Copy only non-conflicting classes from the previous week as drafts? Existing sessions and bookings will be kept. Past or unavailable occurrences will be skipped."
-                    : "Copy the previous week? Conflicting sessions will be replaced. Their bookings will be cancelled and credits returned. Identical sessions and their bookings will be kept.",
-                )
-              )
-                event.preventDefault();
-            }}
-          >
-            <input type="hidden" name="intent" value="copy" />
-            <input type="hidden" name="week" value={data.week} />
-            <label>
-              When copying last week
-              <select
-                name="copyMode"
-                value={copyMode}
-                onChange={(event) => setCopyMode(event.target.value)}
-                disabled={busy}
-              >
-                <option value="skip">
-                  Keep existing sessions · skip conflicts
-                </option>
-                <option value="replace">Replace conflicting sessions</option>
-              </select>
-            </label>
-            <button disabled={busy}>Copy previous week</button>
-          </Form>
+          <CopyWeekForm key={data.week} week={data.week} busy={busy} />
           <Form method="post">
             <input type="hidden" name="intent" value="publish" />
             <input type="hidden" name="week" value={data.week} />
