@@ -17,4 +17,18 @@ Migration `202610300001_admin_pass_edit` adds the revision column and receipt in
 
 ## Verification and delivery
 
-The migration was applied to the local dedicated `skyra_booking_test` database. Fourteen targeted database tests passed, including concurrent retries, expiry-only writes, expired reopening, stale edits, delayed retries, authorization, rollback and unactivated Passes. Full regression passed: 80 files / 1,110 tests. App/customer TypeScript, lint and production build passed. The final checks ran outside the Windows sandbox after sandbox temporary-file/output permission failures. Production deployment and authenticated production UI verification have not been performed.
+The migration was applied to the local dedicated `skyra_booking_test` database. Fourteen targeted database tests passed, including concurrent retries, expiry-only writes, expired reopening, stale edits, delayed retries, authorization, rollback and unactivated Passes. Full regression passed: 80 files / 1,110 tests. App/customer TypeScript, lint and production build passed. The final checks ran outside the Windows sandbox after sandbox temporary-file/output permission failures. Production release details are recorded below. No real customer Pass was edited as a production test.
+
+
+## Production release — 2026-10-30
+
+- User explicitly authorized deployment. Release commit: [`de8d8fc`](https://github.com/robber-857/Skyra/commit/de8d8fc2ef27b67555c9808b8bd4c5a7e72b850e), pushed to `bookingdev`.
+- [Render deployment `dep-dbhv0rnavr4c73d60ok0`](https://dashboard.render.com/web/srv-dajsoofqj5pc73euugi0/deploys/dep-dbhv0rnavr4c73d60ok0) is **Live**. Pre-deploy logs confirm `202610300001_admin_pass_edit` successfully applied to the production `skyra_booking` database at 12:21:42 Australia/Sydney. Service live logged at 12:22:10.
+- [GitHub CI 40985069019](https://github.com/robber-857/Skyra/actions/runs/40985069019) passed: database setup, app/customer type checks, lint, production build, full Vitest regression, Worker build and Python import tests.
+- Post-deploy `/health`: HTTP 200, `{"status":"ok"}`.
+- Both deployed Admin JavaScript files match the locally tested build byte-for-byte (SHA-256):
+  - `admin-clients-view-6uUqoBBT.js`: `22EEBD102E75787A313932964C2CE7AEA4DF538BBD49C9D6C80EADC89D5303E4`
+  - `app.clients._clientId-CWgHy83x.js`: `DC618AEB166B0285AA8F8FFD1E2B54EF5A2169A78702D21526A49B61E100F31B`
+- No Shopify theme, extension, app permissions, business release flags or customer Pass balances were changed during deployment verification.
+- Evidence is under ignored `output/pass-edit-release-2026-10-30/`, including the Render Live screenshot and downloaded public assets.
+- Previous backend release: `a964100f7a621d68a88449848e85f791f2e36553`. If an application rollback is needed, retain the additive database migration and all audit/ledger records; do not undo customer adjustments.
