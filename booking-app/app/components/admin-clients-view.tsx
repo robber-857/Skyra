@@ -458,10 +458,12 @@ export function AdminClientDetailView({
                   </dd>
                 </div>
                 <div>
-                  <dt>Expires</dt>
+                  <dt>Expires at</dt>
                   <dd>
                     {p.expiresAt
-                      ? date(p.expiresAt, data.timezone)
+                      ? DateTime.fromISO(p.expiresAt, {
+                          zone: data.timezone,
+                        }).toFormat("d LLL yyyy, HH:mm ZZZZ")
                       : "Not activated"}
                   </dd>
                 </div>

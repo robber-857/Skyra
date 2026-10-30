@@ -5,6 +5,7 @@ import { Field } from "./admin-ui";
 export function PassCreditAdjustmentForm({
   pass,
   idempotencyKey,
+  timezone,
 }: {
   pass: {
     id: string;
@@ -12,13 +13,21 @@ export function PassCreditAdjustmentForm({
     available: number;
     reserved: number;
     status: string;
+    expiresAt: string | null;
+    revision: number;
   };
   idempotencyKey: string;
+  timezone: string;
 }) {
   const [available, setAvailable] = useState(String(pass.available));
+  const [expiryDate, setExpiryDate] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const busy = useNavigation().state !== "idle";
-  if (!["ACTIVE", "UNACTIVATED", "UPCOMING", "EXHAUSTED"].includes(pass.status))
+  if (
+    !["ACTIVE", "UNACTIVATED", "UPCOMING", "EXHAUSTED", "EXPIRED"].includes(
+      pass.status,
+    )
+  )
     return null;
   const target = Number(available);
   const valid =
@@ -26,10 +35,10 @@ export function PassCreditAdjustmentForm({
     Number.isInteger(target) &&
     target >= 0 &&
     target <= 10000 &&
-    target !== pass.available;
+    (target !== pass.available || expiryDate !== "");
   return (
     <details className="pass-credit-adjustment">
-      <summary>Adjust credits</summary>
+      <summary>Edit credits &amp; expiry</summary>
       <Form
         method="post"
         className="booking-action-form"
@@ -38,10 +47,16 @@ export function PassCreditAdjustmentForm({
         <input type="hidden" name="intent" value="adjust-pass" />
         <input type="hidden" name="entitlementId" value={pass.id} />
         <input type="hidden" name="expectedAvailable" value={pass.available} />
+        <input type="hidden" name="expectedRevision" value={pass.revision} />
+        <input
+          type="hidden"
+          name="expectedExpiresAt"
+          value={pass.expiresAt ?? ""}
+        />
         <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
         <p>
-          Set available credits for {pass.name}. Reserved and used credits,
-          expiry and payment records stay unchanged.
+          Set available credits and expiry for {pass.name}. Reserved and used
+          credits are tracked separately from the available balance.
         </p>
         <Field label="New available credits">
           <input
@@ -55,6 +70,24 @@ export function PassCreditAdjustmentForm({
             onChange={(e) => setAvailable(e.target.value)}
           />
         </Field>
+        <Field label={`New expiry date (${timezone}, valid through this day)`}>
+          <input
+            name="expiryDate"
+            type="date"
+            value={expiryDate}
+            onChange={(e) => setExpiryDate(e.target.value)}
+          />
+        </Field>
+        <p className="muted">
+          Leave the date empty to keep the current expiry. Setting an expiry on
+          an unactivated Pass starts it immediately. Extending an expired Pass
+          makes its available credits usable again.
+        </p>
+        {expiryDate && (
+          <p role="status">
+            New expiry: {expiryDate}, end of day ({timezone}).
+          </p>
+        )}
         {valid && (
           <p role="status">
             Available: {pass.available} → {target} (
@@ -82,7 +115,7 @@ export function PassCreditAdjustmentForm({
               setConfirmed(e.target.checked);
             }}
           />{" "}
-          I have checked the client, Pass and new credit balance.
+          I have checked the client, Pass, available credits and expiry.
         </label>
         <button className="primary" disabled={busy || !valid || !confirmed}>
           {busy ? "Saving…" : "Save adjustment"}

@@ -10,7 +10,7 @@ import {
   staffBookingOptions,
 } from "../services/staff-booking.server";
 import { PassCreditAdjustmentForm } from "../components/pass-credit-adjustment-form";
-import { adjustClientPassCredits } from "../services/pass-credit-adjustment.server";
+import { updateClientPass } from "../services/pass-credit-adjustment.server";
 import { randomUUID } from "node:crypto";
 import {
   redirect,
@@ -112,18 +112,21 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
     if (form.get("intent") === "adjust-pass") {
       if (form.get("confirmed") !== "on")
-        return { error: "Confirm the new Pass credit balance." };
-      await adjustClientPassCredits(actor, {
+        return { error: "Confirm the Pass credits and expiry." };
+      await updateClientPass(actor, {
         customerId: params.clientId,
         entitlementId: form.get("entitlementId"),
         available: form.get("available"),
         expectedAvailable: form.get("expectedAvailable"),
+        expectedRevision: form.get("expectedRevision"),
+        expectedExpiresAt: form.get("expectedExpiresAt") || null,
+        expiryDate: form.get("expiryDate"),
         reason: form.get("reason"),
         idempotencyKey: form.get("idempotencyKey"),
       });
       return {
         message:
-          "Pass credits updated. The adjustment and reason have been recorded.",
+          "Pass credits and expiry saved. The adjustment and reason have been recorded.",
       };
     }
     if (form.get("confirmed") !== "on")
@@ -170,6 +173,7 @@ export default function Client() {
         <PassCreditAdjustmentForm
           key={`${pass.id}:${data.idempotencyKey}`}
           pass={pass}
+          timezone={data.data.timezone}
           idempotencyKey={data.idempotencyKey}
         />
       )}

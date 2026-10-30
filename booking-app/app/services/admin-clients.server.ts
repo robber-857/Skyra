@@ -316,6 +316,7 @@ export async function adminClientDetail(
             used,
             remaining: available + reserved,
             status: clientPassState(p, available + reserved, now),
+            revision: p.revision,
             startsAt: p.startsAt?.toISOString() ?? null,
             expiresAt: p.expiresAt?.toISOString() ?? null,
             validityMonths: p.validityMonths,

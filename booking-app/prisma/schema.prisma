@@ -413,6 +413,7 @@ model Booking {
 }
 
 model Entitlement {
+  revision          Int                      @default(0)
   id                String                   @id @default(uuid()) @db.Uuid
   shopId            String                   @db.Uuid
   customerId        String                   @db.Uuid
