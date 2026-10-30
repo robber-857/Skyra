@@ -9,6 +9,7 @@ import {
 } from "../app/services/booking.server";
 import { grantEntitlement } from "../app/services/entitlements.server";
 import { confirmOwnedBooking } from "../app/services/owned-booking.server";
+import { membershipCatalog } from "../app/services/membership-catalog.server";
 import { bookingResult } from "../app/services/booking-result.server";
 import { bookingPurchaseReview } from "../app/services/booking-purchase-review.server";
 import { processPaidBookingEvent } from "../app/services/paid-booking.server";
@@ -80,6 +81,60 @@ test("10 simultaneous confirmations reserve once, create one booking and confirm
     confirmOwnedBooking(f.actor, { ...f.input, entitlementId: randomUUID() }),
   ).rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT" });
 });
+
+test("a retired Pass cannot be purchased but its existing credits can still be booked", async () => {
+  const f = await fixture(3);
+  await db.passPlan.update({
+    where: { id: f.plan.id },
+    data: { status: "INACTIVE" },
+  });
+  await db.productMapping.update({
+    where: { id: f.mapping.id },
+    data: { productStatus: "ARCHIVED" },
+  });
+  const clients = vi.fn();
+  const options = await bookingPurchaseReview(f.actor, {
+    ...f.input,
+    purchaseKind: "OWNED_PASS",
+  }, clients);
+  expect(options.selected).toMatchObject({
+    id: f.entitlement.id, kind: "OWNED_PASS", availableUnits: 3,
+  });
+  expect(options.passes.some((pass) => pass.id === f.plan.id)).toBe(false);
+  const catalog = await membershipCatalog({ ...f.actor, customerGid: null }, {});
+  expect(catalog.passes.some((pass) => pass.id === f.plan.id)).toBe(false);
+  await expect(bookingPurchaseReview(f.actor, {
+    token: f.input.token, purchaseKind: "NEW_PASS", passPlanId: f.plan.id,
+  }, clients)).rejects.toMatchObject({ code: "PASS_UNAVAILABLE" });
+  expect(clients).not.toHaveBeenCalled();
+  expect((await confirmOwnedBooking(f.actor, f.input)).status).toBe("CONFIRMED");
+  const ledger = await db.entitlementLedgerEntry.findMany({
+    where: { entitlementId: f.entitlement.id },
+  });
+  expect(ledger.reduce((sum, entry) => sum + entry.availableDelta, 0)).toBe(2);
+  expect(ledger.reduce((sum, entry) => sum + entry.reservedDelta, 0)).toBe(1);
+});
+
+test.each(["EXPIRED", "REVOKED", "EMPTY", "WRONG_CLASS"])(
+  "retired Pass still rejects an existing credit that is %s",
+  async (reason) => {
+    const f = await fixture(reason === "EMPTY" ? 1 : 3);
+    await db.passPlan.update({ where: { id: f.plan.id }, data: { status: "INACTIVE" } });
+    if (reason === "EXPIRED" || reason === "REVOKED") {
+      await db.entitlement.update({ where: { id: f.entitlement.id }, data: { status: reason } });
+    } else if (reason === "WRONG_CLASS") {
+      await db.passEligibility.deleteMany({ where: { passPlanId: f.plan.id } });
+    } else {
+      await db.entitlementLedgerEntry.create({ data: {
+        shopId: f.shop.id, entitlementId: f.entitlement.id, kind: "ADJUST",
+        availableDelta: -1, reservedDelta: 0, consumedDelta: 0,
+        idempotencyKey: randomUUID(), reason: "Test exhausted balance",
+      } });
+    }
+    await expect(confirmOwnedBooking(f.actor, f.input)).rejects.toMatchObject({ code: "PASS_UNAVAILABLE" });
+    expect(await db.booking.count({ where: { shopId: f.shop.id } })).toBe(0);
+  },
+);
 
 test("an existing Pass can confirm a published class more than 14 days away", async () => {
   const f = await fixture();

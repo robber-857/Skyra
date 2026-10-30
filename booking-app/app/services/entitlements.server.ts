@@ -258,7 +258,7 @@ export async function eligibleEntitlements(
           OR: [
             {
               passPlan: {
-                status: "ACTIVE",
+                // Catalogue status controls new sales, not credits already owned.
                 services: {
                   some: {
                     shopId: input.shopId,
