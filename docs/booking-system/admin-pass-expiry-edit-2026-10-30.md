@@ -37,3 +37,5 @@ The migration was applied to the local dedicated `skyra_booking_test` database. 
 ## Sydney-time follow-up
 
 Expiry editing and the client directory/detail expiry displays now explicitly use `Australia/Sydney`, independent of shop or browser timezone. AEST/AEDT changes automatically with the date. Existing expiry instants are preserved. Local checks passed, including 16 Pass adjustment database tests and summer/winter conversions with a UTC-configured shop, plus app/customer types, lint and production build.
+
+Released as `35af9e0ef49ffa8e5856b075d8f4e186cc0321c0`; [Render deployment](https://dashboard.render.com/web/srv-dajsoofqj5pc73euugi0/deploys/dep-dbhv5hg473hc73b3rt6g) is Live. [CI 40986075485](https://github.com/robber-857/Skyra/actions/runs/40986075485) passed all steps. Post-deploy health returned HTTP 200; `admin-clients-view-ClXYwIUf.js` and `app.clients._clientId-D3AtCO_Y.js` match the local build by SHA-256. No additional database migration or customer-record changes were needed.
