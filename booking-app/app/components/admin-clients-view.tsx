@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { DateTime } from "luxon";
+import { PASS_EXPIRY_TIMEZONE } from "../lib/pass-time";
 import { Form, Link, useNavigate, useNavigation } from "react-router";
 import type {
   adminClients,
@@ -199,7 +200,9 @@ export function AdminClientsView({
                     <td>{c.activePasses}</td>
                     <td>{c.remaining}</td>
                     <td>
-                      {c.nextExpiry ? date(c.nextExpiry, data.timezone) : "—"}
+                      {c.nextExpiry
+                        ? date(c.nextExpiry, PASS_EXPIRY_TIMEZONE)
+                        : "—"}
                     </td>
                     <td>{c.bookings}</td>
                     <td>
@@ -458,11 +461,12 @@ export function AdminClientDetailView({
                   </dd>
                 </div>
                 <div>
-                  <dt>Expires at</dt>
+                  <dt>Expires at (Sydney time)</dt>
                   <dd>
                     {p.expiresAt
                       ? DateTime.fromISO(p.expiresAt, {
-                          zone: data.timezone,
+                          zone: PASS_EXPIRY_TIMEZONE,
+                          locale: "en-AU",
                         }).toFormat("d LLL yyyy, HH:mm ZZZZ")
                       : "Not activated"}
                   </dd>

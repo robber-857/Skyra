@@ -5,7 +5,6 @@ import { Field } from "./admin-ui";
 export function PassCreditAdjustmentForm({
   pass,
   idempotencyKey,
-  timezone,
 }: {
   pass: {
     id: string;
@@ -17,7 +16,6 @@ export function PassCreditAdjustmentForm({
     revision: number;
   };
   idempotencyKey: string;
-  timezone: string;
 }) {
   const [available, setAvailable] = useState(String(pass.available));
   const [expiryDate, setExpiryDate] = useState("");
@@ -70,7 +68,7 @@ export function PassCreditAdjustmentForm({
             onChange={(e) => setAvailable(e.target.value)}
           />
         </Field>
-        <Field label={`New expiry date (${timezone}, valid through this day)`}>
+        <Field label="New expiry date (Sydney time, valid through this day)">
           <input
             name="expiryDate"
             type="date"
@@ -85,7 +83,7 @@ export function PassCreditAdjustmentForm({
         </p>
         {expiryDate && (
           <p role="status">
-            New expiry: {expiryDate}, end of day ({timezone}).
+            New expiry: {expiryDate}, end of day (Sydney time).
           </p>
         )}
         {valid && (

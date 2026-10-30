@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DateTime } from "luxon";
+import { PASS_EXPIRY_TIMEZONE } from "../lib/pass-time";
 import db from "../db.server";
 import { DomainError } from "../lib/errors.server";
 import { requireOperations, type Actor } from "./authorization";
@@ -82,7 +83,9 @@ export async function updateClientPass(actor: Actor, raw: unknown) {
     const now = await databaseNow(tx);
     let expiresAt = pass.expiresAt;
     if (input.expiryDate) {
-      const day = DateTime.fromISO(input.expiryDate, { zone: shop.timezone });
+      const day = DateTime.fromISO(input.expiryDate, {
+        zone: PASS_EXPIRY_TIMEZONE,
+      });
       if (!day.isValid || day.toISODate() !== input.expiryDate)
         throw new DomainError(
           "INVALID_EXPIRY",

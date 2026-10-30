@@ -3,7 +3,7 @@
 Client profile → each Pass record → **Edit credits & expiry**.
 
 - Set an absolute available-credit balance (0–10,000), a new expiry date, or both. Reserved and consumed credits remain separate ledger balances.
-- Expiry dates use the shop timezone and include the selected day; the stored exclusive cutoff is midnight on the next local calendar day. The profile shows the exact cutoff and timezone.
+- Expiry dates use the fixed Australia/Sydney timezone and include the selected day; the stored exclusive cutoff is midnight on the next local calendar day. The profile shows the exact cutoff with Sydney time and AEST/AEDT.
 - An empty expiry field preserves the exact stored instant. Giving an unactivated Pass an explicit expiry starts it immediately. An expired Pass can be reopened with a future expiry and the desired available balance; expired credits are never silently re-granted.
 - Pending/revoked Passes cannot be reopened through this form. Existing reservations block shortening expiry. Every edit requires a reason and confirmation.
 
@@ -32,3 +32,8 @@ The migration was applied to the local dedicated `skyra_booking_test` database. 
 - No Shopify theme, extension, app permissions, business release flags or customer Pass balances were changed during deployment verification.
 - Evidence is under ignored `output/pass-edit-release-2026-10-30/`, including the Render Live screenshot and downloaded public assets.
 - Previous backend release: `a964100f7a621d68a88449848e85f791f2e36553`. If an application rollback is needed, retain the additive database migration and all audit/ledger records; do not undo customer adjustments.
+
+
+## Sydney-time follow-up
+
+Expiry editing and the client directory/detail expiry displays now explicitly use `Australia/Sydney`, independent of shop or browser timezone. AEST/AEDT changes automatically with the date. Existing expiry instants are preserved. Local checks passed, including 16 Pass adjustment database tests and summer/winter conversions with a UTC-configured shop, plus app/customer types, lint and production build.

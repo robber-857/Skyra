@@ -390,3 +390,25 @@ test("unactivated passes accept credit-only edits without activation, or an expl
   expect(activated.startsAt).not.toBeNull();
   expect(activated.expiresAt?.toISOString()).toBe("2099-10-04T13:00:00.000Z");
 });
+
+test.each([
+  ["2099-01-15", "2099-01-15T13:00:00.000Z"],
+  ["2099-07-15", "2099-07-15T14:00:00.000Z"],
+])(
+  "expiry %s uses Sydney daylight-saving rules even when shop timezone differs",
+  async (expiryDate, expected) => {
+    const f = await editFixture();
+    await db.shop.update({
+      where: { id: f.shop.id },
+      data: { timezone: "UTC" },
+    });
+    const input = { ...f.input, expiryDate };
+    await updateClientPass(f.actor, input);
+    await updateClientPass(f.actor, input);
+    const pass = await db.entitlement.findUniqueOrThrow({
+      where: { id: f.pass.id },
+    });
+    expect(pass.expiresAt?.toISOString()).toBe(expected);
+    expect(pass.revision).toBe(f.pass.revision + 1);
+  },
+);

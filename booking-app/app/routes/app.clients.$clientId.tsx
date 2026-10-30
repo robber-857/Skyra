@@ -173,7 +173,6 @@ export default function Client() {
         <PassCreditAdjustmentForm
           key={`${pass.id}:${data.idempotencyKey}`}
           pass={pass}
-          timezone={data.data.timezone}
           idempotencyKey={data.idempotencyKey}
         />
       )}
