@@ -1,6 +1,6 @@
 # Configurable private appointment capacity
 
-Status: validated locally; production release authorized and in progress.
+Status: released and production catalogue capacity verified on 2 November 2026.
 
 ## Incident
 
@@ -61,3 +61,38 @@ the catalogue editor. Existing dated sessions retain their saved capacity and
 must be reviewed/edited separately. Do not recreate the class or its Pass merely
 to work around this incident. Confirm the live migration and actual admin save
 before claiming production resolution.
+
+## Production release evidence
+
+- Backend commit: `86118102f3c683b521dfa63ec8945473ff2b1ed1` on `bookingdev`.
+- [GitHub CI 41441986782](https://github.com/robber-857/Skyra/actions/runs/41441986782)
+  completed successfully, including the capacity-3 booking-engine regression.
+- [Render deploy dep-dbk7pg7b9u1s73cfivsg](https://dashboard.render.com/web/srv-dajsoofqj5pc73euugi0/deploys/dep-dbk7pg7b9u1s73cfivsg)
+  succeeded. Logs confirm the migration applied at 23:09:59 Australia/Sydney and
+  the service went live at 23:10:28. `/health` returned 200 / `{"status":"ok"}`.
+- The live catalogue asset `app.catalog-DSyUQ6Cv.js` matches the tested local
+  build byte-for-byte (SHA-256).
+- Final Shopify version: [skyra-private-capacity-20261102-2](https://dev.shopify.com/dashboard/232832637/apps/420648878081/versions/1191115980801).
+  Theme check and extension bundling passed. The final label was shortened to
+  `Private appointment · Capacity: N`, keeping `booking.js` at 9,995 bytes, below
+  the 10,000-byte app-block budget. The live Programs page references this final
+  version and its CDN asset matches the local file by SHA-256.
+- The authorized `2:1 Private Aerial Class` catalogue capacity was saved from 1
+  to 2 through the authenticated production admin. The returned catalogue shows
+  `55 min · 2 places · A$170.00`, ACTIVE, Private appointment, SYNCED. Screenshot:
+  `output/private-capacity-live.jpg` (local ignored evidence).
+- No dated sessions were created or altered and no customer bookings were made.
+  Existing session capacities require separate review; this release does not
+  automatically rewrite them or implement one booking for multiple students.
+
+### Shopify release configuration
+
+The initial release preview showed unrelated historical drift in the checked-in
+app configuration (removed customer metafield, scope/webhook changes and a new
+checkout-guard extension). That release was cancelled before confirmation.
+The successful release used a temporary package in `tmp/private-capacity-release`
+with configuration freshly linked from the live app and only the two existing
+extensions. Only the booking theme asset differs from the previous released
+extension sources. Future releases must reconcile this configuration drift;
+do not publish the repository configuration blindly or allow deletions to bypass
+the preview. The temporary package contains no copied `.env`.

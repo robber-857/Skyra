@@ -224,7 +224,7 @@
             element("h3", "", session.service.name),
             element("p", "", session.coach.name)
           );
-          if(session.service.kind === "APPOINTMENT") sessionCopy.append(element("p","",`Private appointment · ${session.capacity} ${session.capacity === 1 ? "place" : "places"}`));
+          if(session.service.kind === "APPOINTMENT") sessionCopy.append(element("p","","Private appointment · Capacity: "+session.capacity));
           if(session.service.kind === "COURSE") sessionCopy.append(element("p","","Workshop"));
           const availability = element(
             "span",
