@@ -178,7 +178,7 @@ test("notes require signed-in ownership, bounded plain text and an unfrozen atte
     }),
   ).rejects.toMatchObject({ code: "COMMENT_FROZEN" });
 });
-test("private slots reserve coach/location/buffers and database rejects capacity changes", async () => {
+test("private slots reserve coach/location/buffers and allow capacity changes while keeping their type", async () => {
   const f = await privateFixture();
   await expect(
     addSessions(f.actor, {
@@ -196,10 +196,10 @@ test("private slots reserve coach/location/buffers and database rejects capacity
       where: { id: f.session.id },
       data: { capacity: 2 },
     }),
-  ).rejects.toThrow();
+  ).resolves.toMatchObject({ capacity: 2 });
   await expect(
     db.service.update({ where: { id: f.service.id }, data: { capacity: 2 } }),
-  ).rejects.toThrow();
+  ).resolves.toMatchObject({ capacity: 2 });
   await expect(
     db.service.update({ where: { id: f.service.id }, data: { kind: "CLASS" } }),
   ).rejects.toThrow();

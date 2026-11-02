@@ -139,6 +139,16 @@ test("attempts are hashed, anonymous browsing has no occupancy, and return paths
   expect(await db.bookingHold.count({ where: { shopId: f.shopId } })).toBe(0);
 });
 
+test.each([2, 3])("%i:1 private appointments respect capacity under concurrent seat holds", async (capacity) => {
+  const f = await fixture(capacity, "APPOINTMENT");
+  const attempts = await Promise.all(Array.from({ length: 10 }, (_, i) => f.start(i + 1)));
+  const outcomes = await Promise.allSettled(attempts.map((attempt, i) => f.hold(attempt.token, i + 1)));
+  expect(outcomes.filter((result) => result.status === "fulfilled")).toHaveLength(capacity);
+  expect(outcomes.filter((result) => result.status === "rejected")).toHaveLength(10 - capacity);
+  expect((await classAvailability(f.shopId, [f.session.id])).get(f.session.id)).toBe(0);
+  await expect(db.classSession.update({ where: { id: f.session.id }, data: { capacity: 1 } })).rejects.toThrow();
+});
+
 test("published Workshops enter the public booking and eligible Pass flow", async () => {
   const f = await fixture(12, "COURSE");
   const attempt = await f.start();

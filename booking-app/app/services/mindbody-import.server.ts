@@ -444,7 +444,6 @@ export async function importMindbody(
           });
           if (
             service.locationId !== locationId ||
-            (service.kind === "APPOINTMENT" && row.capacity !== 1) ||
             !(await tx.serviceCoach.findUnique({
               where: {
                 shopId_serviceId_coachId: {

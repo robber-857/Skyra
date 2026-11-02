@@ -77,7 +77,6 @@ export async function audit(
 export async function saveService(actor: Actor, raw: unknown) {
   requireOperations(actor);
   const { coachIds, id, version, ...input } = serviceInput.parse(raw);
-  if (input.kind === "APPOINTMENT") input.capacity = 1;
   return db.$transaction(async (tx) => {
     await lockShop(tx, actor.shopId);
     const old = id

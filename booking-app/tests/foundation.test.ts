@@ -133,7 +133,7 @@ test("Workshop scheduling is supported and Passes cannot mix service types", asy
     ...input(),
     name: "Private coaching",
     kind: "APPOINTMENT",
-    capacity: 8,
+    capacity: 1,
   });
   expect(workshop.capacity).toBe(16);
   expect(privateAppointment.capacity).toBe(1);
@@ -178,6 +178,40 @@ test("Workshop scheduling is supported and Passes cannot mix service types", asy
     requestId: randomUUID(),
   });
   expect(sessions[0].serviceId).toBe(workshop.id);
+});
+
+test("2:1 private capacity survives catalogue save, draft creation, edits, publication and copying", async () => {
+  const shop = await db.shop.create({ data: { domain: `${randomUUID()}.myshopify.com` } });
+  const actor: Actor = { shopId: shop.id, actorId: "test-admin", role: "ADMIN" };
+  const locationId = (await db.location.create({ data: { shopId: shop.id, name: "Private studio" } })).id;
+  const coachId = (await db.coach.create({ data: { shopId: shop.id, name: "Private coach" } })).id;
+  const privateClass = await saveService(actor, {
+    ...input(), name: "2:1 Private Aerial Class", kind: "APPOINTMENT", capacity: 2,
+    locationId, coachIds: [coachId],
+  });
+  expect(privateClass.capacity).toBe(2);
+  const fields = {
+    serviceId: privateClass.id, coachId, localStart: "2031-02-03T10:00",
+    requestId: randomUUID(),
+  };
+  const [draft] = await addSessions(actor, fields);
+  expect(draft.capacity).toBe(2);
+  expect((await addSessions(actor, fields))[0].id).toBe(draft.id);
+  const edit = { id: draft.id, serviceId: privateClass.id, coachId, localStart: fields.localStart };
+  await updateSession(actor, { ...edit, version: draft.version, capacity: 1 });
+  await updateSession(actor, { ...edit, version: draft.version + 1, capacity: 2 });
+  expect((await publishWeek(actor, "2031-02-03")).published).toBe(1);
+  expect((await copyPreviousWeek(actor, "2031-02-10", "skip")).copied).toBe(1);
+  const sessions = await db.classSession.findMany({ where: { serviceId: privateClass.id } });
+  expect(sessions).toHaveLength(2);
+  expect(sessions.every((session) => session.capacity === 2)).toBe(true);
+  await saveService(actor, {
+    ...input(), id: privateClass.id, version: privateClass.version,
+    name: privateClass.name, kind: "APPOINTMENT", capacity: 1,
+    locationId, coachIds: [coachId],
+  });
+  // Catalogue defaults never rewrite already scheduled capacity snapshots.
+  expect((await db.classSession.findUniqueOrThrow({ where: { id: draft.id } })).capacity).toBe(2);
 });
 test("20 simultaneous overlapping schedule requests permit only one", async () => {
   const outcomes = await Promise.allSettled(

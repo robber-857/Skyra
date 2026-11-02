@@ -118,6 +118,7 @@ export default function Catalog() {
   const [tab, setTab] = useState<"service" | "pass">(data.initialTab);
   const [edit, setEdit] = useState<string | null>(data.editId);
   const [open, setOpen] = useState(data.openEditor);
+  const [newServiceKind, setNewServiceKind] = useState("CLASS");
   const editorHeading = useRef<HTMLHeadingElement>(null);
   const [editorRequest, setEditorRequest] = useState(0);
   useEffect(() => {
@@ -127,6 +128,7 @@ export default function Catalog() {
   }, [open, edit, editorRequest]);
   function openEditor(id: string | null) {
     setEdit(id);
+    setNewServiceKind("CLASS");
     setOpen(true);
     setEditorRequest((value) => value + 1);
   }
@@ -236,17 +238,22 @@ export default function Catalog() {
               {tab === "service" ? (
                 <>
                   <Field label="Service type">
-                    <select name="kind" defaultValue={service?.kind || "CLASS"}>
+                    <select
+                      name="kind"
+                      defaultValue={service?.kind || "CLASS"}
+                      onChange={(event) => setNewServiceKind(event.target.value)}
+                    >
                       <option value="CLASS">Group class</option>
                       <option value="APPOINTMENT">
-                        Private appointment (one customer)
+                        Private appointment
                       </option>
                       <option value="COURSE">Workshop</option>
                     </select>
                   </Field>
                   <p className="muted">
-                    Private appointments always have one place. Workshops keep
-                    their configured capacity. Publish all available times in
+                    Set capacity to the number of students: 1 for a 1:1 private
+                    appointment, 2 for 2:1, or 3 for 3:1. Each student booking uses one place.
+                    Publish all available times in
                     Weekly Schedule; valid bookings confirm directly.
                   </p>
                   <Field label="Duration (minutes)">
@@ -261,12 +268,13 @@ export default function Catalog() {
                   </Field>
                   <Field label="Capacity">
                     <input
+                      key={service?.id || newServiceKind}
                       name="capacity"
                       type="number"
                       min={1}
                       max={200}
                       required
-                      defaultValue={service?.capacity || 10}
+                      defaultValue={service?.capacity ?? (newServiceKind === "APPOINTMENT" ? 1 : 10)}
                     />
                   </Field>
                   <Field label="Location">
