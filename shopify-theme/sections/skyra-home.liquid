@@ -116,29 +116,29 @@
           aria-label="Skyra movement gallery. Drag or use the arrow keys to browse."
         >
           <div class="circular-gallery__stage">
-            <figure class="gallery-card" data-gallery-card>
-              <img src="{{ 'skyra-movement-01.jpg' | asset_url }}" width="1000" height="1000" alt="Dance fitness class in motion" />
-              <figcaption>Dance fitness</figcaption>
+            <figure class="gallery-card" data-gallery-card style="--photo-ratio: 0.75000000">
+              <img src="{{ 'skyra-home-move-together.jpg' | asset_url }}" width="3024" height="4032" alt="Students practising standing hammock-assisted stretches beside the studio windows" loading="lazy" decoding="async" />
+              <figcaption>Move together</figcaption>
             </figure>
-            <figure class="gallery-card" data-gallery-card>
-              <img src="{{ 'skyra-movement-02.jpg' | asset_url }}" width="1000" height="1000" alt="Aerial hammock class in a bright studio" />
+            <figure class="gallery-card" data-gallery-card style="--photo-ratio: 0.75000000">
+              <img src="{{ 'skyra-home-aerial-practice.jpg' | asset_url }}" width="4284" height="5712" alt="A student in pink practising an aerial backbend in a sunlit hammock" loading="lazy" decoding="async" />
               <figcaption>Aerial practice</figcaption>
             </figure>
-            <figure class="gallery-card" data-gallery-card>
-              <img src="{{ 'skyra-movement-03.jpg' | asset_url }}" width="1000" height="1000" alt="Group dance session in a studio" />
-              <figcaption>Choreography</figcaption>
+            <figure class="gallery-card" data-gallery-card style="--photo-ratio: 0.75000000">
+              <img src="{{ 'skyra-home-find-your-flow.jpg' | asset_url }}" width="4284" height="5712" alt="Students moving together in suspended pink hammocks at Skyra" loading="lazy" decoding="async" />
+              <figcaption>Find your flow</figcaption>
             </figure>
-            <figure class="gallery-card" data-gallery-card>
-              <img src="{{ 'skyra-movement-04.jpg' | asset_url }}" width="1000" height="1000" alt="Group movement sequence" />
-              <figcaption>Creative movement</figcaption>
+            <figure class="gallery-card" data-gallery-card style="--photo-ratio: 0.75000000">
+              <img src="{{ 'skyra-home-explore-movement.jpg' | asset_url }}" width="4284" height="5712" alt="A student balancing in a pink hammock with the fabric spread wide" loading="lazy" decoding="async" />
+              <figcaption>Explore movement</figcaption>
             </figure>
-            <figure class="gallery-card" data-gallery-card>
-              <img src="{{ 'skyra-movement-05.jpg' | asset_url }}" width="1000" height="1000" alt="Floorwork dance class" />
-              <figcaption>Floorwork</figcaption>
+            <figure class="gallery-card" data-gallery-card style="--photo-ratio: 0.56250000">
+              <img src="{{ 'skyra-home-stretch-release.jpg' | asset_url }}" width="2160" height="3840" alt="A group practising seated stretches with aerial hammocks" loading="lazy" decoding="async" />
+              <figcaption>Stretch &amp; release</figcaption>
             </figure>
-            <figure class="gallery-card" data-gallery-card>
-              <img src="{{ 'skyra-movement-06.jpg' | asset_url }}" width="1000" height="1000" alt="Flexibility class moving through a backbend" />
-              <figcaption>Flexibility</figcaption>
+            <figure class="gallery-card" data-gallery-card style="--photo-ratio: 1.33333333">
+              <img src="{{ 'skyra-home-our-studio.jpg' | asset_url }}" width="4032" height="3024" alt="A wide view of the sunlit Skyra studio during an aerial class" loading="lazy" decoding="async" />
+              <figcaption>Our studio</figcaption>
             </figure>
           </div>
         </div>
@@ -146,11 +146,7 @@
 
       <section class="story section-shell" id="story" aria-labelledby="story-title">
         <div class="story-image reveal">
-          <img
-            src="{{ 'skyra-movement-02.jpg' | asset_url }}" width="1000" height="1000"
-            alt="Aerial movement class using suspended hammocks"
-            loading="lazy"
-          />
+          <img src="{{ 'skyra-home-our-studio.jpg' | asset_url }}" width="4032" height="3024" alt="A wide view of the sunlit Skyra studio during an aerial class" loading="lazy" decoding="async" />
         </div>
         <div class="story-copy reveal">
           <p class="story-kicker">Our story</p>
@@ -191,11 +187,7 @@
               href="{{ section.settings.programs_link | default: '/pages/programs' }}"
               aria-label="Explore Skyra classes"
             >
-              <img
-                src="{{ 'skyra-movement-03.jpg' | asset_url }}" width="1000" height="1000"
-                alt="Group dance class moving together in a studio"
-                loading="lazy"
-              />
+              <img src="{{ 'skyra-home-move-together.jpg' | asset_url }}" width="3024" height="4032" alt="Students practising standing hammock-assisted stretches beside the studio windows" loading="lazy" decoding="async" />
             </a>
             <div class="membership-path__copy">
               <h3>Class passes</h3>
@@ -210,11 +202,7 @@
               href="{{ section.settings.membership_link | default: '/pages/membership' }}"
               aria-label="View Skyra membership"
             >
-              <img
-                src="{{ 'skyra-movement-02.jpg' | asset_url }}" width="1000" height="1000"
-                alt="Aerial class practising with suspended hammocks"
-                loading="lazy"
-              />
+              <img src="{{ 'skyra-home-find-your-flow.jpg' | asset_url }}" width="4284" height="5712" alt="Students moving together in suspended pink hammocks at Skyra" loading="lazy" decoding="async" />
             </a>
             <div class="membership-path__copy">
               <h3>Membership</h3>
@@ -308,13 +296,13 @@
             height="208"
             loading="lazy"
           />
-          <p>Where movement becomes expression.</p>
           <nav class="footer-socials" aria-label="Social media">
             <a href="{{ section.settings.instagram_url | default: 'https://www.instagram.com/skyradancesydney/' }}" aria-label="Instagram"><img src="{{ 'skyra-instagram.svg' | asset_url }}" width="24" height="24" alt="" /></a>
             <a href="{{ section.settings.xiaohongshu_url | default: 'https://www.rednote.com/user/profile/69c9db750000000034013859?xsec_token=ABhFafMg0WYOGN7v8dZ0ud_INxS7fmTyRaBwPmAUrUtDU=&xsec_source=pc_search' }}" aria-label="Rednote"><img src="{{ 'skyra-xiaohongshu.svg' | asset_url }}" width="24" height="24" alt="" /></a>
             <a href="{{ section.settings.facebook_url | default: 'https://www.facebook.com/' }}" aria-label="Facebook"><img src="{{ 'skyra-facebook.svg' | asset_url }}" width="24" height="24" alt="" /></a>
             <a href="{{ section.settings.tiktok_url | default: 'https://www.tiktok.com/' }}" aria-label="TikTok"><img src="{{ 'skyra-tiktok.svg' | asset_url }}" width="24" height="24" alt="" /></a>
           </nav>
+          {% render 'skyra-footer-wechat' %}
         </div>
 
         <nav class="footer-navigation" aria-label="Footer navigation">

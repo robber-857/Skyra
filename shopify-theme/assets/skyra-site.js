@@ -124,7 +124,7 @@ if (prefersReducedMotion.matches || staticMode || !("IntersectionObserver" in wi
 const gallery = document.querySelector("[data-gallery]");
 const galleryCards = [...document.querySelectorAll("[data-gallery-card]")];
 
-let galleryPosition = 0;
+let galleryPosition = 1;
 let galleryDragStart = 0;
 let galleryStartPosition = 0;
 let galleryDragging = false;
@@ -147,7 +147,12 @@ function renderGallery() {
   if (!gallery || !galleryCards.length) return;
   const active = wrapGalleryIndex(galleryPosition);
   const isMobileGallery = window.innerWidth < 768;
-  const cardGap = Math.min(isMobileGallery ? 132 : 220, gallery.clientWidth * 0.27);
+  // Interpolate widths so portrait and landscape cards move smoothly together.
+  const lower = Math.floor(active);
+  const progress = active - lower;
+  const activeWidth = galleryCards[lower].offsetWidth * (1 - progress)
+    + galleryCards[wrapGalleryIndex(lower + 1)].offsetWidth * progress;
+  const cardGap = Math.min(activeWidth * 0.72, gallery.clientWidth * 0.27, 260);
 
   galleryCards.forEach((card, index) => {
     const distance = signedGalleryDistance(index, active);

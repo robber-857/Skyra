@@ -741,6 +741,8 @@ body.is-menu-open .menu-toggle {
 }
 
 .circular-gallery {
+  --gallery-photo-height: clamp(300px, 30vw, 440px);
+  overflow: hidden;
   position: relative;
   min-width: 0;
   height: clamp(520px, 49vw, 700px);
@@ -764,8 +766,8 @@ body.is-menu-open .menu-toggle {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: clamp(190px, 20vw, 310px);
-  height: clamp(310px, 34vw, 500px);
+  width: calc(var(--gallery-photo-height) * var(--photo-ratio, 0.75));
+  height: auto;
   margin: 0;
   overflow: hidden;
   border-radius: var(--radius);
@@ -784,20 +786,19 @@ body.is-menu-open .menu-toggle {
 }
 
 .gallery-card img {
+  display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: var(--gallery-photo-height);
+  object-fit: contain;
   pointer-events: none;
 }
 
 .gallery-card figcaption {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
-  padding: 9px 12px;
-  border-radius: 999px;
-  background: rgba(247, 244, 241, 0.88);
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 10px 8px;
+  background: var(--ground);
   color: #211e1a;
   font-size: 0.76rem;
   font-weight: 800;
@@ -812,17 +813,17 @@ body.is-menu-open .menu-toggle {
 }
 
 .story-image {
-  height: min(72vw, 800px);
-  max-height: 800px;
+  aspect-ratio: 4 / 3;
   overflow: hidden;
-  border-radius: clamp(30px, 7vw, 110px) var(--radius) clamp(30px, 7vw, 110px) var(--radius);
+  border-radius: 24px;
   box-shadow: var(--shadow);
 }
 
 .story-image img {
+  display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  object-fit: contain;
 }
 
 .story-copy {
@@ -1047,19 +1048,20 @@ body.is-menu-open .menu-toggle {
 
 .membership-path {
   display: grid;
-  grid-template-columns: minmax(0, 1.42fr) minmax(260px, 0.58fr);
-  align-items: end;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
   gap: clamp(38px, 6vw, 90px);
 }
 
 .membership-path--membership {
-  grid-template-columns: minmax(380px, 0.74fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   margin-left: 0;
 }
 
 .membership-path--membership .membership-path__media {
   grid-column: 2;
   grid-row: 1;
+  justify-self: end;
 }
 
 .membership-path--membership .membership-path__copy {
@@ -1069,29 +1071,33 @@ body.is-menu-open .menu-toggle {
 
 .membership-path__media {
   display: block;
+  width: 100%;
+  max-width: 420px;
   overflow: hidden;
-  border-radius: clamp(24px, 3vw, 42px);
+  border-radius: 24px;
   background: #d7d0c8;
+  transition: box-shadow 300ms var(--ease-out);
 }
 
 .membership-path--classes .membership-path__media {
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 3 / 4;
+  justify-self: start;
 }
 
 .membership-path--membership .membership-path__media {
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 3 / 4;
 }
 
 .membership-path__media img {
+  display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 500ms var(--ease-out);
+  height: auto;
+  object-fit: contain;
 }
 
-.membership-path__media:hover img,
-.membership-path__media:focus-visible img {
-  transform: scale(1.025);
+.membership-path__media:hover,
+.membership-path__media:focus-visible {
+  box-shadow: 0 16px 40px rgba(86, 64, 43, 0.16);
 }
 
 .membership-path__copy {
@@ -2000,20 +2006,21 @@ body.is-menu-open .menu-toggle {
   }
 
   .circular-gallery {
-    height: 520px;
+    --gallery-photo-height: min(320px, calc((100vw - 80px) * 0.75));
+    height: calc(var(--gallery-photo-height) + 160px);
     margin-inline: 0;
     overflow: hidden;
   }
 
   .gallery-card {
-    width: 210px;
-    height: 360px;
+    width: calc(var(--gallery-photo-height) * var(--photo-ratio, 0.75));
+    height: auto;
   }
 
   .story-image {
     order: 2;
-    height: 120vw;
-    max-height: 650px;
+    height: auto;
+    max-height: none;
   }
 
   .story-copy {
@@ -2067,7 +2074,8 @@ body.is-menu-open .menu-toggle {
   .membership-path__media,
   .membership-path--classes .membership-path__media,
   .membership-path--membership .membership-path__media {
-    aspect-ratio: 4 / 3;
+    aspect-ratio: 3 / 4;
+    justify-self: center;
     border-radius: 22px;
   }
 
@@ -2283,4 +2291,67 @@ body.is-menu-open .menu-toggle {
       background: #f3efeb;
     }
   }
+}
+
+/* Display the supplied WeChat image's QR area with its white quiet zone. */
+.footer-wechat {
+  display: block;
+  width: 144px;
+  margin-top: 22px;
+  color: #695d51;
+  text-align: center;
+  text-decoration: none;
+}
+.footer-wechat__code {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #fff;
+}
+.footer-wechat__code img {
+  position: absolute;
+  width: 132.142857%;
+  max-width: none;
+  height: auto;
+  left: -16.071429%;
+  top: -41.071429%;
+}
+.footer-wechat__label {
+  display: block;
+  margin-top: 7px;
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+}
+.footer-wechat:focus-visible {
+  outline: 2px solid #76521e;
+  outline-offset: 5px;
+  border-radius: 8px;
+}
+@media (max-width: 767px) {
+  .footer-brand {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 112px;
+    column-gap: 16px;
+    align-items: start;
+  }
+  .footer-brand > img,
+  .footer-brand > p,
+  .footer-brand > .footer-socials { grid-column: 1; }
+  .footer-brand > .footer-wechat {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    width: 112px;
+    margin-top: 0;
+  }
+  .footer-brand > .footer-socials { gap: 8px; }
+}
+@media (max-width: 380px) {
+  .footer-brand { column-gap: 12px; grid-template-columns: minmax(0, 1fr) 104px; }
+  .footer-brand > .footer-wechat { width: 104px; }
+  .footer-brand > .footer-socials { gap: 6px; }
+  .footer-brand > .footer-socials a { width: 30px; height: 30px; flex-shrink: 0; }
 }
