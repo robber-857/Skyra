@@ -13,7 +13,7 @@ beforeAll(() => {
     throw Error("Dedicated test DB required");
 });
 afterAll(() => db.$disconnect());
-async function fixture(kind: "NEW_PASS" | "DROP_IN" = "NEW_PASS") {
+async function fixture(kind: "NEW_PASS" | "DROP_IN" = "NEW_PASS", units?: number) {
   const f = await paidFixture(kind);
   return {
     ...f,
@@ -24,7 +24,7 @@ async function fixture(kind: "NEW_PASS" | "DROP_IN" = "NEW_PASS") {
         kind === "NEW_PASS"
           ? "PASS_PLAN:" + f.plan.id
           : "SERVICE:" + f.service.id,
-      units: kind === "NEW_PASS" ? 5 : 1,
+      units: units ?? (kind === "NEW_PASS" ? 5 : 1),
       validityDays: 30,
       amount: "140.00",
       reason: "Cash received receipt 123",
@@ -32,10 +32,14 @@ async function fixture(kind: "NEW_PASS" | "DROP_IN" = "NEW_PASS") {
     },
   };
 }
-test.each(["NEW_PASS", "DROP_IN"] as const)(
-  "cash %s creates usable credits once without Shopify payment",
-  async (kind) => {
-    const f = await fixture(kind);
+test.each([
+  ["NEW_PASS", 5],
+  ["DROP_IN", 1],
+  ["DROP_IN", 4],
+] as const)(
+  "cash %s with %i credits creates usable credits once without Shopify payment",
+  async (kind, units) => {
+    const f = await fixture(kind, units);
     const grants = await Promise.all(
       Array.from({ length: 5 }, () => grantCashCredits(f.actor, f.input)),
     );
@@ -103,6 +107,24 @@ test.each(["NEW_PASS", "DROP_IN"] as const)(
     ).rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT" });
   },
 );
+test("multiple service credits remain restricted to manual cash grants", async () => {
+  const f = await fixture("DROP_IN", 4);
+  const grant = await grantCashCredits(f.actor, f.input);
+  await expect(
+    db.entitlement.create({
+      data: {
+        ...grant,
+        id: randomUUID(),
+        sourceSystem: "SHOPIFY",
+        externalKey: null,
+        sourceOrderGid: "gid://shopify/Order/987654",
+        sourceLineItemGid: "gid://shopify/LineItem/987654",
+      },
+    }),
+  ).rejects.toThrow("entitlement_purchase_target");
+  expect(await db.entitlement.count({ where: { shopId: f.shop.id } })).toBe(1);
+});
+
 test("cash grants enforce staff access, tenant scope and valid cash details", async () => {
   const f = await fixture(),
     other = await fixture();
