@@ -1,3 +1,4 @@
+import { purchaseUsageReport } from "./purchase-usage-report.server";
 import { Prisma } from "@prisma/client";
 import { DateTime } from "luxon";
 import { z } from "zod";
@@ -96,6 +97,7 @@ export async function bookingReports(actor: Actor, raw: unknown) {
         attention,
         spendingRows,
         unusedRows,
+        purchaseUsage,
       ] = await Promise.all([
         tx.booking.groupBy({
           by: ["status"],
@@ -157,12 +159,14 @@ export async function bookingReports(actor: Actor, raw: unknown) {
             expiresAt: Date | null;
           }[]
         >`SELECT e.id AS "entitlementId", c.id AS "customerId", COALESCE(NULLIF(TRIM(c."preferredName"), ''), NULLIF(TRIM(c."shopifyName"), ''), NULLIF(c.email, ''), 'Unnamed client') AS "customerName", COALESCE(p.name,s.name,'Class credit') AS "passName", e."grantedUnits"::int AS purchased, COALESCE(SUM(l."consumedDelta"),0)::int AS used, COALESCE(SUM(l."availableDelta"),0)::int AS available, COALESCE(SUM(l."reservedDelta"),0)::int AS reserved, COALESCE(SUM(l."availableDelta" + l."reservedDelta"),0)::int AS remaining, e."expiresAt" FROM "Entitlement" e JOIN "CustomerProfile" c ON c.id=e."customerId" AND c."shopId"=e."shopId" LEFT JOIN "PassPlan" p ON p.id=e."passPlanId" AND p."shopId"=e."shopId" LEFT JOIN "Service" s ON s.id=e."serviceId" AND s."shopId"=e."shopId" JOIN "EntitlementLedgerEntry" l ON l."entitlementId"=e.id AND l."shopId"=e."shopId" WHERE e."shopId"=${shop.id}::uuid AND e.status='ACTIVE' AND (e."expiresAt" IS NULL OR e."expiresAt">${now}) AND (${customerId}::uuid IS NULL OR c.id=${customerId}::uuid) AND (${search}='' OR strpos(lower(COALESCE(c."preferredName",'')), lower(${search}))>0 OR strpos(lower(COALESCE(c."shopifyName",'')), lower(${search}))>0 OR strpos(lower(COALESCE(c.email,'')), lower(${search}))>0) GROUP BY e.id,c.id,c."preferredName",p.name,s.name,e."grantedUnits",e."expiresAt" HAVING SUM(l."availableDelta" + l."reservedDelta")>0 ORDER BY e."expiresAt" ASC,e.id ASC`,
+        purchaseUsageReport(tx, shop.id, range, now),
       ]);
       const counts = Object.fromEntries(
         states.map((s) => [s.status, s._count._all]),
       );
       return {
         range,
+        purchaseUsage,
         asOf: now.toISOString(),
         sessionCount,
         counts,

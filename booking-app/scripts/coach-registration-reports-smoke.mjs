@@ -63,19 +63,17 @@ try {
     const context = await browser.newContext({ viewport: { width, height: 1100 } }), page = await context.newPage();
     const errors = []; page.on("pageerror", error => errors.push(error.message));
     await page.goto("http://127.0.0.1:3315/app/reports");
-    assert.deepEqual(await page.locator("table").nth(0).locator("th").allTextContents(), ["Customer", "Total spend", "Pass purchases", "Refunds", "Last purchase"]);
-    assert.deepEqual(await page.locator("table").nth(1).locator("th").allTextContents(), ["Customer", "Pass", "Purchased", "Used", "Remaining", "Expiry"]);
-    assert.equal(await page.locator(".report-block").count(), 2);
-    assert.equal(await page.locator(".report-metrics article").count(), 6);
+    assert.deepEqual(await page.locator("table").nth(1).locator("th").allTextContents(), ["Customer", "Total spend", "Pass purchases", "Refunds", "Last purchase"]);
+    assert.deepEqual(await page.locator("table").nth(2).locator("th").allTextContents(), ["Customer", "Pass", "Purchased", "Used", "Remaining", "Expiry"]);
+    assert.equal(await page.locator(".report-block").count(), 3);
+    assert.equal(await page.locator(".report-metrics article").count(), 9);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await page.screenshot({ path: resolve(out, `reports-${width}.png`), fullPage: true });
     await page.locator(".report-date-picker summary").click();
     await page.getByLabel("From", { exact: true }).waitFor({ state: "visible" });
     await page.locator(".report-date-picker summary").click();
-    const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("link", { name: "Export both reports", exact: true }).click();
-    const download = await downloadPromise; await download.saveAs(resolve(out, `reports-${width}.zip`));
-    assert.equal(await download.failure(), null);
+    // This preview is SSR only. Hydrated CSV/ZIP and error flows are covered by reports-download-smoke.mjs.
+    await page.getByRole("button", { name: "Export all reports", exact: true }).waitFor();
     await page.goto("http://127.0.0.1:3315/app/people");
     const loginBounds = await page.getByLabel("Authorized login email for Karen", { exact: true }).boundingBox();
     const notificationBounds = await page.getByLabel("Booking-notification email for Karen", { exact: true }).boundingBox();
@@ -115,7 +113,7 @@ try {
       assert.ok((await db.coach.findUniqueOrThrow({ where: { id: fixture.coach.id } })).loginVerifiedAt);
     }
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
-    assert.deepEqual(errors, []); results.push({ width, reportsTables: true, csvZipDownload: true, peopleEmailLayout: true, registrationForm: true, noOverflow: true, pageErrors: errors });
+    assert.deepEqual(errors, []); results.push({ width, reportsTables: true, exportButtonRendered: true, peopleEmailLayout: true, registrationForm: true, noOverflow: true, pageErrors: errors });
     await context.close();
   }
   await writeFile(resolve(out, "results.json"), JSON.stringify({ results, mockEmailFlow: true, realEmailSent: false, realKarenUat: false }, null, 2));

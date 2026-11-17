@@ -14,9 +14,53 @@ const csv = (rows: (string | number)[][]) =>
         .join(","),
     )
     .join("\r\n");
-export function reportCsv(report: Report, kind: "spending" | "unused") {
+export function reportCsv(
+  report: Report,
+  kind: "spending" | "unused" | "purchases",
+) {
   const date = (value: string) =>
     DateTime.fromISO(value, { zone: report.range.timezone }).toISODate()!;
+  if (kind === "purchases")
+    return csv([
+      [
+        "Customer",
+        "Purchase date",
+        "Date basis",
+        "Pass / class",
+        "Purchase amount (AUD; before refunds)",
+        "Purchased classes",
+        "Used classes",
+        "Remaining classes (including reserved)",
+        "Unit price (AUD)",
+        "Reserved classes",
+        "Source",
+        "Purchase reference",
+        "Usage cutoff (exclusive)",
+        "Timezone",
+        "Refunds",
+      ],
+      ...report.purchaseUsage.rows.map((row) => [
+        row.customerName,
+        date(row.purchasedAt),
+        row.dateBasis,
+        row.passName,
+        row.amountCents == null
+          ? "Not recorded"
+          : (row.amountCents / 100).toFixed(2),
+        row.purchased ?? "Not recorded",
+        row.used ?? "Not linked",
+        row.remaining ?? "Not linked",
+        row.unitPriceCents == null
+          ? "Not recorded"
+          : (row.unitPriceCents / 100).toFixed(2),
+        row.reserved ?? "Not linked",
+        row.source,
+        row.reference,
+        report.purchaseUsage.cutoff,
+        report.range.timezone,
+        "Not connected",
+      ]),
+    ]);
   return kind === "spending"
     ? csv([
         [
@@ -55,13 +99,16 @@ const crc32 = (bytes: Buffer) => {
   }
   return (crc ^ 0xffffffff) >>> 0;
 };
-// Two uncompressed CSV entries in one standard ZIP. No browser multi-download
+// Uncompressed CSV entries in one standard ZIP. No browser multi-download
 // permission, archive dependencies or temporary files required.
-export function reportZip(report: Report) {
+export function reportZip(report: Report, includePurchases = false) {
   const local: Buffer[] = [],
     central: Buffer[] = [];
   let offset = 0;
-  for (const kind of ["spending", "unused"] as const) {
+  const kinds: ("spending" | "unused" | "purchases")[] = includePurchases
+    ? ["spending", "unused", "purchases"]
+    : ["spending", "unused"];
+  for (const kind of kinds) {
     const filename = Buffer.from(
       `skyra-${kind}-${report.range.from}-to-${report.range.to}.csv`,
     );
@@ -94,8 +141,8 @@ export function reportZip(report: Report) {
   const directory = Buffer.concat(central),
     end = Buffer.alloc(22);
   end.writeUInt32LE(0x06054b50, 0);
-  end.writeUInt16LE(2, 8);
-  end.writeUInt16LE(2, 10);
+  end.writeUInt16LE(kinds.length, 8);
+  end.writeUInt16LE(kinds.length, 10);
   end.writeUInt32LE(directory.length, 12);
   end.writeUInt32LE(offset, 16);
   return Buffer.concat([...local, directory, end]);

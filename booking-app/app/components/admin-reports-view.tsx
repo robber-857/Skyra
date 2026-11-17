@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
-import { useRef } from "react";
+import { downloadReport } from "../lib/report-download";
+import { useRef, useState } from "react";
 import { Form, Link, useNavigation } from "react-router";
 import type { bookingReports } from "../services/booking-reports.server";
 
@@ -16,6 +17,10 @@ export function AdminReportsView({
   error: string | null;
   warning?: string | null;
 }) {
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportStatus, setExportStatus] = useState("");
+  const exportLock = useRef(false);
   const busy = useNavigation().state !== "idle";
   const datePickerRef = useRef<HTMLDetailsElement>(null);
   const query = new URLSearchParams();
@@ -29,11 +34,34 @@ export function AdminReportsView({
   const clearQuery = new URLSearchParams(query);
   clearQuery.delete("q");
   clearQuery.delete("customer");
-  const exportLink = (type: "spending" | "unused" | "both") => {
+  const exportLink = (
+    type: "spending" | "unused" | "both" | "purchases" | "all",
+  ) => {
     const params = new URLSearchParams(query);
     params.set("type", type);
     return `/app/reports/export?${params}`;
   };
+  async function exportFile(type: "spending" | "unused" | "purchases" | "all") {
+    if (exportLock.current) return;
+    exportLock.current = true;
+    setExporting(true);
+    setExportError(null);
+    setExportStatus("Preparing download…");
+    try {
+      await downloadReport(exportLink(type));
+      setExportStatus("Download started. Check your browser downloads.");
+    } catch (error) {
+      setExportStatus("");
+      setExportError(
+        error instanceof Error
+          ? error.message
+          : "Export failed. Please try again.",
+      );
+    } finally {
+      exportLock.current = false;
+      setExporting(false);
+    }
+  }
   const date = (value: string) =>
     DateTime.fromISO(value, {
       zone: data?.range.timezone || "Australia/Sydney",
@@ -45,8 +73,8 @@ export function AdminReportsView({
           <p className="page-kicker">Admin · Exports</p>
           <h1>Reports</h1>
           <p className="muted">
-            Two direct reports for the questions the studio needs to answer: who
-            spent what, and who bought a Pass but still has classes left.
+            Purchase amounts, class usage and remaining credits, with CSV
+            exports.
           </p>
         </div>
       </header>
@@ -115,9 +143,14 @@ export function AdminReportsView({
         </div>
         <span className="toolbar-spacer" />
         {data && (
-          <Link className="button" reloadDocument to={exportLink("both")}>
-            Export both reports
-          </Link>
+          <button
+            type="button"
+            className="button"
+            disabled={exporting || busy}
+            onClick={() => exportFile("all")}
+          >
+            Export all reports
+          </button>
         )}
       </Form>
       {(data?.range.search || data?.range.customerId) && (
@@ -125,6 +158,16 @@ export function AdminReportsView({
           {data.range.search
             ? `Showing clients matching “${data.range.search}”.`
             : "Showing one selected client."}
+        </p>
+      )}
+      {exportError && (
+        <p role="alert" className="feedback error">
+          {exportError}
+        </p>
+      )}
+      {exportStatus && (
+        <p role="status" className="feedback">
+          {exportStatus}
         </p>
       )}
       {error && (
@@ -139,19 +182,121 @@ export function AdminReportsView({
       )}
       {data && (
         <>
+          <section className="report-block" aria-labelledby="purchase-usage">
+            <div className="report-block-head">
+              <div>
+                <h2 id="purchase-usage">Purchase &amp; class usage details</h2>
+                <p>
+                  Purchases in the selected date range; usage through the end
+                  date.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="button report-export"
+                disabled={exporting || busy}
+                onClick={() => exportFile("purchases")}
+              >
+                Export purchase &amp; usage CSV
+              </button>
+            </div>
+            <p className="report-source">
+              Includes recorded Booking online, Membership and Cash purchases,
+              including exhausted, expired and revoked passes. Usage is the
+              credit ledger before{" "}
+              {DateTime.fromISO(data.purchaseUsage.cutoff)
+                .setZone(data.range.timezone)
+                .toFormat("d LLL yyyy HH:mm:ss")}{" "}
+              ({data.range.timezone}); future end dates are capped at report
+              generation time. Refunds and unrecorded/imported historical
+              payments are not included. Remaining includes reserved credits and
+              does not guarantee that expired credits can be used.
+            </p>
+            <div className="report-metrics">
+              <article>
+                <span>Purchasing customers</span>
+                <strong>{data.purchaseUsage.customers}</strong>
+              </article>
+              <article>
+                <span>Recorded purchase amount</span>
+                <strong>{money(data.purchaseUsage.amountCents)}</strong>
+                <small>Before refunds; known amounts only</small>
+              </article>
+              <article>
+                <span>Purchases</span>
+                <strong>{data.purchaseUsage.rows.length}</strong>
+              </article>
+            </div>
+            <div className="table-wrap">
+              <table className="data-table report-table">
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Purchase date</th>
+                    <th>Pass / class</th>
+                    <th>Amount (AUD)</th>
+                    <th>Purchased classes</th>
+                    <th>Used classes</th>
+                    <th>Remaining classes</th>
+                    <th>Unit price (AUD)</th>
+                    <th>Source</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.purchaseUsage.rows.map((row) => (
+                    <tr key={row.source + row.purchaseId}>
+                      <td>{row.customerName}</td>
+                      <td>
+                        {date(row.purchasedAt)}
+                        <small className="muted"> {row.dateBasis}</small>
+                      </td>
+                      <td>{row.passName}</td>
+                      <td>
+                        {row.amountCents == null
+                          ? "Not recorded"
+                          : money(row.amountCents)}
+                      </td>
+                      <td>{row.purchased ?? "Not recorded"}</td>
+                      <td>{row.used ?? "Not linked"}</td>
+                      <td>{row.remaining ?? "Not linked"}</td>
+                      <td>
+                        {row.unitPriceCents == null
+                          ? "Not recorded"
+                          : money(row.unitPriceCents)}
+                      </td>
+                      <td>{row.source}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {!data.purchaseUsage.rows.length && (
+              <p className="empty">
+                No recorded purchases match these dates and client filters.
+              </p>
+            )}
+            <p className="report-source">
+              Unit price = recorded purchase amount ÷ originally purchased
+              classes (rounded for display). Used means net credits consumed,
+              not bookings made; ledger adjustments may change remaining
+              credits. Purchase dates use verified payment dates where
+              available, otherwise the recorded date shown.
+            </p>
+          </section>
           <section className="report-block" aria-labelledby="customer-spending">
             <div className="report-block-head">
               <div>
                 <h2 id="customer-spending">Customer spending</h2>
                 <p>Paid orders, Pass purchases and refunds by customer.</p>
               </div>
-              <Link
+              <button
+                type="button"
                 className="button report-export"
-                reloadDocument
-                to={exportLink("spending")}
+                disabled={exporting || busy}
+                onClick={() => exportFile("spending")}
               >
                 Export customer spending CSV
-              </Link>
+              </button>
             </div>
             <p className="report-connection-note">
               Currently connected: online purchases and Cash payments recorded
@@ -236,13 +381,14 @@ export function AdminReportsView({
                   tracking.
                 </p>
               </div>
-              <Link
+              <button
+                type="button"
                 className="button report-export"
-                reloadDocument
-                to={exportLink("unused")}
+                disabled={exporting || busy}
+                onClick={() => exportFile("unused")}
               >
                 Export unused Pass CSV
-              </Link>
+              </button>
             </div>
             <div className="report-metrics">
               <article>

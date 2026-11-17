@@ -123,13 +123,13 @@ test("client search filters both reports by partial names or email in this shop 
   expect(view.data?.unusedPasses.rows.map((r) => r.customerId)).toEqual([
     bob.id,
   ]);
-  for (const type of ["spending", "unused", "both"]) {
+  for (const type of ["spending", "unused", "both", "purchases", "all"]) {
     const response = await exportLoader(
       args(`/app/reports/export?type=${type}&q=Bob`),
     );
     const body = await response.text();
     expect(body).not.toContain("Ally");
-    if (type !== "spending") expect(body).toContain("Bob");
+    if (["unused", "both", "all"].includes(type)) expect(body).toContain("Bob");
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
   }
 });

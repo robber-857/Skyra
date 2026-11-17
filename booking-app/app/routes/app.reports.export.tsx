@@ -7,7 +7,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const { actor } = await adminContext(request);
   const url = new URL(request.url),
     kind = z
-      .enum(["spending", "unused", "both"])
+      .enum(["spending", "unused", "both", "purchases", "all"])
       .parse(url.searchParams.get("type"));
   const raw = Object.fromEntries(
     ["range", "from", "to", "customer", "q"].flatMap((key) => {
@@ -16,16 +16,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }),
   );
   const report = await bookingReports(actor, raw);
+  const zip = kind === "both" || kind === "all";
   return new Response(
-    kind === "both"
-      ? new Uint8Array(reportZip(report))
+    zip
+      ? new Uint8Array(reportZip(report, kind === "all"))
       : reportCsv(report, kind),
     {
       headers: {
         "Cache-Control": "private, no-store",
-        "Content-Type":
-          kind === "both" ? "application/zip" : "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="skyra-${kind}-${report.range.from}-to-${report.range.to}.${kind === "both" ? "zip" : "csv"}"`,
+        "Content-Type": zip ? "application/zip" : "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="skyra-${kind}-${report.range.from}-to-${report.range.to}.${zip ? "zip" : "csv"}"`,
         "X-Content-Type-Options": "nosniff",
       },
     },
