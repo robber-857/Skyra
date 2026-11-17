@@ -210,7 +210,10 @@ export function AdminReportsView({
               ({data.range.timezone}); future end dates are capped at report
               generation time. Refunds and unrecorded/imported historical
               payments are not included. Remaining includes reserved credits and
-              does not guarantee that expired credits can be used.
+              does not guarantee that expired credits can be used. Booking
+              online amounts use checkout price snapshots; historical test
+              discounts may differ from actual payments. Reconcile these amounts
+              against payment records before using them for tax reporting.
             </p>
             <div className="report-metrics">
               <article>

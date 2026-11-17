@@ -3,7 +3,11 @@ import { randomUUID } from "node:crypto";
 import db from "../app/db.server";
 import { paidFixture, queuePaid } from "./paid-fixture";
 import { processPaidBookingEvent } from "../app/services/paid-booking.server";
-import { bookingReports } from "../app/services/booking-reports.server";
+import {
+  bookingReports,
+  reportDateRange,
+} from "../app/services/booking-reports.server";
+import { purchaseUsageReport } from "../app/services/purchase-usage-report.server";
 import { reportCsv, reportZip } from "../app/lib/report-exports.server";
 import { retainPaidMembershipReceipt } from "../app/services/membership-notifications.server";
 beforeAll(() => {
@@ -219,6 +223,21 @@ test("online amount and credits use purchase terms and fully consumed passes sta
     data: { status: "EXPIRED" },
   });
   const report = await bookingReports(actor(f.shop.id), { range: "month" });
+  // Prisma-created timestamps use the host clock; PostgreSQL can lag slightly
+  // in local Docker. Use an explicit cutoff after all fixture entries.
+  const latest = await db.entitlementLedgerEntry.aggregate({
+    where: { entitlementId: paid.entitlementId! },
+    _max: { createdAt: true },
+  });
+  const cutoff = new Date(latest._max.createdAt!.getTime() + 1000);
+  report.purchaseUsage = await db.$transaction((tx) =>
+    purchaseUsageReport(
+      tx,
+      f.shop.id,
+      reportDateRange({ range: "month" }, "Australia/Sydney", cutoff),
+      cutoff,
+    ),
+  );
   expect(report.purchaseUsage.rows).toHaveLength(1);
   expect(report.purchaseUsage.rows[0]).toMatchObject({
     purchased: 5,
@@ -227,6 +246,9 @@ test("online amount and credits use purchase terms and fully consumed passes sta
     amountCents: 22000,
     unitPriceCents: 4400,
   });
+  expect(reportCsv(report, "purchases")).toContain(
+    "Checkout price snapshot; verify discounts against payment records",
+  );
 });
 test("membership receipt takes precedence over matching booking payment and uses paid price/credits", async () => {
   const f = await paidFixture();

@@ -13,6 +13,7 @@ Exports now use App Bridge-patched global fetch, verify status/content type/none
 - Used is net consumed ledger credits (including restores). Remaining is available plus reserved ledger credits as of cutoff. Adjustments/revocations can change the balance. Expired and exhausted passes are retained; balance does not imply current usability.
 - Payment timestamps are used where stored; otherwise the row explicitly identifies its recorded-date fallback. Missing prices/credits and unlinked balances are labelled, not inferred.
 - Refunds and unrecorded/imported historical payments are NOT included. This is an operational purchase/usage export, not a complete tax reconciliation.
+- Booking online amounts come from checkout snapshots. Historical UAT discounts can make these differ from actual payments; the CSV identifies the amount basis and the page requires payment reconciliation. Membership receipts use the recorded paid amount; Cash uses the manually entered amount.
 - Existing unused-pass report remains today's active balance. Existing type=both stays two files; type=all adds the new purchase CSV as a third ZIP entry.
 
 ## Validation

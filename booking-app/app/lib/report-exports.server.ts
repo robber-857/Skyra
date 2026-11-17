@@ -38,6 +38,7 @@ export function reportCsv(
         "Usage cutoff (exclusive)",
         "Timezone",
         "Refunds",
+        "Amount basis",
       ],
       ...report.purchaseUsage.rows.map((row) => [
         row.customerName,
@@ -59,6 +60,11 @@ export function reportCsv(
         report.purchaseUsage.cutoff,
         report.range.timezone,
         "Not connected",
+        row.source === "Booking online"
+          ? "Checkout price snapshot; verify discounts against payment records"
+          : row.source === "Membership"
+            ? "Membership payment receipt"
+            : "Manually recorded Cash amount",
       ]),
     ]);
   return kind === "spending"
